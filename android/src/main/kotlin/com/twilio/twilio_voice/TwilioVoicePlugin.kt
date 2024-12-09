@@ -182,7 +182,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             override fun onRinging(call: Call) {
                 Log.d(TAG, "onRinging")
                 // TODO - outgoing call check
-                val list = arrayOf("Ringing", call.from ?: "", call.to ?: "", "Incoming")
+                val list = arrayOf("Ringing=>1", call.from ?: "", call.to ?: "", "Incoming")
                 logEvents("", list)
             }
 
@@ -1669,7 +1669,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 }.toString()
 //                callSid = callHandle
                 logEvents("", arrayOf("Incoming", from, to, CallDirection.INCOMING.label, params))
-                logEvents("", arrayOf("Ringing=>1", from, to, CallDirection.INCOMING.label,  callInvite.customParameters.toString()))
+                logEvents("", arrayOf("Ringing", from, to, CallDirection.INCOMING.label,params))
             }
 
             TVBroadcastReceiver.ACTION_CALL_ENDED -> {
@@ -1793,7 +1793,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 val callDirection = CallDirection.fromId(direction).toString()
 
 //                callSid = callHandle
-                logEvents("", arrayOf("Ringing=>2", from, to, callDirection, call.customParameters.toString()))
+                logEvents("", arrayOf("Ringing=>2", from, to, callDirection))
             }
 
             TVNativeCallEvents.EVENT_CONNECTED -> {
