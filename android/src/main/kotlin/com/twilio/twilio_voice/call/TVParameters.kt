@@ -10,7 +10,7 @@ interface TVParameters {
 
     val to: String
 
-    val customParameters: Map<String, String>
+    val customParameters: MapConverter
 
     val callSid: String
 
