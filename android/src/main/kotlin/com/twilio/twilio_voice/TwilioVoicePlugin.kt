@@ -1668,8 +1668,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                     }
                 }.toString()
 //                callSid = callHandle
-                logEvents("", arrayOf("Incoming", from, to, CallDirection.INCOMING.label, params))
-                logEvents("", arrayOf("Ringing", from, to, CallDirection.INCOMING.label,params))
+                logEvents("", arrayOf("Incoming", from, to, CallDirection.INCOMING.label, "${callInvite.customParameters}"))
+                logEvents("", arrayOf("Ringing", from, to, CallDirection.INCOMING.label,"${callInvite.customParameters}"))
             }
 
             TVBroadcastReceiver.ACTION_CALL_ENDED -> {
