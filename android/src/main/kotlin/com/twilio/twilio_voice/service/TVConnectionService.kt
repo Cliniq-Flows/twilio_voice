@@ -295,8 +295,8 @@ class TVConnectionService : ConnectionService() {
                         putBundle(TelecomManager.EXTRA_INCOMING_CALL_EXTRAS, myBundle)
                         putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
 
-                        if (!callInvite.customParameters.containsKey("_TWI_SUBJECT")) {
-                            putString(TelecomManager.EXTRA_CALL_SUBJECT, callInvite.customParameters["matches"])
+                        if (callInvite.customParameters.containsKey("_TWI_SUBJECT")) {
+                            putString(TelecomManager.EXTRA_CALL_SUBJECT, callInvite.customParameters["_TWI_SUBJECT"])
                         }
                     }
 
