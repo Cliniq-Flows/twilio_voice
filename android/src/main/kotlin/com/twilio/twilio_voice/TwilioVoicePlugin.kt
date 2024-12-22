@@ -1662,11 +1662,12 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                         }
                 val from = callInvite.from ?: ""
                 val to = callInvite.to
-                val params = JSONObject().apply {
-                    callInvite.customParameters.forEach { (key, value) ->
-                        put(key, value)
-                    }
-                }.toString()
+                val params =  (callInvite.customParameters["matches"]).toString()
+//                val params = JSONObject().apply {
+//                    callInvite.customParameters.forEach { (key, value) ->
+//                        put(key, value)
+//                    }
+//                }.toString()
 //                callSid = callHandle
                 logEvents("", arrayOf("Incoming", from, to, CallDirection.INCOMING.label, params))
                 logEvents("", arrayOf("Ringing", from, to, CallDirection.INCOMING.label,params))
