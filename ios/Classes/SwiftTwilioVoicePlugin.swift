@@ -561,17 +561,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // let number:String = "\(callInvite.from)"
         // var combinename:String = "\(firstname) \(lastname)"
         // var whichName:String = combinename.trimmingCharacters(in: .whitespaces).isEmpty ? number: combinename 
-        // var from:String = whichName
-        // // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
-        // from = from.replacingOccurrences(of: "client:", with: "")
-        let from:String?  =  "\(callInvite.customParameters)"
-        let fromx:String? = "\(callInvite.customParameters)"
-        var fromx1:String = callInvite.from ?? ""
-        fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
+        var from:String = callInvite.customParameters!
+        // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
+        from = from.replacingOccurrences(of: "client:", with: "")
+       
         
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        // reportIncomingCall(from: from, uuid: callInvite.uuid)
-         reportIncomingCall(from: from!, fromx: fromx! ,fromx1 : fromx1,uuid: callInvite.uuid)
+         reportIncomingCall(from: from, uuid: callInvite.uuid)
+        // reportIncomingCall(from: from!, fromx: fromx! ,fromx1 : fromx1,uuid: callInvite.uuid)
         self.callInvite = callInvite
     }
     
@@ -877,22 +874,22 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
     
-    func reportIncomingCall(from: String,fromx: String, fromx1: String, uuid: UUID) {
+    func reportIncomingCall(from: String, uuid: UUID) {
       
-       let firstname: String = from
-        let lastname: String = fromx 
-        let number: String = fromx1
-        var combine: String = "\(firstname) \(lastname)"
-        var finale:String = combine.trimmingCharacters(in: .whitespaces).isEmpty ? number : combine
+    //    let firstname: String = from
+    //     let lastname: String = fromx 
+    //     let number: String = fromx1
+    //     var combine: String = "\(firstname) \(lastname)"
+    //     var finale:String = combine.trimmingCharacters(in: .whitespaces).isEmpty ? number : combine
         
         // Test from here
-        let callHandle: CXHandle = CXHandle(type: .generic,value: finale.capitalized)
+        let callHandle: CXHandle = CXHandle(type: .generic,value: from.capitalized)
         // let callHandle = CXHandle(type: .generic, value: from)
         
         let callUpdate = CXCallUpdate()
         callUpdate.remoteHandle = callHandle
        // callUpdate.localizedCallerName = clients[from] ?? self.clients["defaultCaller"] ?? defaultCaller
-        callUpdate.localizedCallerName = finale
+        callUpdate.localizedCallerName = from
         callUpdate.supportsDTMF = true
         callUpdate.supportsHolding = true
         callUpdate.supportsGrouping = false
