@@ -557,7 +557,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
         let firstname:String = callInvite.customParameters!["firstname"] ?? ""
         let lastname:String = callInvite.customParameters!["lastname"] ?? ""
-        let number:String = callInvite.from
+        let number:String = "\(callInvite.from)"
         var combinename:String = "\(firstname) \(lastname)"
         var whichName:String = combinename.trimmingCharacters(in: .whitespaces).isEmpty ? number: combinename 
         var from:String = whichName
