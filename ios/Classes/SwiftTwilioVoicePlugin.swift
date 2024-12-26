@@ -561,7 +561,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // let number:String = "\(callInvite.from)"
         // var combinename:String = "\(firstname) \(lastname)"
         // var whichName:String = combinename.trimmingCharacters(in: .whitespaces).isEmpty ? number: combinename 
-        var customParams:[String:String] = callInvite.customParameters
+        var customParams:[String:String] = callInvite.customParameters ?? [:]
         var from:String = "\(customParams["firstname"] ?? callInvite.from ?? "")"
         // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
         from = from.replacingOccurrences(of: "client:", with: "")
