@@ -559,7 +559,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let lastname:String = callInvite.customParameters!["lastname"] ?? ""
         let number:String = "\(callInvite.from)"
         var combinename:String = "\(firstname) \(lastname)"
-        var whichName:String = combinename.trimmingCharacters(in: .whitespaces).isEmpty ? number: combinename 
+        var whichName:String =  combinename ?? number
         var from:String = whichName
         // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
         from = from.replacingOccurrences(of: "client:", with: "")
@@ -877,7 +877,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let callUpdate = CXCallUpdate()
         callUpdate.remoteHandle = callHandle
        // callUpdate.localizedCallerName = clients[from] ?? self.clients["defaultCaller"] ?? defaultCaller
-        callUpdate.localizedCallerName = from
+        callUpdate.localizedCallerName = "\(from)"
         callUpdate.supportsDTMF = true
         callUpdate.supportsHolding = true
         callUpdate.supportsGrouping = false
