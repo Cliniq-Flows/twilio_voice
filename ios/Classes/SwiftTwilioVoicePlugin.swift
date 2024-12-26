@@ -555,17 +555,23 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          * sent to this device/identity pair.
          */
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
-        let firstname:String = callInvite.customParameters!["firstname"] ?? ""
-        let lastname:String = callInvite.customParameters!["lastname"] ?? ""
-        let number:String = "\(callInvite.from)"
-        var combinename:String = "\(firstname) \(lastname)"
-        var whichName:String = combinename.trimmingCharacters(in: .whitespaces).isEmpty ? number: combinename 
-        var from:String = whichName
-        // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
-        from = from.replacingOccurrences(of: "client:", with: "")
+        
+        // let firstname:String? = callInvite.customParameters!["firstname"] ?? ""
+        // let lastname:String? = callInvite.customParameters!["lastname"] ?? ""
+        // let number:String = "\(callInvite.from)"
+        // var combinename:String = "\(firstname) \(lastname)"
+        // var whichName:String = combinename.trimmingCharacters(in: .whitespaces).isEmpty ? number: combinename 
+        // var from:String = whichName
+        // // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
+        // from = from.replacingOccurrences(of: "client:", with: "")
+        let from:String?  =  callInvite.customParameters!["firstname"] ?? ""
+        let fromx:String? = callInvite.customParameters!["lastname"] ?? ""
+        var fromx1:String = callInvite.from ?? ""
+        fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
         
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        reportIncomingCall(from: from, uuid: callInvite.uuid)
+        // reportIncomingCall(from: from, uuid: callInvite.uuid)
+         reportIncomingCall(from: from!, fromx: fromx! ,fromx1 : fromx1,uuid: callInvite.uuid)
         self.callInvite = callInvite
     }
     
@@ -871,13 +877,21 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
     
-    func reportIncomingCall(from: String, uuid: UUID) {
-        let callHandle = CXHandle(type: .generic, value: from)
+    func reportIncomingCall(from: String,fromx: String, fromx1: String, uuid: UUID) {
+      let firstname: String = from.capitalized
+        let lastname: String = fromx.capitalized
+        let number: String = fromx1
+        let combine: String = "\(firstname) \(lastname)"
+        let finale:String = combine.trimmingCharacters(in: .whitespaces).isEmpty ? number : combine
+        
+        // Test from here
+        let callHandle: CXHandle = CXHandle(type: .generic,value: finale.capitalized)
+        // let callHandle = CXHandle(type: .generic, value: from)
         
         let callUpdate = CXCallUpdate()
         callUpdate.remoteHandle = callHandle
        // callUpdate.localizedCallerName = clients[from] ?? self.clients["defaultCaller"] ?? defaultCaller
-        callUpdate.localizedCallerName = clients[from] ?? "\(from)"
+        callUpdate.localizedCallerName = finale
         callUpdate.supportsDTMF = true
         callUpdate.supportsHolding = true
         callUpdate.supportsGrouping = false
