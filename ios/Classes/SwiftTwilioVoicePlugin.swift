@@ -564,8 +564,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // var from:String = whichName
         // // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
         // from = from.replacingOccurrences(of: "client:", with: "")
-        let from:String?  =  callInvite.customParameters!["firstname"] ?? ""
-        let fromx:String? = callInvite.customParameters!["lastname"] ?? ""
+        let from:String?  =  "\(callInvite.customParameters)"
+        let fromx:String? = "\(callInvite.customParameters)"
         var fromx1:String = callInvite.from ?? ""
         fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
         
@@ -883,7 +883,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let lastname: String = fromx 
         let number: String = fromx1
         var combine: String = "\(firstname) \(lastname)"
-        var finale:String = combine.isEmpty ? number : combine
+        var finale:String = combine.trimmingCharacters(in: .whitespaces).isEmpty ? number : combine
         
         // Test from here
         let callHandle: CXHandle = CXHandle(type: .generic,value: finale.capitalized)
