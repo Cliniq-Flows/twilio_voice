@@ -879,11 +879,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     func reportIncomingCall(from: String,fromx: String, fromx1: String, uuid: UUID) {
       
-        let firstname: String = from ?? "EMPTY F"
-        let lastname: String = fromx ?? "EMPTY L"
+       let firstname: String = from
+        let lastname: String = fromx 
         let number: String = fromx1
-        let combine: String = "\(firstname) \(lastname)"
-        let finale:String = combine ?? combine.trimmingCharacters(in: .whitespaces).isEmpty ? number : combine
+        var combine: String = "\(firstname) \(lastname)"
+        var finale:String = combine.isEmpty ? number : combine
         
         // Test from here
         let callHandle: CXHandle = CXHandle(type: .generic,value: finale.capitalized)
