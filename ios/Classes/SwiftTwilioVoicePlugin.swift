@@ -555,8 +555,13 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          * sent to this device/identity pair.
          */
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
-        
-        var from:String = "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
+        let firstname:String = callInvite.customParameters!["firstname"] ?? ""
+        let lastname:String = callInvite.customParameters!["lastname"] ?? ""
+        let number:String = callInvite.from
+        var combinename:String = "\(firstname) \(lastname)"
+        var whichName:String = combinename.trimmingCharacters(in: .whitespaces).isEmpty ? number: combinename 
+        var from:String = whichName
+        // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
         from = from.replacingOccurrences(of: "client:", with: "")
         
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
@@ -631,7 +636,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // MARK: TVOCallDelegate
     public func callDidStartRinging(call: Call) {
         let direction = (self.callOutgoing ? "Outgoing" : "Incoming")
-        let from = (("\(call.customParameters!["firstname"]) \(call.customParameters!["lastname"])") ?? self.identity)
+        let from = (call.from ?? self.identity)
         let to = (call.to ?? self.callTo)
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(to)|\(direction)", isError: false)
         
@@ -871,7 +876,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         let callUpdate = CXCallUpdate()
         callUpdate.remoteHandle = callHandle
-        callUpdate.localizedCallerName = clients[from] ?? self.clients["defaultCaller"] ?? defaultCaller
+       // callUpdate.localizedCallerName = clients[from] ?? self.clients["defaultCaller"] ?? defaultCaller
+        callUpdate.localizedCallerName = from
         callUpdate.supportsDTMF = true
         callUpdate.supportsHolding = true
         callUpdate.supportsGrouping = false
