@@ -237,10 +237,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     let hold = call.isOnHold
     if(shouldHold && !hold) {
         call.isOnHold = true
-        eventSink?.("Hold|\(uuid.uuidString)")
+        eventSink?("Hold|\(uuid.uuidString)")
     } else if(!shouldHold && hold) {
         call.isOnHold = false
-        eventSink?.("Unhold|\(uuid.uuidString)")
+        eventSink?("Unhold|\(uuid.uuidString)")
     }
         }
         else if flutterCall.method == "isHolding" {
