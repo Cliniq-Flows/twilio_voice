@@ -34,7 +34,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
     var voipRegistry: PKPushRegistry
     var incomingPushCompletionCallback: (() -> Swift.Void?)? = nil
     
-    // Store active call invites using a String key (preferably callSid).
+    // Store active call invites using a String key (preferably callSid)
     var activeCallInvites: [String: CallInvite] = [:]
     // Active calls are keyed by their UUID.
     var activeCalls: [UUID: Call] = [:]
@@ -186,7 +186,6 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
                   let uuid = UUID(uuidString: callUUIDString) else { return }
             hangUpCall(with: uuid)
         }
-        // ... handle other method calls similarly ...
         result(true)
     }
     
@@ -332,12 +331,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
         var fromx1 = callInvite.from ?? ""
         fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        // Store the invite using callSid if available; fallback to uuid string.
-        if let callSid = callInvite.callSid {
-            activeCallInvites[callSid] = callInvite
-        } else {
-            activeCallInvites[callInvite.uuid.uuidString] = callInvite
-        }
+        // Use callSid as key if available; otherwise, use uuid string.
+        let key = callInvite.callSid.isEmpty ? callInvite.uuid.uuidString : callInvite.callSid
+        activeCallInvites[key] = callInvite
         reportIncomingCall(from: from, fromx: fromx, fromx1: fromx1, uuid: callInvite.uuid)
     }
     
@@ -358,13 +354,13 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
         self.sendPhoneCallEvents(description: "Missed Call", isError: false)
         self.sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
         self.showMissedCallNotification(from: "\(cancelledCallInvite.customParameters?["firstname"] as? String ?? "") \(cancelledCallInvite.customParameters?["lastname"] as? String ?? "")", to: cancelledCallInvite.to)
-        // Look up the invite by callSid
-        if let callSid = cancelledCallInvite.callSid,
-           let invite = activeCallInvites[callSid] {
+        // Look up the invite using callSid as key.
+        let key = cancelledCallInvite.callSid.isEmpty ? cancelledCallInvite.uuid.uuidString : cancelledCallInvite.callSid
+        if let invite = activeCallInvites[key] {
             if let uuid = invite.uuid {
                 performEndCallAction(uuid: uuid)
             }
-            activeCallInvites.removeValue(forKey: callSid)
+            activeCallInvites.removeValue(forKey: key)
         }
     }
     
@@ -664,7 +660,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
             self.sendPhoneCallEvents(description: "Answer|\(theCall.from ?? "")|\(theCall.to ?? "")\(formatCustomParams(params: callInvite.customParameters))", isError: false)
             activeCalls[uuid] = theCall
             self.callKitCompletionCallback = completionHandler
-            activeCallInvites.removeValue(forKey: callInvite.callSid ?? callInvite.uuid.uuidString)
+            activeCallInvites.removeValue(forKey: callInvite.callSid.isEmpty ? callInvite.uuid.uuidString : callInvite.callSid)
             if #available(iOS 13, *) {
                 // iOS 13 and above handle push completion differently.
             } else {
