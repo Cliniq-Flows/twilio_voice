@@ -145,14 +145,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             //     let ferror: FlutterError = FlutterError(code: "MUTE_ERROR", message: "No call to be muted", details: nil)
             //     _result!(ferror)
             // }
-             guard let muted = arguments["muted"] as? Bool else { return }
-        if let activeCallEntry = self.calls.first(where: { !$0.value.isOnHold }) {
-            activeCallEntry.value.isMuted = muted
-            eventSink?(muted ? "Mute" : "Unmute")
-        } else {
-            let ferror = FlutterError(code: "MUTE_ERROR", message: "No active call to mute", details: nil)
-            _result?(ferror)
-        }
+            guard let muted = arguments["muted"] as? Bool else { return }
+            if let activeCallEntry = self.calls.first(where: { !$0.value.isOnHold }) {
+                activeCallEntry.value.isMuted = muted
+                eventSink?(muted ? "Mute" : "Unmute")
+            } else {
+                let ferror = FlutterError(code: "MUTE_ERROR", message: "No active call to mute", details: nil)
+                _result?(ferror)
+            }
         }
         else if flutterCall.method == "isMuted"
         {
