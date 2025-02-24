@@ -202,6 +202,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
     }
     
     func makeCall(to: String) {
+
+        // Force any active call (not on hold) into hold before making the new call.
+        if let activeCall = self.activeCalls.values.first(where: { !$0.isOnHold }) {
+            activeCall.isOnHold = true
+            self.sendPhoneCallEvents(description: "LOG|Active call forced to hold before making a new call", isError: false)
+        }
+    
+
         let uuid = UUID()
         checkRecordPermission { permissionGranted in
             if !permissionGranted {
@@ -326,6 +334,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
     public func callInviteReceived(callInvite: CallInvite) {
         self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
+        // Find any active call that is not on hold and force it to hold.
+        if let activeCall = self.activeCalls.values.first(where: { !$0.isOnHold }) {
+            activeCall.isOnHold = true
+            self.sendPhoneCallEvents(description: "LOG|Active call forced on hold due to new incoming call", isError: false)
+        }
         let from = callInvite.customParameters?["firstname"] as? String ?? ""
         let fromx = callInvite.customParameters?["lastname"] as? String ?? ""
         var fromx1 = callInvite.from ?? ""
