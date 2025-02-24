@@ -168,11 +168,16 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         else if flutterCall.method == "isMuted"
         {
-            if(self.call != nil) {
-                result(self.call!.isMuted);
-            } else {
-                result(false);
-            }
+//            if(self.call != nil) {
+//                result(self.call!.isMuted);
+//            } else {
+//                result(false);
+//            }
+            if let activeCall = self.call.values.first {
+                     result(activeCall.isMuted)
+                } else {
+                     result(false)
+                }
         }
         else if flutterCall.method == "toggleSpeaker"
         {
@@ -205,20 +210,32 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         else if flutterCall.method == "call-sid"
         {
-            result(self.call == nil ? nil : self.call!.sid);
-            return;
+//            result(self.call == nil ? nil : self.call!.sid);
+//            return;
+            if let activeCall = self.call.values.first {
+                    result(activeCall.sid)
+                } else {
+                    result(nil)
+                }
+                return
         }
         else if flutterCall.method == "isOnCall"
         {
-            result(self.call != nil);
-            return;
+//            result(self.call != nil);
+//            return;
+            result(!self.call.isEmpty)
+               return
         }
         else if flutterCall.method == "sendDigits"
         {
-            guard let digits = arguments["digits"] as? String else {return}
-            if (self.call != nil) {
-                self.call!.sendDigits(digits);
-            }
+//            guard let digits = arguments["digits"] as? String else {return}
+//            if (self.call != nil) {
+//                self.call!.sendDigits(digits);
+//            }
+            guard let digits = arguments["digits"] as? String else { return }
+                if let activeCall = self.call.values.first {
+                     activeCall.sendDigits(digits)
+                }
         }
         /* else if flutterCall.method == "receiveCalls"
          {
@@ -226,40 +243,67 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          self.identity = clientIdentity;
          } */
         else if flutterCall.method == "holdCall" {
-            guard let shouldHold = arguments["shouldHold"] as? Bool else {return}
-            
-            if (self.call != nil) {
-                let hold = self.call!.isOnHold
-                if(shouldHold && !hold) {
-                    self.call!.isOnHold = true
-                    guard let eventSink = eventSink else {
-                        return
-                    }
-                    eventSink("Hold")
-                } else if(!shouldHold && hold) {
-                    self.call!.isOnHold = false
-                    guard let eventSink = eventSink else {
-                        return
-                    }
-                    eventSink("Unhold")
+//            guard let shouldHold = arguments["shouldHold"] as? Bool else {return}
+//            
+//            if (self.call != nil) {
+//                let hold = self.call!.isOnHold
+//                if(shouldHold && !hold) {
+//                    self.call!.isOnHold = true
+//                    guard let eventSink = eventSink else {
+//                        return
+//                    }
+//                    eventSink("Hold")
+//                } else if(!shouldHold && hold) {
+//                    self.call!.isOnHold = false
+//                    guard let eventSink = eventSink else {
+//                        return
+//                    }
+//                    eventSink("Unhold")
+//                }
+//            }
+            guard let shouldHold = arguments["shouldHold"] as? Bool else { return }
+                
+                // Ensure there's at least one active call, and retrieve one.
+                guard let callInstance = self.call.values.first else {
+                    return
                 }
-            }
+                
+                let hold = callInstance.isOnHold
+                if shouldHold && !hold {
+                    callInstance.isOnHold = true
+                    eventSink?("Hold")
+                } else if !shouldHold && hold {
+                    callInstance.isOnHold = false
+                    eventSink?("Unhold")
+                }
         }
         else if flutterCall.method == "isHolding" {
             // guard call not nil
-            guard let call = self.call else {
-                return;
-            }
-            
-            // toggle state current state
-            let isOnHold = call.isOnHold;
-            call.isOnHold = !isOnHold;
-            
-            // guard event sink not nil & post update
-            guard let eventSink = eventSink else {
-                return
-            }
-            eventSink(!isOnHold ? "Hold" : "Unhold")
+//            guard let call = self.call else {
+//                return;
+//            }
+//            
+//            // toggle state current state
+//            let isOnHold = call.isOnHold;
+//            call.isOnHold = !isOnHold;
+//            
+//            // guard event sink not nil & post update
+//            guard let eventSink = eventSink else {
+//                return
+//            }
+//            eventSink(!isOnHold ? "Hold" : "Unhold")
+            // Ensure there's at least one active call.
+                guard !self.call.isEmpty, let activeCall = self.call.values.first else {
+                    return
+                }
+                
+                // Toggle the hold state of the chosen call.
+                let isOnHold = activeCall.isOnHold
+                activeCall.isOnHold = !isOnHold
+                
+                // Notify via event sink.
+                guard let eventSink = eventSink else { return }
+                eventSink(!isOnHold ? "Hold" : "Unhold")
         }
         else if flutterCall.method == "answer" {
             // nuthin
@@ -581,32 +625,53 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     // MARK: TVONotificaitonDelegate
     public func callInviteReceived(callInvite: CallInvite) {
+        //        self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
+        //
+        //        /**
+        //         * The TTL of a registration is 1 year. The TTL for registration for this device/identity
+        //         * pair is reset to 1 year whenever a new registration occurs or a push notification is
+        //         * sent to this device/identity pair.
+        //         */
+        //        UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
+        //
+        //        // let firstname:String? = callInvite.customParameters!["firstname"] ?? ""
+        //        // let lastname:String? = callInvite.customParameters!["lastname"] ?? ""
+        //        // let number:String = "\(callInvite.from)"
+        //        // var combinename:String = "\(firstname) \(lastname)"
+        //        // var whichName:String = combinename.trimmingCharacters(in: .whitespaces).isEmpty ? number: combinename
+        //        // var from:String = whichName
+        //        // // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
+        //        // from = from.replacingOccurrences(of: "client:", with: "")
+        //        let from:String?  =  callInvite.customParameters!["firstname"] ?? ""
+        //        let fromx:String? = callInvite.customParameters!["lastname"] ?? ""
+        //        var fromx1:String = callInvite.from ?? ""
+        //        fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
+        //
+        //        self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
+        //        // reportIncomingCall(from: from, uuid: callInvite.uuid)
+        //         reportIncomingCall(from: from!, fromx: fromx! ,fromx1 : fromx1,uuid: callInvite.uuid)
+        //        self.callInvite = callInvite
+        
         self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
-        
-        /**
-         * The TTL of a registration is 1 year. The TTL for registration for this device/identity
-         * pair is reset to 1 year whenever a new registration occurs or a push notification is
-         * sent to this device/identity pair.
-         */
-        UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
-        
-        // let firstname:String? = callInvite.customParameters!["firstname"] ?? ""
-        // let lastname:String? = callInvite.customParameters!["lastname"] ?? ""
-        // let number:String = "\(callInvite.from)"
-        // var combinename:String = "\(firstname) \(lastname)"
-        // var whichName:String = combinename.trimmingCharacters(in: .whitespaces).isEmpty ? number: combinename 
-        // var from:String = whichName
-        // // "\(callInvite.customParameters!["firstname"]) \(callInvite.customParameters!["lastname"])"
-        // from = from.replacingOccurrences(of: "client:", with: "")
-        let from:String?  =  callInvite.customParameters!["firstname"] ?? ""
-        let fromx:String? = callInvite.customParameters!["lastname"] ?? ""
-        var fromx1:String = callInvite.from ?? ""
-        fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
-        
-        self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        // reportIncomingCall(from: from, uuid: callInvite.uuid)
-         reportIncomingCall(from: from!, fromx: fromx! ,fromx1 : fromx1,uuid: callInvite.uuid)
-        self.callInvite = callInvite
+           
+           // Reset the binding date
+           UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
+           
+           // Safely unwrap custom parameters
+           let from = (callInvite.customParameters?["firstname"] as? String) ?? ""
+           let fromx = (callInvite.customParameters?["lastname"] as? String) ?? ""
+           var fromx1 = callInvite.from ?? ""
+           fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
+           
+           self.sendPhoneCallEvents(
+               description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))",
+               isError: false
+           )
+           
+           reportIncomingCall(from: from, fromx: fromx, fromx1: fromx1, uuid: callInvite.uuid)
+           
+           // Add the received invite to the dictionary using its UUID as key.
+           self.callInvite[callInvite.uuid] = callInvite
     }
     
     func formatCustomParams(params: [String:Any]?)->String{
@@ -624,17 +689,30 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     public func cancelledCallInviteReceived(cancelledCallInvite: CancelledCallInvite, error: Error) {
         self.sendPhoneCallEvents(description: "Missed Call", isError: false)
-        self.sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
-        self.showMissedCallNotification(from:"\(cancelledCallInvite.customParameters!["firstname"]) \(cancelledCallInvite.customParameters!["lastname"])"
-        , to: cancelledCallInvite.to)
-        if (self.callInvite == nil) {
-            self.sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
-            return
-        }
-        
-        if let ci = self.callInvite {
-            performEndCallAction(uuid: ci.uuid)
-        }
+          self.sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
+          
+          // Safely unwrap the custom parameters.
+          let firstName = (cancelledCallInvite.customParameters?["firstname"] as? String) ?? ""
+          let lastName = (cancelledCallInvite.customParameters?["lastname"] as? String) ?? ""
+          
+          self.showMissedCallNotification(from: "\(firstName) \(lastName)", to: cancelledCallInvite.to)
+          
+          // If there are no pending invites, log and return.
+          if self.callInvite.isEmpty {
+              self.sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
+              return
+          }
+          
+          // Try to find the matching call invite by comparing callSid.
+          for (uuid, invite) in self.callInvite {
+              if invite.callSid == cancelledCallInvite.callSid {
+                  // Perform end call action using the UUID stored in our dictionary.
+                  performEndCallAction(uuid: uuid)
+                  // Remove the invite from the dictionary.
+                  self.callInvite.removeValue(forKey: uuid)
+                  break
+              }
+          }
     }
     
     func showMissedCallNotification(from:String?, to:String?){
@@ -763,17 +841,19 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     func callDisconnected() {
         self.sendPhoneCallEvents(description: "LOG|Call Disconnected", isError: false)
-        if (self.call != nil) {
             
-            self.sendPhoneCallEvents(description: "LOG|Setting call to nil", isError: false)
-            self.call = nil
-        }
-        if (self.callInvite != nil) {
-            self.callInvite = nil
-        }
-        
-        self.callOutgoing = false
-        self.userInitiatedDisconnect = false
+            if !self.call.isEmpty {
+                self.sendPhoneCallEvents(description: "LOG|Clearing call dictionary", isError: false)
+                self.call.removeAll()
+            }
+            
+            if !self.callInvite.isEmpty {
+                self.callInvite.removeAll()
+            }
+            
+            self.callOutgoing = false
+            self.userInitiatedDisconnect = false
+
         
     }
     
@@ -872,38 +952,57 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         self.sendPhoneCallEvents(description: "LOG|provider:performEndCallAction:", isError: false)
-        
-        
-        if (self.callInvite != nil) {
-            self.sendPhoneCallEvents(description: "LOG|provider:performEndCallAction: rejecting call", isError: false)
-            self.callInvite?.reject()
-            self.callInvite = nil
-        }else if let call = self.call {
-            self.sendPhoneCallEvents(description: "LOG|provider:performEndCallAction: disconnecting call", isError: false)
-            call.disconnect()
-        }
-        action.fulfill()
+            
+            if !self.callInvite.isEmpty {
+                self.sendPhoneCallEvents(description: "LOG|provider:performEndCallAction: rejecting call", isError: false)
+                // Iterate over all pending call invites and reject each.
+                for (_, invite) in self.callInvite {
+                    invite.reject()
+                }
+                // Clear the dictionary of call invites.
+                self.callInvite.removeAll()
+            } else if !self.call.isEmpty {
+                self.sendPhoneCallEvents(description: "LOG|provider:performEndCallAction: disconnecting call", isError: false)
+                // Iterate over all active calls and disconnect each.
+                for (_, callInstance) in self.call {
+                    callInstance.disconnect()
+                }
+                // Clear the dictionary of active calls.
+                self.call.removeAll()
+            }
+            action.fulfill()
     }
     
     public func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {
         self.sendPhoneCallEvents(description: "LOG|provider:performSetHeldAction:", isError: false)
-        if let call = self.call {
-            call.isOnHold = action.isOnHold
+            
+            // Ensure there is at least one active call.
+            guard !self.call.isEmpty, let activeCall = self.call.values.first else {
+                action.fail()
+                return
+            }
+            
+            // Update the hold state for the chosen call.
+            activeCall.isOnHold = action.isOnHold
             action.fulfill()
-        } else {
-            action.fail()
-        }
     }
     
     public func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
         self.sendPhoneCallEvents(description: "LOG|provider:performSetMutedAction:", isError: false)
-        
-        if let call = self.call {
-            call.isMuted = action.isMuted
-            action.fulfill()
-        } else {
-            action.fail()
-        }
+            
+            // Check if there is at least one active call.
+            if self.call.isEmpty {
+                action.fail()
+                return
+            }
+            
+            // Retrieve one active call; if there's more than one, decide how you want to choose.
+            if let activeCall = self.call.values.first {
+                activeCall.isMuted = action.isMuted
+                action.fulfill()
+            } else {
+                action.fail()
+            }
     }
     
     // MARK: Call Kit Actions
@@ -1014,24 +1113,34 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
-        if let ci = self.callInvite {
+        // Retrieve the call invite corresponding to the given UUID.
+            guard let ci = self.callInvite[uuid] else {
+                self.sendPhoneCallEvents(description: "LOG|No CallInvite matches the UUID", isError: false)
+                return
+            }
+            
             let acceptOptions: AcceptOptions = AcceptOptions(callInvite: ci) { (builder) in
                 builder.uuid = ci.uuid
             }
             self.sendPhoneCallEvents(description: "LOG|performAnswerVoiceCall: answering call", isError: false)
-            let theCall = ci.accept(options: acceptOptions, delegate: self)
-            self.sendPhoneCallEvents(description: "Answer|\(theCall.from!)|\(theCall.to!)\(formatCustomParams(params: ci.customParameters))", isError:false)
-            self.call = theCall
-            self.callKitCompletionCallback = completionHandler
-            self.callInvite = nil
             
-            guard #available(iOS 13, *) else {
+            // Accept the call invite to create a call.
+            let theCall = ci.accept(options: acceptOptions, delegate: self)
+            self.sendPhoneCallEvents(description: "Answer|\(theCall.from!)|\(theCall.to!)\(formatCustomParams(params: ci.customParameters))", isError: false)
+            
+            // Store the new call using the same UUID key.
+            self.call[uuid] = theCall
+            self.callKitCompletionCallback = completionHandler
+            
+            // Remove the answered call invite from the dictionary.
+            self.callInvite.removeValue(forKey: uuid)
+            
+            // Handle incoming push completion for iOS versions earlier than 13.
+            if #available(iOS 13, *) {
+                // iOS 13 and later: no additional handling needed.
+            } else {
                 self.incomingPushHandled()
-                return
             }
-        } else {
-            self.sendPhoneCallEvents(description: "LOG|No CallInvite matches the UUID", isError: false)
-        }
     }
     
     public func onListen(withArguments arguments: Any?,
