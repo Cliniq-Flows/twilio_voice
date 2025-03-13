@@ -1,9 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:twilio_voice/twilio_voice.dart';
-
 import '../platform_interface/twilio_call_platform_interface.dart';
 
-// abstract class MethodChannelTwilioCall extends TwilioVoiceSharedPlatform {
 class MethodChannelTwilioCall extends TwilioCallPlatform {
   ActiveCall? _activeCall;
 
@@ -19,96 +17,130 @@ class MethodChannelTwilioCall extends TwilioCallPlatform {
 
   MethodChannelTwilioCall();
 
-  /// Places new call
+  /// Places new call.
   ///
-  /// [extraOptions] will be added to the callPayload sent to your server
+  /// [extraOptions] will be added to the call payload.
   @override
-  Future<bool?> place({required String from, required String to, Map<String, dynamic>? extraOptions}) {
-    _activeCall = ActiveCall(from: from, to: to, callDirection: CallDirection.outgoing);
-
+  Future<bool?> place({
+    required String from,
+    required String to,
+    Map<String, dynamic>? extraOptions,
+  }) {
+    _activeCall =
+        ActiveCall(from: from, to: to, callDirection: CallDirection.outgoing);
     var options = extraOptions ?? <String, dynamic>{};
     options['From'] = from;
     options['To'] = to;
     return _channel.invokeMethod('makeCall', options);
   }
 
-  /// Hangs up active call
+  /// Hangs up active call.
+  ///
+  /// Optionally specify a [callId] (UUID string) to hang up a particular call.
   @override
-  Future<bool?> hangUp() {
-    return _channel.invokeMethod('hangUp', <String, dynamic>{});
+  Future<bool?> hangUp({String? callId}) {
+    var params = <String, dynamic>{};
+    if (callId != null) {
+      params['callId'] = callId;
+    }
+    return _channel.invokeMethod('hangUp', params);
   }
 
-  /// Checks if there is an ongoing call
+  /// Checks if there is an ongoing call.
   @override
   Future<bool> isOnCall() {
-    return _channel.invokeMethod<bool?>('isOnCall', <String, dynamic>{}).then<bool>((bool? value) => value ?? false);
+    return _channel.invokeMethod<bool?>('isOnCall',
+        <String, dynamic>{}).then<bool>((bool? value) => value ?? false);
   }
 
-  /// Gets the active call's SID. This will be null until the first Ringing event occurs
+  /// Gets the active call's SID.
   @override
   Future<String?> getSid() {
-    return _channel.invokeMethod<String?>('call-sid', <String, dynamic>{}).then<String?>((String? value) => value);
+    return _channel.invokeMethod<String?>('call-sid', <String, dynamic>{});
   }
 
-  /// Answers incoming call
+  /// Answers an incoming call.
   @override
   Future<bool?> answer() {
     return _channel.invokeMethod('answer', <String, dynamic>{});
   }
 
-  /// Holds active call
-  /// [holdCall] is respected in web only, in native it will always toggle the hold state.
-  /// In future, native mobile will also respect the [holdCall] value.
+  /// Holds active call.
+  ///
+  /// [holdCall] toggles the hold state. Optionally specify a [callId].
   @override
-  Future<bool?> holdCall({bool holdCall = true}) {
-    return _channel.invokeMethod('holdCall', <String, dynamic>{"shouldHold": holdCall});
+  Future<bool?> holdCall({bool holdCall = true, String? callId}) {
+    var params = <String, dynamic>{"shouldHold": holdCall};
+    if (callId != null) {
+      params['callId'] = callId;
+    }
+    return _channel.invokeMethod('holdCall', params);
   }
 
-  /// Query's active call holding state
+  /// Queries the active call's holding state.
+  ///
+  /// Optionally specify a [callId].
   @override
-  Future<bool?> isHolding() {
-    return _channel.invokeMethod('isHolding', <String, dynamic>{});
+  Future<bool?> isHolding({String? callId}) {
+    var params = <String, dynamic>{};
+    if (callId != null) {
+      params['callId'] = callId;
+    }
+    return _channel.invokeMethod('isHolding', params);
   }
 
-  /// Toggles mute state to provided value
+  /// Toggles mute state.
+  ///
+  /// Optionally specify a [callId].
   @override
-  Future<bool?> toggleMute(bool isMuted) {
-    return _channel.invokeMethod('toggleMute', <String, dynamic>{"muted": isMuted});
+  Future<bool?> toggleMute(bool isMuted, {String? callId}) {
+    var params = <String, dynamic>{"muted": isMuted};
+    if (callId != null) {
+      params['callId'] = callId;
+    }
+    return _channel.invokeMethod('toggleMute', params);
   }
 
-  /// Query's mute status of call, true if call is muted
+  /// Queries the mute status of the call.
+  ///
+  /// Optionally specify a [callId].
   @override
-  Future<bool?> isMuted() {
-    return _channel.invokeMethod('isMuted', <String, dynamic>{});
+  Future<bool?> isMuted({String? callId}) {
+    var params = <String, dynamic>{};
+    if (callId != null) {
+      params['callId'] = callId;
+    }
+    return _channel.invokeMethod('isMuted', params);
   }
 
-  /// Toggles speaker state to provided value
+  /// Toggles the speaker state.
   @override
   Future<bool?> toggleSpeaker(bool speakerIsOn) {
-    return _channel.invokeMethod('toggleSpeaker', <String, dynamic>{"speakerIsOn": speakerIsOn});
+    return _channel.invokeMethod(
+        'toggleSpeaker', <String, dynamic>{"speakerIsOn": speakerIsOn});
   }
 
-  /// Switches Audio Device
-  /*Future<String?> switchAudio({String audioDevice = "auto}) {
-    return _channel.invokeMethod('switchAudio', <String, dynamic>{"audioDevice": audioDevice});
-  }*/
-
-  /// Query's speaker output status, true if on loud speaker.
+  /// Checks if the speaker is active.
   @override
   Future<bool?> isOnSpeaker() {
     return _channel.invokeMethod('isOnSpeaker', <String, dynamic>{});
   }
 
+  /// Sends DTMF digits during a call.
   @override
   Future<bool?> sendDigits(String digits) {
-    return _channel.invokeMethod('sendDigits', <String, dynamic>{"digits": digits});
+    return _channel
+        .invokeMethod('sendDigits', <String, dynamic>{"digits": digits});
   }
 
+  /// Toggles the Bluetooth state.
   @override
   Future<bool?> toggleBluetooth({bool bluetoothOn = true}) {
-    return _channel.invokeMethod('toggleBluetooth', <String, dynamic>{"bluetoothOn": bluetoothOn});
+    return _channel.invokeMethod(
+        'toggleBluetooth', <String, dynamic>{"bluetoothOn": bluetoothOn});
   }
 
+  /// Checks if Bluetooth is active.
   @override
   Future<bool?> isBluetoothOn() {
     return _channel.invokeMethod('isBluetoothOn', <String, dynamic>{});
@@ -118,5 +150,10 @@ class MethodChannelTwilioCall extends TwilioCallPlatform {
   @override
   Future<bool?> connect({Map<String, dynamic>? extraOptions}) {
     return Future.value(false);
+  }
+
+  /// Swaps active and held calls if exactly two calls exist.
+  Future<bool?> swapCalls() {
+    return _channel.invokeMethod('swapCalls', <String, dynamic>{});
   }
 }
