@@ -418,7 +418,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
             } else {
                  // UPDATED: Check for an existing active call.
            if let activeCallEntry = self.calls.first(where: { !$0.value.isOnHold }) {
-                // Issue a CXSetHeldCallAction to hold the current active call.
+               
                 let setHeldAction = CXSetHeldCallAction(call: activeCallEntry.key, onHold: true)
                 let holdTransaction = CXTransaction(action: setHeldAction)
                 self.callKitCallController.request(holdTransaction) { error in
@@ -426,8 +426,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
                         self.sendPhoneCallEvents(description: "Failed to hold the active call: \(error.localizedDescription)", isError: true)
                         return
                     }
-                    // Wait briefly to ensure the state change is committed
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                         self.performStartCallAction(uuid: uuid, handle: to)
                     }
                 }
