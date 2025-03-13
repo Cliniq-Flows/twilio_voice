@@ -159,30 +159,30 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
         }
         else if flutterCall.method == "toggleMute" {
             guard let muted = arguments["muted"] as? Bool else { return }
-            // Check if a specific call is targeted via callId.
-            if let callId = arguments["callId"] as? String,
-               let uuid = UUID(uuidString: callId),
-               let call = self.calls[uuid] {
-                call.isMuted = muted
-                eventSink?(muted ? "Mute" : "Unmute")
-            } else if let activeCallEntry = self.calls.first(where: { !$0.value.isOnHold }) {
-                activeCallEntry.value.isMuted = muted
-                eventSink?(muted ? "Mute" : "Unmute")
-            } else {
-                let ferror = FlutterError(code: "MUTE_ERROR", message: "No active call to mute", details: nil)
-                _result?(ferror)
-            }
+    // UPDATED: Check if a callId is provided or if only one call is active.
+    if let callId = arguments["callId"] as? String,
+       let uuid = UUID(uuidString: callId),
+       let call = self.calls[uuid] {
+        call.isMuted = muted
+        eventSink?(muted ? "Mute" : "Unmute")
+    } else if self.calls.count == 1, let call = self.calls.first?.value {
+        call.isMuted = muted
+        eventSink?(muted ? "Mute" : "Unmute")
+    } else {
+        _result?(FlutterError(code: "MUTE_ERROR", message: "Multiple active calls. Please specify a callId.", details: nil))
+    }
         }
         else if flutterCall.method == "isMuted" {
-            if let callId = arguments["callId"] as? String,
-               let uuid = UUID(uuidString: callId),
-               let call = self.calls[uuid] {
-                result(call.isMuted)
-            } else if let call = self.calls.first?.value {
-                result(call.isMuted)
-            } else {
-                result(false)
-            }
+            // UPDATED: If multiple calls are active and no callId is provided, return an error.
+    if let callId = arguments["callId"] as? String,
+       let uuid = UUID(uuidString: callId),
+       let call = self.calls[uuid] {
+        result(call.isMuted)
+    } else if self.calls.count == 1, let call = self.calls.first?.value {
+        result(call.isMuted)
+    } else {
+        result(FlutterError(code: "MUTE_ERROR", message: "Multiple active calls. Please specify a callId.", details: nil))
+    }
         }
         else if flutterCall.method == "toggleSpeaker" {
             guard let speakerIsOn = arguments["speakerIsOn"] as? Bool else { return }
@@ -220,33 +220,39 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
             }
         }
         else if flutterCall.method == "holdCall" {
-            // Enhanced to support an optional "callId" parameter.
-            guard let shouldHold = arguments["shouldHold"] as? Bool else { return }
-            var targetCall: Call?
-            if let callId = arguments["callId"] as? String,
-               let uuid = UUID(uuidString: callId),
-               let call = self.calls[uuid] {
-                targetCall = call
-            } else {
-                targetCall = self.calls.first?.value
-            }
-            guard let call = targetCall else { return }
-            if shouldHold && !call.isOnHold {
-                call.isOnHold = true
-                eventSink?("Hold")
-            } else if !shouldHold && call.isOnHold {
-                call.isOnHold = false
-                eventSink?("Unhold")
-            }
+           guard let shouldHold = arguments["shouldHold"] as? Bool else { return }
+    var targetCall: Call?
+    // UPDATED: Prefer using a specific callId if multiple calls exist.
+    if let callId = arguments["callId"] as? String,
+       let uuid = UUID(uuidString: callId),
+       let call = self.calls[uuid] {
+        targetCall = call
+    } else if self.calls.count == 1 {
+        targetCall = self.calls.first?.value
+    } else {
+        _result?(FlutterError(code: "HOLD_ERROR", message: "Multiple active calls. Please specify a callId.", details: nil))
+        return
+    }
+    guard let call = targetCall else { return }
+    if shouldHold && !call.isOnHold {
+        call.isOnHold = true
+        eventSink?("Hold")
+    } else if !shouldHold && call.isOnHold {
+        call.isOnHold = false
+        eventSink?("Unhold")
+    }
         }
         else if flutterCall.method == "isHolding" {
-            if let callId = arguments["callId"] as? String,
-               let uuid = UUID(uuidString: callId),
-               let call = self.calls[uuid] {
-                result(call.isOnHold)
-            } else if let call = self.calls.first?.value {
-                result(call.isOnHold)
-            }
+           // UPDATED: Similar to other methods, require a callId when multiple calls are active.
+    if let callId = arguments["callId"] as? String,
+       let uuid = UUID(uuidString: callId),
+       let call = self.calls[uuid] {
+        result(call.isOnHold)
+    } else if self.calls.count == 1, let call = self.calls.first?.value {
+        result(call.isOnHold)
+    } else {
+        result(FlutterError(code: "HOLD_ERROR", message: "Multiple active calls. Please specify a callId.", details: nil))
+    }
         }
         else if flutterCall.method == "answer" {
             // no action needed here
@@ -260,18 +266,20 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
             }
         }
         else if flutterCall.method == "hangUp" {
-            // Enhanced to optionally target a specific call via "callId".
-            if let callId = arguments["callId"] as? String,
-               let uuid = UUID(uuidString: callId),
-               let _ = self.calls[uuid] {
-                self.sendPhoneCallEvents(description: "LOG|hangUp method invoked for call \(uuid)", isError: false)
-                self.userInitiatedDisconnect = true
-                performEndCallAction(uuid: uuid)
-            } else if let activeCall = self.calls.first(where: { !$0.value.isOnHold })?.value {
-                self.sendPhoneCallEvents(description: "LOG|hangUp method invoked", isError: false)
-                self.userInitiatedDisconnect = true
-                performEndCallAction(uuid: activeCall.uuid!)
-            }
+            // UPDATED: If multiple calls exist and no callId is provided, return an error.
+    if let callId = arguments["callId"] as? String,
+       let uuid = UUID(uuidString: callId),
+       let _ = self.calls[uuid] {
+        self.sendPhoneCallEvents(description: "LOG|hangUp method invoked for call \(uuid)", isError: false)
+        self.userInitiatedDisconnect = true
+        performEndCallAction(uuid: uuid)
+    } else if self.calls.count == 1, let singleCall = self.calls.first {
+        self.sendPhoneCallEvents(description: "LOG|hangUp method invoked for call \(singleCall.key)", isError: false)
+        self.userInitiatedDisconnect = true
+        performEndCallAction(uuid: singleCall.key)
+    } else {
+        _result?(FlutterError(code: "HANGUP_ERROR", message: "Multiple active calls. Please specify a callId.", details: nil))
+    }
         }
         // New method: swapCalls to swap hold status between two concurrent calls.
         else if flutterCall.method == "swapCalls" {
