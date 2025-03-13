@@ -20,67 +20,76 @@ abstract class TwilioCallPlatform extends SharedPlatformInterface {
     _instance = instance;
   }
 
-  /// Gets active call
+  /// Gets active call.
   ActiveCall? get activeCall;
 
-  /// Sets active call
+  /// Sets active call.
   set activeCall(ActiveCall? activeCall);
 
-  /// Places new call
+  /// Places new call.
   ///
-  /// [extraOptions] will be added to the callPayload sent to your server
-  Future<bool?> place({required String from, required String to, Map<String, dynamic>? extraOptions});
+  /// [extraOptions] will be added to the call payload sent to your server.
+  Future<bool?> place({
+    required String from,
+    required String to,
+    Map<String, dynamic>? extraOptions,
+  });
 
-  /// Place outgoing call with raw parameters. Returns true if successful, false otherwise.
-  /// Parameters send to Twilio's REST API endpoint 'makeCall' can be passed in [extraOptions];
-  /// Parameters are reduced to this format
-  /// <code>
-  /// {
-  ///  ...extraOptions
-  /// }
-  /// </code>
-  /// [extraOptions] will be added to the call payload sent to your server
+  /// Place outgoing call with raw parameters. Returns true if successful.
+  ///
+  /// [extraOptions] will be added to the call payload sent to your server.
   Future<bool?> connect({Map<String, dynamic>? extraOptions});
 
-  /// Hangs up active call
-  Future<bool?> hangUp();
+  /// Hangs up a call.
+  ///
+  /// Optionally specify a [callId] (UUID string) to hang up a specific call.
+  Future<bool?> hangUp({String? callId});
 
-  /// Checks if there is an ongoing call
+  /// Checks if there is an ongoing call.
   Future<bool> isOnCall();
 
-  /// Gets the active call's SID. This will be null until the first Ringing event occurs
+  /// Gets the active call's SID. This will be null until the first Ringing event occurs.
   Future<String?> getSid();
 
-  /// Answers incoming call
+  /// Answers an incoming call.
   Future<bool?> answer();
 
-  /// Puts active call on hold
-  Future<bool?> holdCall({bool holdCall = true});
+  /// Puts a call on hold.
+  ///
+  /// [holdCall] determines whether to hold (true) or unhold (false) the call.
+  /// Optionally specify a [callId] to target a specific call.
+  Future<bool?> holdCall({bool holdCall = true, String? callId});
 
-  /// Query's mute status of call, true if call is muted
-  Future<bool?> isHolding();
+  /// Queries the holding status of a call.
+  ///
+  /// Optionally specify a [callId] to target a specific call.
+  Future<bool?> isHolding({String? callId});
 
-  /// Toggles mute state to provided value
-  Future<bool?> toggleMute(bool isMuted);
+  /// Toggles the mute state of a call.
+  ///
+  /// Optionally specify a [callId] to target a specific call.
+  Future<bool?> toggleMute(bool isMuted, {String? callId});
 
-  /// Query's mute status of call, true if call is muted
-  Future<bool?> isMuted();
+  /// Queries the mute status of a call.
+  ///
+  /// Optionally specify a [callId] to target a specific call.
+  Future<bool?> isMuted({String? callId});
 
-  /// Toggles speaker state to provided value
+  /// Toggles the speaker state of the call.
   Future<bool?> toggleSpeaker(bool speakerIsOn);
 
-  /// Switches Audio Device
-  /*Future<String?> switchAudio();*/
-
-  /// Query's speaker output status, true if on loud speaker.
+  /// Checks if the speaker output is active.
   Future<bool?> isOnSpeaker();
 
-  /// Toggles bluetooth for active call
+  /// Toggles Bluetooth for the active call.
   Future<bool?> toggleBluetooth({bool bluetoothOn = true});
 
-  /// Query's bluetooth status, true if bluetooth is on.
+  /// Queries the Bluetooth status.
   Future<bool?> isBluetoothOn();
 
-  /// Send digits to active call
+  /// Sends DTMF digits to the active call.
   Future<bool?> sendDigits(String digits);
+
+  /// Swaps the active and held calls when two concurrent calls exist.
+  Future<bool?> swapCalls();
 }
