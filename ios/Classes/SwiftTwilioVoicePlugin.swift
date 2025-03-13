@@ -6,7 +6,7 @@ import TwilioVoice
 import CallKit
 import UserNotifications
 
-public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate {
+public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate {
     
     final let defaultCallKitIcon = "callkit_icon"
     var callKitIcon: String?
@@ -52,7 +52,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
         let configuration = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appName)
         configuration.maximumCallGroups = 1
-        configuration.maximumCallsPerCallGroup = 2
+        // Updated: Allow up to 3 calls concurrently (e.g. one active, two held)
+        configuration.maximumCallsPerCallGroup = 3  
+        
         let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
         
         clients = UserDefaults.standard.object(forKey: kClientList) as? [String:String] ?? [:]
@@ -119,17 +121,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             }
             self.callTo = callTo
             self.identity = callFrom
-            // Auto-hold active call if exists before starting a new call.
-            if let activeEntry = self.calls.first(where: { !$0.value.isOnHold }) {
-                let activeCall = activeEntry.value
-                activeCall.isOnHold = true
-                let callUpdate = CXCallUpdate()
-                callUpdate.remoteHandle = CXHandle(type: .generic, value: activeCall.from ?? self.identity)
-                callUpdate.hasVideo = false
-                callUpdate.supportsHolding = true
-                self.callKitProvider.reportCall(with: activeCall.uuid!, updated: callUpdate)
-                self.sendPhoneCallEvents(description: "LOG|Auto-held previous call \(activeCall.uuid!)", isError: false)
-            }
+            
+            // Removed Auto-hold logic to allow multiple concurrent calls.
+            
             let uuid = UUID()
             self.checkRecordPermission { (permissionGranted) in
                 if (!permissionGranted) {
@@ -281,39 +275,29 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         // New method: swapCalls to swap hold status between two concurrent calls.
         else if flutterCall.method == "swapCalls" {
-            if self.calls.count == 2 {
-                var activeCall: Call?
-                var heldCall: Call?
-                for (_, call) in self.calls {
-                    if call.isOnHold {
-                        heldCall = call
-                    } else {
-                        activeCall = call
-                    }
-                }
-                if let active = activeCall, let held = heldCall {
-                    // Swap their hold status.
-                    active.isOnHold = true
-                    held.isOnHold = false
-                    
-                    let activeCallUpdate = CXCallUpdate()
-                    activeCallUpdate.remoteHandle = CXHandle(type: .generic, value: active.from ?? self.identity)
-                    activeCallUpdate.hasVideo = false
-                    activeCallUpdate.supportsHolding = true
-                    self.callKitProvider.reportCall(with: active.uuid!, updated: activeCallUpdate)
-                    
-                    let heldCallUpdate = CXCallUpdate()
-                    heldCallUpdate.remoteHandle = CXHandle(type: .generic, value: held.from ?? self.identity)
-                    heldCallUpdate.hasVideo = false
-                    heldCallUpdate.supportsHolding = true
-                    self.callKitProvider.reportCall(with: held.uuid!, updated: heldCallUpdate)
-                    
-                    eventSink?("Swapped Calls")
-                } else {
-                    eventSink?("Swap Failed: Unable to determine active and held calls.")
-                }
+            // Get all active (not held) and held calls.
+            let activeCalls = self.calls.filter { !$0.value.isOnHold }
+            let heldCalls = self.calls.filter { $0.value.isOnHold }
+            if let active = activeCalls.first?.value, let held = heldCalls.first?.value {
+                // Swap their hold statuses.
+                active.isOnHold = true
+                held.isOnHold = false
+                
+                let activeCallUpdate = CXCallUpdate()
+                activeCallUpdate.remoteHandle = CXHandle(type: .generic, value: active.from ?? self.identity)
+                activeCallUpdate.hasVideo = false
+                activeCallUpdate.supportsHolding = true
+                self.callKitProvider.reportCall(with: active.uuid!, updated: activeCallUpdate)
+                
+                let heldCallUpdate = CXCallUpdate()
+                heldCallUpdate.remoteHandle = CXHandle(type: .generic, value: held.from ?? self.identity)
+                heldCallUpdate.hasVideo = false
+                heldCallUpdate.supportsHolding = true
+                self.callKitProvider.reportCall(with: held.uuid!, updated: heldCallUpdate)
+                
+                eventSink?("Swapped Calls")
             } else {
-                eventSink?("Swap Failed: Not enough calls to swap.")
+                eventSink?("Swap Failed: Unable to determine active and held calls.")
             }
         }
         else if flutterCall.method == "registerClient" {
@@ -394,19 +378,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         return false
     }
     
+    // Updated makeCall(to:) – removed auto-hold block so that new calls are not forcing an existing call to be held.
     func makeCall(to: String) {
-        // Auto-hold any active call before initiating a new call.
-        if let activeEntry = self.calls.first(where: { !$0.value.isOnHold }) {
-            let activeCall = activeEntry.value
-            activeCall.isOnHold = true
-            let callUpdate = CXCallUpdate()
-            callUpdate.remoteHandle = CXHandle(type: .generic, value: activeCall.from ?? self.identity)
-            callUpdate.hasVideo = false
-            callUpdate.supportsHolding = true
-            self.callKitProvider.reportCall(with: activeCall.uuid!, updated: callUpdate)
-            self.sendPhoneCallEvents(description: "LOG|Auto-held previous call \(activeCall.uuid!)", isError: false)
-        }
-        
         let uuid = UUID()
         self.checkRecordPermission { (permissionGranted) in
             if (!permissionGranted) {
