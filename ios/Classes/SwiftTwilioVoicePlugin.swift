@@ -52,8 +52,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
         voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
         let configuration = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appName)
         configuration.maximumCallGroups = 1
-        // Updated: Allow up to 3 calls concurrently (e.g. one active, two held)
-        configuration.maximumCallsPerCallGroup = 3  
+        configuration.maximumCallsPerCallGroup = 2  
         
         let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
         
@@ -284,29 +283,31 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
         // New method: swapCalls to swap hold status between two concurrent calls.
         else if flutterCall.method == "swapCalls" {
             // Get all active (not held) and held calls.
-            let activeCalls = self.calls.filter { !$0.value.isOnHold }
-            let heldCalls = self.calls.filter { $0.value.isOnHold }
-            if let active = activeCalls.first?.value, let held = heldCalls.first?.value {
-                // Swap their hold statuses.
-                active.isOnHold = true
-                held.isOnHold = false
-                
-                let activeCallUpdate = CXCallUpdate()
-                activeCallUpdate.remoteHandle = CXHandle(type: .generic, value: active.from ?? self.identity)
-                activeCallUpdate.hasVideo = false
-                activeCallUpdate.supportsHolding = true
-                self.callKitProvider.reportCall(with: active.uuid!, updated: activeCallUpdate)
-                
-                let heldCallUpdate = CXCallUpdate()
-                heldCallUpdate.remoteHandle = CXHandle(type: .generic, value: held.from ?? self.identity)
-                heldCallUpdate.hasVideo = false
-                heldCallUpdate.supportsHolding = true
-                self.callKitProvider.reportCall(with: held.uuid!, updated: heldCallUpdate)
-                
-                eventSink?("Swapped Calls")
-            } else {
-                eventSink?("Swap Failed: Unable to determine active and held calls.")
-            }
+    let activeCalls = self.calls.filter { !$0.value.isOnHold }
+    let heldCalls = self.calls.filter { $0.value.isOnHold }
+    if let active = activeCalls.first?.value, let held = heldCalls.first?.value {
+        // Swap their hold statuses.
+        active.isOnHold = true
+        held.isOnHold = false
+        
+        // Update CallKit for the active call now placed on hold.
+        let activeCallUpdate = CXCallUpdate()
+        activeCallUpdate.remoteHandle = CXHandle(type: .generic, value: active.from ?? self.identity)
+        activeCallUpdate.hasVideo = false
+        activeCallUpdate.supportsHolding = true
+        self.callKitProvider.reportCall(with: active.uuid!, updated: activeCallUpdate)
+        
+        // Update CallKit for the held call now becoming active.
+        let heldCallUpdate = CXCallUpdate()
+        heldCallUpdate.remoteHandle = CXHandle(type: .generic, value: held.from ?? self.identity)
+        heldCallUpdate.hasVideo = false
+        heldCallUpdate.supportsHolding = true
+        self.callKitProvider.reportCall(with: held.uuid!, updated: heldCallUpdate)
+        
+        eventSink?("Swapped Calls")
+    } else {
+        eventSink?("Swap Failed: Unable to determine active and held calls.")
+    }
         }
         else if flutterCall.method == "registerClient" {
             guard let clientId = arguments["id"] as? String,
