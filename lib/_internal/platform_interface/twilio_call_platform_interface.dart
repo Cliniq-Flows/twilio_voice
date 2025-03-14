@@ -92,4 +92,12 @@ abstract class TwilioCallPlatform extends SharedPlatformInterface {
 
   /// Swaps the active and held calls when two concurrent calls exist.
   Future<bool?> swapCalls();
+
+  /// Connects to a conference call using the specified [conferenceName].
+  ///
+  /// [extraOptions] will be added to the call payload sent to your server.
+  Future<bool?> connectToConference({
+    required String conferenceName,
+    Map<String, dynamic>? extraOptions,
+  });
 }

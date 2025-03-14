@@ -153,7 +153,22 @@ class MethodChannelTwilioCall extends TwilioCallPlatform {
   }
 
   /// Swaps active and held calls if exactly two calls exist.
+  @override
   Future<bool?> swapCalls() {
     return _channel.invokeMethod('swapCalls', <String, dynamic>{});
+  }
+
+  // NEW: Connect to Conference implementation.
+  // This method sends the conferenceName and any extra options over the channel.
+  @override
+  Future<bool?> connectToConference({
+    required String conferenceName,
+    Map<String, dynamic>? extraOptions,
+  }) {
+    final Map<String, dynamic> args = {
+      'conferenceName': conferenceName,
+      if (extraOptions != null) 'extraOptions': extraOptions,
+    };
+    return _channel.invokeMethod('connectToConference', args);
   }
 }
