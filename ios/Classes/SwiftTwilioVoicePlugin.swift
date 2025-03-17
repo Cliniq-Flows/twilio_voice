@@ -363,15 +363,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
             result(updateCallKitIcon(icon: newIcon))
             return
         }else if flutterCall.method == "connectToConference" {
-    guard let conferenceName = arguments["conferenceName"] as? String else {
+     guard let conferenceName = arguments["conferenceName"] as? String else {
         result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing conferenceName", details: nil))
         return
     }
-    // Optional: extract any extra options passed from Flutter.
-    let extraOptions = arguments["extraOptions"] as? [String: String]
-    
     let uuid = UUID()
-    self.connectToConference(uuid: uuid, conferenceName: conferenceName, extraOptions: extraOptions) { success in
+    self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
         result(success)
     }
 }
@@ -863,30 +860,22 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin, FlutterStreamHandl
         self.callKitCompletionCallback = completionHandler
     }
     
-    // NEW: Connect to Conference function
-    // This function creates a ConnectOptions instance with the provided conference name
-    // and any extra options you wish to pass to your TwiML application.
-    func connectToConference(uuid: UUID, conferenceName: String, extraOptions: [String: String]? = nil, completionHandler: @escaping (Bool) -> Swift.Void) {
-        guard let token = accessToken else {
-            completionHandler(false)
-            return
-        }
-        let connectOptions = ConnectOptions(accessToken: token) { builder in
-            builder.uuid = uuid
-            // NEW: Specify conference parameter so that your TwiML app knows to join the conference.
-            builder.params["conference"] = conferenceName
-            // NEW: Add any extra options to the connection parameters.
-            if let options = extraOptions {
-                for (key, value) in options {
-                    builder.params[key] = value
-                }
-            }
-        }
-        let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
-        self.calls[uuid] = theCall
-        self.callKitCompletionCallback = completionHandler
+    // Updated connectToConference function without extraOptions:
+func connectToConference(uuid: UUID, conferenceName: String, completionHandler: @escaping (Bool) -> Swift.Void) {
+    guard let token = accessToken else {
+        completionHandler(false)
+        return
     }
-    
+    let connectOptions = ConnectOptions(accessToken: token) { builder in
+        builder.uuid = uuid
+        // Specify the conference parameter so that your TwiML app knows to join the conference.
+        builder.params["conference"] = conferenceName
+    }
+    let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
+    self.calls[uuid] = theCall
+    self.callKitCompletionCallback = completionHandler
+}
+
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
         if let ci = self.callInvite {
             let acceptOptions: AcceptOptions = AcceptOptions(callInvite: ci) { builder in
