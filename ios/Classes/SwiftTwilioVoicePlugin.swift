@@ -319,6 +319,15 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             // update icon & persist
             result(updateCallKitIcon(icon: newIcon))
             return
+        }else if flutterCall.method == "connectToConference" {
+            guard let conferenceName = arguments["conferenceName"] as? String else {
+                result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing conferenceName", details: nil))
+                return
+            }
+            let uuid = UUID()
+            self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
+                result(success)
+            }
         }
         result(true)
     }
@@ -547,20 +556,31 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     // MARK: TVONotificaitonDelegate
     public func callInviteReceived(callInvite: CallInvite) {
-        self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
+        // self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
         
-        /**
-         * The TTL of a registration is 1 year. The TTL for registration for this device/identity
-         * pair is reset to 1 year whenever a new registration occurs or a push notification is
-         * sent to this device/identity pair.
-         */
+        // /**
+        //  * The TTL of a registration is 1 year. The TTL for registration for this device/identity
+        //  * pair is reset to 1 year whenever a new registration occurs or a push notification is
+        //  * sent to this device/identity pair.
+        //  */
+        // UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
+        
+        // var from:String = callInvite.from ?? defaultCaller
+        // from = from.replacingOccurrences(of: "client:", with: "")
+        
+        // self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
+        // reportIncomingCall(from: from, uuid: callInvite.uuid)
+        // self.callInvite = callInvite
+        self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
         
-        var from:String = callInvite.from ?? defaultCaller
-        from = from.replacingOccurrences(of: "client:", with: "")
+        let from: String? = callInvite.customParameters!["firstname"] ?? ""
+        let fromx: String? = callInvite.customParameters!["lastname"] ?? ""
+        var fromx1: String = callInvite.from ?? ""
+        fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
         
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        reportIncomingCall(from: from, uuid: callInvite.uuid)
+        reportIncomingCall(from: from!, fromx: fromx!, fromx1: fromx1, uuid: callInvite.uuid)
         self.callInvite = callInvite
     }
     
@@ -865,12 +885,17 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
     
-    func reportIncomingCall(from: String, uuid: UUID) {
-        let callHandle = CXHandle(type: .generic, value: from)
+   func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
+        let firstname = from.capitalized
+        let lastname = fromx.capitalized
+        let number = fromx1
+        let combine = "\(firstname) \(lastname)"
+        let finale = combine.trimmingCharacters(in: .whitespaces).isEmpty ? number : combine
         
+        let callHandle = CXHandle(type: .generic, value: finale.capitalized)
         let callUpdate = CXCallUpdate()
         callUpdate.remoteHandle = callHandle
-        callUpdate.localizedCallerName = clients[from] ?? self.clients["defaultCaller"] ?? defaultCaller
+        callUpdate.localizedCallerName = finale
         callUpdate.supportsDTMF = true
         callUpdate.supportsHolding = true
         callUpdate.supportsGrouping = false
@@ -884,6 +909,24 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                 self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
             }
         }
+        // let callHandle = CXHandle(type: .generic, value: from)
+        
+        // let callUpdate = CXCallUpdate()
+        // callUpdate.remoteHandle = callHandle
+        // callUpdate.localizedCallerName = clients[from] ?? self.clients["defaultCaller"] ?? defaultCaller
+        // callUpdate.supportsDTMF = true
+        // callUpdate.supportsHolding = true
+        // callUpdate.supportsGrouping = false
+        // callUpdate.supportsUngrouping = false
+        // callUpdate.hasVideo = false
+        
+        // callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+        //     if let error = error {
+        //         self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).", isError: false)
+        //     } else {
+        //         self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
+        //     }
+        // }
     }
     
     func performEndCallAction(uuid: UUID) {
@@ -918,6 +961,21 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
         self.call = theCall
+        self.callKitCompletionCallback = completionHandler
+    }
+    // Updated connectToConference function without extraOptions:
+    func connectToConference(uuid: UUID, conferenceName: String, completionHandler: @escaping (Bool) -> Swift.Void) {
+        guard let token = accessToken else {
+            completionHandler(false)
+            return
+        }
+        let connectOptions = ConnectOptions(accessToken: token) { builder in
+            builder.uuid = uuid
+            // Specify the conference parameter so that your TwiML app knows to join the conference.
+            builder.params["conference"] = conferenceName
+        }
+        let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
+        self.calls[uuid] = theCall
         self.callKitCompletionCallback = completionHandler
     }
     
