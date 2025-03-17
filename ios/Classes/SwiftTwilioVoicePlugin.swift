@@ -1004,7 +1004,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         builder.params["conference"] = conferenceName
     }
     let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
-    self.call = theCall
+    self.call = theCall // Edit error fix here
+    
     self.callKitCompletionCallback = completionHandler
     }
     
