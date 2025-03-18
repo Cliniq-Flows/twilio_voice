@@ -987,11 +987,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     //     self.calls.removeAll()
     // }
      // If there's an active call, end it before connecting to the conference.
-    if let activeCall = self.call {
-        self.sendPhoneCallEvents(description: "LOG|Ending active call with UUID \(activeCall.uuid!) before joining conference", isError: false)
-        self.performEndCallAction(uuid: activeCall.uuid!)
-        self.call = nil
-    }
+    // if let activeCall = self.call {
+    //     self.sendPhoneCallEvents(description: "LOG|Ending active call with UUID \(activeCall.uuid!) before joining conference", isError: false)
+    //     self.performEndCallAction(uuid: activeCall.uuid!)
+    //     self.call = nil
+    // }
     
     guard let token = accessToken else {
         completionHandler(false)
