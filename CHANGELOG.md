@@ -1,3 +1,8 @@
+## 0.2.2
+
+* Fix: [Android] Fix cancelling call when app is in background throws [BackgroundServiceStartNotAllowedException](https://developer.android.com/reference/android/app/BackgroundServiceStartNotAllowedException). [Issue #204](https://github.com/cybex-dev/twilio_voice/issues/204)
+* Fix: [Web] Fixed microphone permission (using `getUserMedia`) for Firefox & Safari. [Issue #260](https://github.com/cybex-dev/twilio_voice/issues/260). Credit to [@AndreiMisiukevich](https://github.com/AndreiMisiukevich)
+
 ## 0.2.1
 
 * Fix: [iOS] Race condition ending call remotely and locally results in a "End Call Failed: The operation couldn’t be completed." error. [Issue #184](https://github.com/cybex-dev/twilio_voice/issues/184)
