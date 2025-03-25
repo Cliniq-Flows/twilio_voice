@@ -498,26 +498,30 @@ class TVConnectionService : ConnectionService() {
 
     // New function to join a conference call
   private fun joinConference(intent: Intent, conferenceName: String) {
-
-        Log.d(TAG, "Joining conference: $conferenceName")
-   
-    val token = intent?.getStringExtra(EXTRA_TOKEN) ?: ""
-    if (token.isNullOrEmpty()) {
+    Log.d(TAG, "Joining conference: $conferenceName")
+    
+    val token = intent.getStringExtra(EXTRA_TOKEN) ?: ""
+    if (token.isEmpty()) {
         Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
         return
     }
+    
     val params = HashMap<String, String>().apply {
-        put("ConferenceName", conferenceName)
+        put("conference", conferenceName)  // Use lowercase key as in Swift
     }
+    
     val connectOptions = ConnectOptions.Builder(token)
         .params(params)
         .build()
+    
     val conferenceConnection = TVCallConnection(applicationContext)
     conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
+    
     val tempId = "conference_$conferenceName"
     activeConnections[tempId] = conferenceConnection
+    
     Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
-    }
+}
 
     // Stub for retrieving the access token for conference calls.
     private fun getConferenceAccessToken(): String? {
