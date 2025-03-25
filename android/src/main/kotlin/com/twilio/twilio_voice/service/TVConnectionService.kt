@@ -499,7 +499,7 @@ class TVConnectionService : ConnectionService() {
     private fun joinConference(intent: Intent, conferenceName: String) {
 
         Log.d(TAG, "Joining conference: $conferenceName")
-    // Retrieve the token passed via intent
+   
     val token = intent?.getStringExtra(EXTRA_TOKEN) ?: ""
     if (token.isNullOrEmpty()) {
         Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
