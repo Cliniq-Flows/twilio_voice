@@ -521,32 +521,36 @@ class TVConnectionService : ConnectionService() {
     // activeConnections[tempId] = conferenceConnection
     
     // Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
-     Log.d(TAG, "Joining conference: $conferenceName")
+        Log.d(TAG, "Joining conference: $conferenceName")
     
-    val iterator = activeConnections.entries.iterator()
-    while (iterator.hasNext()) {
-        val entry = iterator.next()
-        if (!entry.key.startsWith("conference_")) {
-            Log.d(TAG, "Disconnecting existing call with ID: ${entry.key}")
-            entry.value.disconnect()  
-            iterator.remove()        
-        }
+    // First, collect keys of calls that are not conference calls
+    val keysToRemove = activeConnections.keys.filter { !it.startsWith("conference_") }
+    for (key in keysToRemove) {
+        Log.d(TAG, "Disconnecting existing call with ID: $key")
+        activeConnections[key]?.disconnect()
+        activeConnections.remove(key)
     }
-   val token = intent.getStringExtra(EXTRA_TOKEN) ?: ""
+    
+    val token = intent.getStringExtra(EXTRA_TOKEN) ?:  ""
     if (token.isEmpty()) {
         Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
         return
     }
+    
     val params = HashMap<String, String>().apply {
         put("conference", conferenceName)
     }
+    
     val connectOptions = ConnectOptions.Builder(token)
         .params(params)
         .build()
+    
     val conferenceConnection = TVCallConnection(applicationContext)
     conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
+    
     val tempId = "conference_$conferenceName"
     activeConnections[tempId] = conferenceConnection
+    
     Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
  }
 
