@@ -498,7 +498,10 @@ class TVConnectionService : ConnectionService() {
     // New function to join a conference call
     private fun joinConference(conferenceName: String) {
         Log.d(TAG, "Joining conference: $conferenceName")
-        val token = getConferenceAccessToken()
+        val token: String = myBundle.getString(EXTRA_TOKEN) ?: run {
+            Log.e(TAG, "onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
+            throw Exception("onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN");
+        }
         if (token.isNullOrEmpty()) {
             Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
             return
