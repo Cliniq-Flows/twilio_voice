@@ -475,12 +475,13 @@ class TVConnectionService : ConnectionService() {
 
                 // ─── New branch for conference connection ───────────────────────────────
                 ACTION_CONNECT_TO_CONFERENCE -> {
-                    val conferenceName = it.getStringExtra(EXTRA_CONFERENCE_NAME)
+                    val conferenceName = intent.getStringExtra(EXTRA_CONFERENCE_NAME)
                     if (conferenceName.isNullOrEmpty()){
                         Log.e(TAG, "onStartCommand: ACTION_CONNECT_TO_CONFERENCE missing conference name")
                         return@let
                     }
-                    joinConference(conferenceName)
+                    // Pass the intent along with the conference name
+                    joinConference(intent, conferenceName)
                 }
                 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -496,7 +497,7 @@ class TVConnectionService : ConnectionService() {
     //endregion
 
     // New function to join a conference call
-    private fun joinConference(intent: Intent, conferenceName: String) {
+  private fun joinConference(intent: Intent, conferenceName: String) {
 
         Log.d(TAG, "Joining conference: $conferenceName")
    
