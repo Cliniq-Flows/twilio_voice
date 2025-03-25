@@ -48,6 +48,13 @@ class TVConnectionService : ConnectionService() {
 
         val SERVICE_TYPE_MICROPHONE: Int = 100
 
+         // ─── NEW: Conference Call ACTION and EXTRA ───────────────────────────────
+        const val ACTION_CONNECT_TO_CONFERENCE: String = "ACTION_CONNECT_TO_CONFERENCE"
+        const val EXTRA_CONFERENCE_NAME: String = "EXTRA_CONFERENCE_NAME"
+        // ─────────────────────────────────────────────────────────────────────────────
+        
+
+
         //region ACTIONS_* Constants
         /**
          * Action used with [VoiceFirebaseMessagingService] to notify of incoming calls
@@ -466,6 +473,17 @@ class TVConnectionService : ConnectionService() {
                     sendBroadcastCallHandle(applicationContext, activeCallHandle)
                 }
 
+                // ─── New branch for conference connection ───────────────────────────────
+                ACTION_CONNECT_TO_CONFERENCE -> {
+                    val conferenceName = it.getStringExtra(EXTRA_CONFERENCE_NAME)
+                    if (conferenceName.isNullOrEmpty()){
+                        Log.e(TAG, "onStartCommand: ACTION_CONNECT_TO_CONFERENCE missing conference name")
+                        return@let
+                    }
+                    joinConference(conferenceName)
+                }
+                // ─────────────────────────────────────────────────────────────────────────────
+
                 else -> {
                     Log.e(TAG, "onStartCommand: unknown action: ${it.action}")
                 }
@@ -476,6 +494,34 @@ class TVConnectionService : ConnectionService() {
         return START_STICKY
     }
     //endregion
+
+    // New function to join a conference call
+    private fun joinConference(conferenceName: String) {
+        Log.d(TAG, "Joining conference: $conferenceName")
+        val token = getConferenceAccessToken()
+        if (token.isNullOrEmpty()) {
+            Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
+            return
+        }
+        val params = HashMap<String, String>().apply {
+            put("ConferenceName", conferenceName)
+        }
+        val connectOptions = ConnectOptions.Builder(token)
+            .params(params)
+            .build()
+        val conferenceConnection = TVCallConnection(applicationContext)
+        conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
+        // Use a temporary identifier for the conference call
+        val tempId = "conference_$conferenceName"
+        activeConnections[tempId] = conferenceConnection
+        Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
+    }
+
+    // Stub for retrieving the access token for conference calls.
+    private fun getConferenceAccessToken(): String? {
+        // TODO: Implement your logic to retrieve a valid Twilio access token for conference calls.
+        return "YOUR_TWILIO_ACCESS_TOKEN"
+    }
 
     override fun onCreateIncomingConnection(connectionManagerPhoneAccount: PhoneAccountHandle?, request: ConnectionRequest?): Connection {
         assert(request != null) { "ConnectionRequest cannot be null" }
