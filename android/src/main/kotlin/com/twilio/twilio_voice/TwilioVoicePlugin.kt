@@ -959,8 +959,9 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         }
     }
     //endregion
-private fun connectToConference(conferenceName: String, token: String): Boolean {     return context?.let { ctx ->
-         return context?.let { ctx ->
+
+    private fun connectToConference(conferenceName: String, token: String): Boolean {
+    return context?.let { ctx ->
         // Check if there is an active call and hang it up
         TVConnectionService.getActiveCallHandle()?.let { activeCallHandle ->
             Log.d(TAG, "Disconnecting active call with handle: $activeCallHandle")
@@ -990,7 +991,8 @@ private fun connectToConference(conferenceName: String, token: String): Boolean 
         Log.e(TAG, "Context is null. Cannot connect to conference.")
         false
     }
-    }
+}
+
 
 
     private fun sendDigits(digits: String): Boolean {
