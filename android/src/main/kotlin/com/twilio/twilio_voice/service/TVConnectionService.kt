@@ -523,7 +523,7 @@ class TVConnectionService : ConnectionService() {
     // Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
         Log.d(TAG, "Joining conference: $conferenceName")
     
-    // First, collect keys of calls that are not conference calls
+    // Disconnect any active calls that are not conference calls
     val keysToRemove = activeConnections.keys.filter { !it.startsWith("conference_") }
     for (key in keysToRemove) {
         Log.d(TAG, "Disconnecting existing call with ID: $key")
@@ -531,27 +531,35 @@ class TVConnectionService : ConnectionService() {
         activeConnections.remove(key)
     }
     
-    val token = intent.getStringExtra(EXTRA_TOKEN) ?:  ""
-    if (token.isEmpty()) {
-        Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
-        return
-    }
+    // Wait a short period (e.g. 500ms) to let the disconnections process
+    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        // Retrieve token from the intent extras or SharedPreferences
+        val token = intent.getStringExtra(EXTRA_TOKEN) ?:""
+        if (token.isEmpty()) {
+            Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
+            return@postDelayed
+        }
     
-    val params = HashMap<String, String>().apply {
-        put("conference", conferenceName)
-    }
+        // Build parameters (use the key "conference" to match iOS implementation)
+        val params = HashMap<String, String>().apply {
+            put("conference", conferenceName)
+        }
     
-    val connectOptions = ConnectOptions.Builder(token)
-        .params(params)
-        .build()
+        val connectOptions = ConnectOptions.Builder(token)
+            .params(params)
+            .build()
     
-    val conferenceConnection = TVCallConnection(applicationContext)
-    conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
+        val conferenceConnection = TVCallConnection(applicationContext)
+        conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
     
-    val tempId = "conference_$conferenceName"
-    activeConnections[tempId] = conferenceConnection
+        val tempId = "conference_$conferenceName"
+        activeConnections[tempId] = conferenceConnection
     
-    Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
+        Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
+    
+        // Broadcast the new call handle so the UI is updated accordingly
+        sendBroadcastCallHandle(applicationContext, tempId)
+    }, 500)
  }
 
     
