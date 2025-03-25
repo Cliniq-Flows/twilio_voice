@@ -959,8 +959,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         }
     }
     //endregion
-    private fun connectToConference(conferenceName: String): Boolean {
-     return context?.let { ctx ->
+private fun connectToConference(conferenceName: String, token: String): Boolean {     return context?.let { ctx ->
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_CONNECT_TO_CONFERENCE
             putExtra(TVConnectionService.EXTRA_CONFERENCE_NAME, conferenceName)
