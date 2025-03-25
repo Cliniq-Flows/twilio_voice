@@ -496,7 +496,8 @@ class TVConnectionService : ConnectionService() {
     //endregion
 
     // New function to join a conference call
-    private fun joinConference(conferenceName: String) {
+    private fun joinConference(intent: Intent, conferenceName: String) {
+
         Log.d(TAG, "Joining conference: $conferenceName")
     // Retrieve the token passed via intent
     val token = intent?.getStringExtra(EXTRA_TOKEN) ?: ""

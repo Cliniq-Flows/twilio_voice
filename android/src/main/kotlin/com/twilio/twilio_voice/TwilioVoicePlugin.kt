@@ -890,7 +890,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             }
 
             TVMethodChannels.CONNECTTOCONFERENCE ->{
-             val conferenceName = call.argument<String>("conferenceName") ?: run {
+                    val conferenceName = call.argument<String>("conferenceName") ?: run {
         result.error(
             FlutterErrorCodes.MALFORMED_ARGUMENTS,
             "Missing 'conferenceName' argument",
@@ -906,7 +906,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         )
         return@onMethodCall
     }
-    val success = connectToConference(conferenceName)
+    // Pass the token along to the helper
+    val success = connectToConference(conferenceName, accessToken!!)
     result.success(success)
             }
 
@@ -959,12 +960,11 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
     //endregion
     private fun connectToConference(conferenceName: String): Boolean {
-       
-       return context?.let { ctx ->
+     return context?.let { ctx ->
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_CONNECT_TO_CONFERENCE
             putExtra(TVConnectionService.EXTRA_CONFERENCE_NAME, conferenceName)
-            putExtra(TVConnectionService.EXTRA_TOKEN, accessToken) // Pass your token here
+            putExtra(TVConnectionService.EXTRA_TOKEN, token)  // Pass the token here
             ctx.startService(this)
         }
         true
@@ -972,7 +972,6 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         Log.e(TAG, "Context is null. Cannot connect to conference.")
         false
     }
-      
     }
 
 
