@@ -498,26 +498,23 @@ class TVConnectionService : ConnectionService() {
     // New function to join a conference call
     private fun joinConference(conferenceName: String) {
         Log.d(TAG, "Joining conference: $conferenceName")
-        val token: String = myBundle.getString(EXTRA_TOKEN) ?: run {
-            Log.e(TAG, "onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
-            throw Exception("onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN");
-        }
-        if (token.isNullOrEmpty()) {
-            Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
-            return
-        }
-        val params = HashMap<String, String>().apply {
-            put("ConferenceName", conferenceName)
-        }
-        val connectOptions = ConnectOptions.Builder(token)
-            .params(params)
-            .build()
-        val conferenceConnection = TVCallConnection(applicationContext)
-        conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
-        // Use a temporary identifier for the conference call
-        val tempId = "conference_$conferenceName"
-        activeConnections[tempId] = conferenceConnection
-        Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
+    // Retrieve the token passed via intent
+    val token = intent?.getStringExtra(EXTRA_TOKEN) ?: ""
+    if (token.isNullOrEmpty()) {
+        Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
+        return
+    }
+    val params = HashMap<String, String>().apply {
+        put("ConferenceName", conferenceName)
+    }
+    val connectOptions = ConnectOptions.Builder(token)
+        .params(params)
+        .build()
+    val conferenceConnection = TVCallConnection(applicationContext)
+    conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
+    val tempId = "conference_$conferenceName"
+    activeConnections[tempId] = conferenceConnection
+    Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
     }
 
     // Stub for retrieving the access token for conference calls.

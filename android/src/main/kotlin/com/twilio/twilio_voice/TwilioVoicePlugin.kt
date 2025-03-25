@@ -964,6 +964,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_CONNECT_TO_CONFERENCE
             putExtra(TVConnectionService.EXTRA_CONFERENCE_NAME, conferenceName)
+            putExtra(TVConnectionService.EXTRA_TOKEN, accessToken) // Pass your token here
             ctx.startService(this)
         }
         true
