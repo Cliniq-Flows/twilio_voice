@@ -889,6 +889,32 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 result.success(true)
             }
 
+            TVMethodChannels.CONNECTTOCONFERENCE ->{
+              // Conference Call
+                val conferenceName = call.argument<String>("conferenceName") ?: run {
+                    result.error(
+                        FlutterErrorCodes.MALFORMED_ARGUMENTS,
+                        "Missing 'conferenceName' argument",
+                        null
+                    )
+                    return
+                }
+
+                // Check that an access token is available.
+                if (accessToken.isNullOrEmpty()) {
+                    result.error(
+                        FlutterErrorCodes.MALFORMED_ARGUMENTS,
+                        "No accessToken set, are you registered?",
+                        null
+                    )
+                    return
+                }
+
+                // Call our helper function to connect to the conference.
+                val success = connectToConference(conferenceName)
+                result.success(success)
+            }
+
             TVMethodChannels.UPDATE_CALLKIT_ICON -> {
                 // we don't use CallKit on Android... yet
                 result.success(true)
@@ -937,6 +963,43 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         }
     }
     //endregion
+    private fun connectToConference(conferenceName: String): Boolean {
+        // Prepare a parameter map containing the conference name.
+        val params = HashMap<String, String>()
+        params["conference"] = conferenceName
+
+        // For a conference call, we use dummy values for 'from' and 'to'
+        // because the underlying place call routine requires them to be non-empty.
+        val dummyFrom = "conference"
+        val dummyTo = "conference"
+
+        // Ensure the access token is available.
+        if (accessToken.isNullOrEmpty()) {
+            Log.e(TAG, "No access token set, cannot connect to conference.")
+            return false
+        }
+
+        // Start the call by sending an intent to TVConnectionService.
+        context?.let { ctx ->
+            Intent(ctx, TVConnectionService::class.java).apply {
+                action = TVConnectionService.ACTION_PLACE_OUTGOING_CALL
+                putExtra(TVConnectionService.EXTRA_TOKEN, accessToken)
+                putExtra(TVConnectionService.EXTRA_FROM, dummyFrom)
+                putExtra(TVConnectionService.EXTRA_TO, dummyTo)
+                putExtra(TVConnectionService.EXTRA_OUTGOING_PARAMS, Bundle().apply {
+                    for ((key, value) in params) {
+                        putString(key, value)
+                    }
+                })
+                ctx.startService(this)
+            }
+            return true
+        } ?: run {
+            Log.e(TAG, "Context is null. Cannot connect to conference.")
+            return false
+        }
+    }
+
 
     private fun sendDigits(digits: String): Boolean {
         // Send to active call via Intent
