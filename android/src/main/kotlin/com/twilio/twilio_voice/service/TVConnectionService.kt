@@ -532,7 +532,7 @@ class TVConnectionService : ConnectionService() {
             iterator.remove()        
         }
     }
-    val token = intent.getStringExtra(EXTRA_TOKEN) ?: getTokenFromPrefs() ?: ""
+   val token = intent.getStringExtra(EXTRA_TOKEN) ?: ""
     if (token.isEmpty()) {
         Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
         return
