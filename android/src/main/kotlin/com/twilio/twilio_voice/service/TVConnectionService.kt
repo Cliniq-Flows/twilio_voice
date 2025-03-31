@@ -568,6 +568,17 @@ class TVConnectionService : ConnectionService() {
             throw Exception("onCreateIncomingConnection: request is missing CallInvite EXTRA_INCOMING_CALL_INVITE");
         }
 
+            // Extract custom display name components
+            val firstName = ci.customParameters["firstname"] ?: ""
+            val lastName = ci.customParameters["lastname"] ?: ""
+            // Use custom display name if available, otherwise default to callInvite.from
+            val displayName = if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
+                "$firstName $lastName".trim()
+            } else {
+                ci.from ?: ""
+            }
+
+
         // Create storage instance for call parameters
         val storage: Storage = StorageImpl(applicationContext)
 
@@ -586,6 +597,11 @@ class TVConnectionService : ConnectionService() {
         // Setup connection event listeners and UI parameters
         attachCallEventListeners(connection, ci.callSid)
         applyParameters(connection, callParams)
+         // **Override the caller display name here using the custom displayName**
+            connection.setCallerDisplayName(displayName, TelecomManager.PRESENTATION_ALLOWED)
+            // Optionally, if you want the address to use the displayName rather than the phone number:
+            connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, displayName, null), TelecomManager.PRESENTATION_ALLOWED)
+
         connection.setRinging()
 
         startForegroundService()
