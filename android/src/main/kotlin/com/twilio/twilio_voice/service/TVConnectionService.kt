@@ -261,6 +261,20 @@ class TVConnectionService : ConnectionService() {
                         return@let
                     }
 
+                    // Extract firstname and lastname from the custom parameters (if available)
+                    val firstName = callInvite.customParameters["firstname"] ?: ""
+                    val lastName = callInvite.customParameters["lastname"] ?: ""
+                    // Also clean up the default 'from' value (remove any unwanted prefix)
+                    var fromCleaned = callInvite.from ?: ""
+                    fromCleaned = fromCleaned.replace("client:", "")
+
+
+                     // Log or send events as needed (similar to your iOS logging)
+                    Log.d(TAG, "Ringing | $firstName | ${callInvite.to} | Incoming - customParams: ${callInvite.customParameters}")
+
+                    // Optionally, create a display name by combining firstname and lastname
+                    val displayName = "$firstName $lastName".trim()
+
                     val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
                     if (!telecomManager.canReadPhoneState(applicationContext)) {
                         Log.e(TAG, "onCallInvite: Permission to read phone state not granted or requested.")
@@ -294,6 +308,10 @@ class TVConnectionService : ConnectionService() {
 
                     val myBundle: Bundle = Bundle().apply {
                         putParcelable(EXTRA_INCOMING_CALL_INVITE, callInvite)
+                         // Set the Telecom call subject only if displayName is not empty
+                        if (displayName.isNotEmpty()) {
+                            putString(TelecomManager.EXTRA_CALL_SUBJECT, displayName)
+                        }
                     }
                     myBundle.classLoader = CallInvite::class.java.classLoader
 
@@ -302,9 +320,13 @@ class TVConnectionService : ConnectionService() {
                         putBundle(TelecomManager.EXTRA_INCOMING_CALL_EXTRAS, myBundle)
                         putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
 
-                        if (callInvite.customParameters.containsKey("_TWI_SUBJECT")) {
-                            putString(TelecomManager.EXTRA_CALL_SUBJECT, callInvite.customParameters["_TWI_SUBJECT"])
+                        // if (callInvite.customParameters.containsKey("_TWI_SUBJECT")) {
+                        //     putString(TelecomManager.EXTRA_CALL_SUBJECT, callInvite.customParameters["_TWI_SUBJECT"])
+                        // }
+                         if (displayName.isNotEmpty()) {
+                            putString(TelecomManager.EXTRA_CALL_SUBJECT, displayName)
                         }
+                       
                     }
 
                     // Add new incoming call to the telecom manager
