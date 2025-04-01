@@ -675,8 +675,8 @@ class TVConnectionService : ConnectionService() {
                 connection.setCallParameters(callParams)
 
                 // Build custom display name for outgoing calls if provided
-                val firstName = params["firstname"] ?: ""
-                val lastName = params["lastname"] ?: ""
+                val firstName = params["to_firstname"] ?: ""
+                val lastName = params["to_lastname"] ?: ""
                 val customDisplayName = if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
                     "$firstName $lastName".trim()
                 } else {
