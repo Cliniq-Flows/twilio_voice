@@ -674,6 +674,20 @@ class TVConnectionService : ConnectionService() {
                 val callParams = TVCallParametersImpl(mStorage, call, to, from, params)
                 connection.setCallParameters(callParams)
 
+                // Build custom display name for outgoing calls if provided
+                val firstName = params["firstname"] ?: ""
+                val lastName = params["lastname"] ?: ""
+                val customDisplayName = if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
+                    "$firstName $lastName".trim()
+                } else {
+                    to
+                }
+                // Update the connection extras and UI parameters
+                connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, customDisplayName)
+                connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, customDisplayName, null), TelecomManager.PRESENTATION_ALLOWED)
+                connection.setCallerDisplayName(customDisplayName, TelecomManager.PRESENTATION_ALLOWED)
+
+
                 // If call is not attached, attach it
                 if (!activeConnections.containsKey(callSid)) {
                     applyParameters(connection, callParams)
@@ -738,19 +752,11 @@ class TVConnectionService : ConnectionService() {
             connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, it)
         }
 
-        // val name = if(connection.callDirection == CallDirection.OUTGOING) params.to else params.from
-        // connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, name, null), TelecomManager.PRESENTATION_ALLOWED)
-        // connection.setCallerDisplayName(name, TelecomManager.PRESENTATION_ALLOWED)
-         // Extract custom display name parameters if available
-        val firstName = params.getExtra("firstname", "") ?: ""
-        val lastName = params.getExtra("lastname", "") ?: ""
-        val customDisplayName = if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
-            "$firstName $lastName".trim()
-        } else {
-            if (connection.callDirection == CallDirection.OUTGOING) params.to else params.from
-        }
-        connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, customDisplayName, null), TelecomManager.PRESENTATION_ALLOWED)
-        connection.setCallerDisplayName(customDisplayName, TelecomManager.PRESENTATION_ALLOWED)
+        val name = if(connection.callDirection == CallDirection.OUTGOING) params.to else params.from
+        connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, name, null), TelecomManager.PRESENTATION_ALLOWED)
+        connection.setCallerDisplayName(name, TelecomManager.PRESENTATION_ALLOWED)
+      
+       
     }
 
     private fun sendBroadcastEvent(ctx: Context, event: String, callSid: String?, extras: Bundle? = null) {
