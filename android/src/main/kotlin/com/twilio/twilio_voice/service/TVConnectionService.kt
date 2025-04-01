@@ -752,11 +752,30 @@ class TVConnectionService : ConnectionService() {
             connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, it)
         }
 
-        val name = if(connection.callDirection == CallDirection.OUTGOING) params.to else params.from
-        connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, name, null), TelecomManager.PRESENTATION_ALLOWED)
-        connection.setCallerDisplayName(name, TelecomManager.PRESENTATION_ALLOWED)
+        // val name = if(connection.callDirection == CallDirection.OUTGOING) params.to else params.from
+        // connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, name, null), TelecomManager.PRESENTATION_ALLOWED)
+        // connection.setCallerDisplayName(name, TelecomManager.PRESENTATION_ALLOWED)
       
-       
+        // For outgoing calls, try to extract custom name from "from_firstname" and "from_lastname".
+    val name = if (connection.callDirection == CallDirection.OUTGOING) {
+        val firstName = params.getExtra("to_firstname", "") as? String ?: ""
+        val lastName = params.getExtra("to_lastname", "") as? String ?: ""
+        if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
+            "$firstName $lastName".trim()
+        } else {
+            // Fallback if custom names are not provided.
+            params.to
+        }
+    } else {
+        // For incoming calls, use the default "from" value.
+        params.from
+    }
+
+    connection.setAddress(
+        Uri.fromParts(PhoneAccount.SCHEME_TEL, name, null),
+        TelecomManager.PRESENTATION_ALLOWED
+    )
+    connection.setCallerDisplayName(name, TelecomManager.PRESENTATION_ALLOWED)
     }
 
     private fun sendBroadcastEvent(ctx: Context, event: String, callSid: String?, extras: Bundle? = null) {
