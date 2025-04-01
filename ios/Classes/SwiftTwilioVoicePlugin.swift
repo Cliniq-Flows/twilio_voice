@@ -891,10 +891,20 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             }
             
             self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request successful", isError: false)
-            
+
+
+            // Determine the custom display name using your extra parameters.
+            // Here we check for "from_firstname" and "from_lastname" in callArgs.
+            var displayName = handle  // fallback to the handle if custom values are not provided
+            if let fromFirstName = self.callArgs["to_firstname"] as? String,
+            let fromLastName = self.callArgs["to_lastname"] as? String,
+            (!fromFirstName.isEmpty || !fromLastName.isEmpty) {
+                displayName = "\(fromFirstName) \(fromLastName)".trimmingCharacters(in: .whitespaces)
+            }
+
             let callUpdate = CXCallUpdate()
             callUpdate.remoteHandle = callHandle
-            callUpdate.localizedCallerName = self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller
+            callUpdate.localizedCallerName = displayName ?? self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller
             callUpdate.supportsDTMF = false
             callUpdate.supportsHolding = true
             callUpdate.supportsGrouping = false
