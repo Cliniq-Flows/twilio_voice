@@ -737,9 +737,20 @@ class TVConnectionService : ConnectionService() {
         params.getExtra(TVParameters.PARAM_SUBJECT, null)?.let {
             connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, it)
         }
-        val name = if(connection.callDirection == CallDirection.OUTGOING) params.to else params.from
-        connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, name, null), TelecomManager.PRESENTATION_ALLOWED)
-        connection.setCallerDisplayName(name, TelecomManager.PRESENTATION_ALLOWED)
+
+        // val name = if(connection.callDirection == CallDirection.OUTGOING) params.to else params.from
+        // connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, name, null), TelecomManager.PRESENTATION_ALLOWED)
+        // connection.setCallerDisplayName(name, TelecomManager.PRESENTATION_ALLOWED)
+         // Extract custom display name parameters if available
+        val firstName = params.getExtra("firstname", "") ?: ""
+        val lastName = params.getExtra("lastname", "") ?: ""
+        val customDisplayName = if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
+            "$firstName $lastName".trim()
+        } else {
+            if (connection.callDirection == CallDirection.OUTGOING) params.to else params.from
+        }
+        connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, customDisplayName, null), TelecomManager.PRESENTATION_ALLOWED)
+        connection.setCallerDisplayName(customDisplayName, TelecomManager.PRESENTATION_ALLOWED)
     }
 
     private fun sendBroadcastEvent(ctx: Context, event: String, callSid: String?, extras: Bundle? = null) {
