@@ -500,6 +500,7 @@ class TVConnectionService : ConnectionService() {
 
                 ACTION_UPDATE_DISPLAY_NAME -> {
                     val newDisplayName = it.getStringExtra("name")
+                    /////
                     if (newDisplayName.isNullOrEmpty()) {
                         Log.e(TAG, "ACTION_UPDATE_DISPLAY_NAME: Missing display name extra")
                         return@let
