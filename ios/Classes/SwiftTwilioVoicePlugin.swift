@@ -352,7 +352,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         NSLog("No active call to update")
         return
     }
-    let uuid = activeCall.uuid
+    // Unwrap the optional UUID
+    guard let uuid = activeCall.uuid else {
+        NSLog("Active call has no UUID")
+        return
+    }
 
     // Build a CXCallUpdate
     let update = CXCallUpdate()
