@@ -193,4 +193,8 @@ abstract class TwilioVoicePlatform extends SharedPlatformInterface {
   Future<bool?> connectToConference({
     required String conferenceName,
   });
+
+  Future<bool?> updateDisplayName({
+    required String displayName,
+  });
 }

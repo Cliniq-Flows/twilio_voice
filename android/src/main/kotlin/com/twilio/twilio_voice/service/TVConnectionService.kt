@@ -52,7 +52,10 @@ class TVConnectionService : ConnectionService() {
         const val ACTION_CONNECT_TO_CONFERENCE: String = "ACTION_CONNECT_TO_CONFERENCE"
         const val EXTRA_CONFERENCE_NAME: String = "EXTRA_CONFERENCE_NAME"
         // ─────────────────────────────────────────────────────────────────────────────
-        
+
+        const val ACTION_UPDATE_DISPLAY_NAME: String = "ACTION_UPDATE_DISPLAY_NAME";
+
+
 
 
         //region ACTIONS_* Constants
@@ -493,6 +496,32 @@ class TVConnectionService : ConnectionService() {
                 ACTION_ACTIVE_HANDLE -> {
                     val activeCallHandle = getActiveCallHandle()
                     sendBroadcastCallHandle(applicationContext, activeCallHandle)
+                }
+
+                ACTION_UPDATE_DISPLAY_NAME -> {
+                    val newDisplayName = it.getStringExtra("name")
+                    if (newDisplayName.isNullOrEmpty()) {
+                        Log.e(TAG, "ACTION_UPDATE_DISPLAY_NAME: Missing display name extra")
+                        return@let
+                    }
+
+                    val activeCallHandle = getActiveCallHandle()
+                    if (activeCallHandle == null) {
+                        Log.e(TAG, "ACTION_UPDATE_DISPLAY_NAME: No active call handle found")
+                        return@let
+                    }
+
+                    val connection = getConnection(activeCallHandle)
+                    if (connection != null) {
+                        connection.setCallerDisplayName(newDisplayName, TelecomManager.PRESENTATION_ALLOWED)
+                        Log.d(TAG, "Display name updated to: $newDisplayName for call: $activeCallHandle")
+                        connection.setAddress(
+                            Uri.fromParts(PhoneAccount.SCHEME_TEL, newDisplayName, null),
+                            TelecomManager.PRESENTATION_ALLOWED
+                        )
+                    } else {
+                        Log.e(TAG, "ACTION_UPDATE_DISPLAY_NAME: No connection found for call handle: $activeCallHandle")
+                    }
                 }
 
                 // ─── New branch for conference connection ───────────────────────────────

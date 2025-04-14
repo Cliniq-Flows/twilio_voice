@@ -142,4 +142,12 @@ class MethodChannelTwilioCall extends TwilioCallPlatform {
     };
     return _channel.invokeMethod('connectToConference', args);
   }
+
+  @override
+  Future<bool?> updateDisplayName({required String displayName}) {
+    final Map<String, dynamic> args = {
+      'name': displayName,
+    };
+    return _channel.invokeMethod('updateDisplayName', args);
+  }
 }

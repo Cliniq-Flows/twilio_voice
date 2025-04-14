@@ -332,10 +332,44 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
                 result(success)
             }
+        } else  if flutterCall.method == "updateDisplayName" {
+        guard let args = flutterCall.arguments as? [String:Any],
+              let newName = args["name"] as? String
+        else {
+            result(FlutterError(code: "INVALID_ARGS", message: "Missing name", details: nil))
+            return
         }
+        updateCurrentCallDisplayName(to: newName)
+        result(true)
+        return
+    }
         result(true)
     }
     
+
+    func updateCurrentCallDisplayName(to newName: String) {
+    guard let activeCall = self.call else {
+        NSLog("No active call to update")
+        return
+    }
+    let uuid = activeCall.uuid
+
+    // Build a CXCallUpdate
+    let update = CXCallUpdate()
+    update.remoteHandle = CXHandle(type: .generic, value: activeCall.to ?? activeCall.from ?? "")
+    update.localizedCallerName = newName
+    update.supportsDTMF = true
+    update.supportsHolding = true
+    update.supportsGrouping = false
+    update.supportsUngrouping = false
+    update.hasVideo = false
+
+    // Tell CallKit to apply it
+    callKitProvider.reportCall(with: uuid, updated: update)
+}
+
+
+
     /// Updates the CallkitProvider configuration with a new icon, and saves this change to future use.
     /// - Parameter icon: icon path / name
     /// - Returns: true if succesful

@@ -478,6 +478,14 @@ class MethodChannelTwilioVoice extends TwilioVoicePlatform {
         throw ArgumentError('$state is not a valid CallState.');
     }
   }
+
+  @override
+  Future<bool?> updateDisplayName({required String displayName}) {
+    final Map<String, dynamic> args = {
+      'name': displayName,
+    };
+    return _channel.invokeMethod('updateDisplayName', args);
+  }
 }
 
 ActiveCall createCallFromState(String state,
