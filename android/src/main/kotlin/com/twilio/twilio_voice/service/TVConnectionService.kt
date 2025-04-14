@@ -53,7 +53,7 @@ class TVConnectionService : ConnectionService() {
         const val EXTRA_CONFERENCE_NAME: String = "EXTRA_CONFERENCE_NAME"
         // ─────────────────────────────────────────────────────────────────────────────
 
-        const val ACTION_UPDATE_DISPLAY_NAME: String = "ACTION_UPDATE_DISPLAY_NAME";
+        const val ACTION_UPDATE_DISPLAY_NAME: String = "updateDisplayName"
 
 
 
