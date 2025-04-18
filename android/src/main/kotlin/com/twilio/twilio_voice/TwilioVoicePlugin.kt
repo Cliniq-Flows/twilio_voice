@@ -529,6 +529,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             }
 
             TVMethodChannels.HOLD_CALL -> {
+
                 val shouldHold = call.argument<Boolean>("shouldHold") ?: run {
                     result.error(
                         FlutterErrorCodes.MALFORMED_ARGUMENTS,
@@ -1101,6 +1102,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun toggleHold(ctx: Context, shouldHold: Boolean) {
+
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_TOGGLE_HOLD
             putExtra(TVConnectionService.EXTRA_HOLD_STATE, shouldHold)

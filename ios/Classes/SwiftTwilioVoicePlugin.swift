@@ -1004,7 +1004,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // check if call is still active, preventing a race condition ending the call throwing an End Call Failed transaction error 4 error
         guard isCallActive(uuid: uuid) else {
             print("Call not found or already ended. Skipping end request.")
-            self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+         //   self.sendPhoneCallEvents(description: "Call Ended", isError: false)
             return
         }
         
@@ -1014,9 +1014,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         callKitCallController.request(transaction) { error in
             if let error = error {
                 self.sendPhoneCallEvents(description: "End Call Failed: \(error.localizedDescription).", isError: true)
-            } else {
-                self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-            }
+            } 
+            // else {
+            //     self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+            // }
         }
     }
     
