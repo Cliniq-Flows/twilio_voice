@@ -776,9 +776,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         callDisconnected()
         self.userInitiatedDisconnect = false
 
-         DispatchQueue.main.async {
-        self.makeCall(to: self.callTo)
-    }
+    //      DispatchQueue.main.async {
+    //     self.makeCall(to: self.callTo)
+    // }
     }
     
     func callDisconnected() {
