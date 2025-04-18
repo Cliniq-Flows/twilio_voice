@@ -758,16 +758,21 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             self.sendPhoneCallEvents(description: "Call Failed: \(error.localizedDescription)", isError: true)
         }
         
-        if !self.userInitiatedDisconnect {
-            var reason = CXCallEndedReason.remoteEnded
-            self.sendPhoneCallEvents(description: "LOG|User initiated disconnect", isError: false)
-            if error != nil {
-                reason = .failed
-            }
+        // if !self.userInitiatedDisconnect {
+        //     var reason = CXCallEndedReason.remoteEnded
+        //     self.sendPhoneCallEvents(description: "LOG|User initiated disconnect", isError: false)
+        //     if error != nil {
+        //         reason = .failed
+        //     }
             
-            self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
-        }
+        //     self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
+        // }
         
+     // 👉 Always report to CallKit that *this* call has ended:
+    let reason: CXCallEndedReason = self.userInitiatedDisconnect ? .remoteEnded : .failed
+    self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
+
+
         callDisconnected()
     }
     
