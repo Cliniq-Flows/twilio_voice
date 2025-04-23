@@ -11,6 +11,7 @@ class StorageImpl(ctx: Context) : Storage {
     private val kDefaultCaller: String = "defaultCaller"
     private val kRejectOnNoPermissions: String = "rejectOnNoPermissions"
     private val kShowNotifications: String = "show-notifications"
+    private val kTwilioCustomParams:String = "TwilioCustomParams"
 
     override var defaultCaller
         get() = prefs.getString(kDefaultCaller, null)
@@ -96,5 +97,18 @@ class StorageImpl(ctx: Context) : Storage {
         val editor = prefs.edit()
         editor.clear()
         return editor.commit()
+    }
+
+    // ── NEW: JSON‐encoded custom‐params ───────────────────────────────────────
+
+    override fun saveCustomParams(json: String) {
+        prefs.edit().putString(kTwilioCustomParams, json).apply()
+    }
+
+    override fun getCustomParamsJson(): String? =
+        prefs.getString(kTwilioCustomParams, null)
+
+    override fun clearCustomParams() {
+        prefs.edit().remove(kTwilioCustomParams).apply()
     }
 }

@@ -184,6 +184,9 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 // TODO - outgoing call check
                 val list = arrayOf("Ringing", call.from ?: "", call.to ?: "", "Incoming")
                 logEvents("", list)
+                // ── NEW: serialize & save ───────────────────────────────
+                val paramsJson = JSONObject(call.customParameters).toString()
+                storage?.saveCustomParams(paramsJson)
             }
 
             override fun onConnectFailure(call: Call, error: CallException) {
@@ -202,6 +205,9 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 // TODO - outgoing call check
                 val list = arrayOf("Connected", call.from ?: "", call.to ?: "", "Incoming")
                 logEvents("", list)
+                 // ── NEW: serialize & save (again, in case they differ) ─
+        val paramsJson = JSONObject(call.customParameters).toString()
+        storage?.saveCustomParams(paramsJson)
             }
 
             override fun onReconnecting(call: Call, callException: CallException) {
@@ -214,6 +220,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
             override fun onDisconnected(call: Call, error: CallException?) {
                 Log.d(TAG, "Disconnected")
+                storage?.clearCustomParams()
                 if (error != null) {
                     val message = String.format(
                         Locale.getDefault(),
@@ -898,6 +905,25 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 }
                 // Call a helper function to send the intent to update display name.
                 updateDisplayName(newDisplayName)
+                result.success(true)
+            }
+
+            TVMethodChannels.GET_CUSTOM_PARAMS -> {
+                // returns the raw JSON map to Dart
+                val json = storage?.getCustomParamsJson()
+                if (json == null) {
+                    result.success(null)
+                } else {
+                    // decode into a Map<String, String> for Dart
+                    val map = JSONObject(json).let { obj ->
+                        obj.keys().asSequence().associateWith { key -> obj.getString(key) }
+                    }
+                    result.success(map)
+                }
+            }
+
+            TVMethodChannels.CLEAR_CUSTOM_PARAMS -> {
+                storage?.clearCustomParams()
                 result.success(true)
             }
 
@@ -1750,6 +1776,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                     }
                 }.toString()
 //                callSid = callHandle
+                val paramsJson = JSONObject(callInvite.customParameters).toString()
+            storage?.saveCustomParams(paramsJson)
                 logEvents("", arrayOf("Incoming", from, to, CallDirection.INCOMING.label, params))
                 logEvents("", arrayOf("Ringing", from, to, CallDirection.INCOMING.label, params))
             }
@@ -1764,6 +1792,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                         return
                     }
 //                callSid = null
+                 // ── NEW: clear when call ends ─────────────────────────
+            storage?.clearCustomParams()
                 Log.d(TAG, "handleBroadcastIntent: Call ended $callHandle")
                 logEvent("", "Call ended")
             }

@@ -150,4 +150,17 @@ class MethodChannelTwilioCall extends TwilioCallPlatform {
     };
     return _channel.invokeMethod('updateDisplayName', args);
   }
+
+  /// Retrieves the last‐saved custom parameters (or null).
+  @override
+  Future<Map<String, dynamic>?> getCustomParams() async {
+    final Map? raw = await _channel.invokeMethod<Map>('getCustomParams');
+    return raw?.cast<String, dynamic>();
+  }
+
+  /// Clears the saved custom parameters.
+  @override
+  Future<bool?> clearCustomParams() {
+    return _channel.invokeMethod<bool>('clearCustomParams');
+  }
 }

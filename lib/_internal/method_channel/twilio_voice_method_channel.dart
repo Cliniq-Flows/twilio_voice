@@ -486,6 +486,17 @@ class MethodChannelTwilioVoice extends TwilioVoicePlatform {
     };
     return _channel.invokeMethod('updateDisplayName', args);
   }
+
+  @override
+  Future<Map<String, dynamic>?> getCustomParams() async {
+    final Map? raw = await _channel.invokeMethod<Map>('getCustomParams');
+    return raw?.cast<String, dynamic>();
+  }
+
+  @override
+  Future<bool?> clearCustomParams() {
+    return _channel.invokeMethod<bool>('clearCustomParams');
+  }
 }
 
 ActiveCall createCallFromState(String state,

@@ -49,8 +49,10 @@ enum class TVMethodChannels(val method: String) {
     IS_REJECTING_CALL_ON_NO_PERMISSIONS("isRejectingCallOnNoPermissions"),
     UPDATE_CALLKIT_ICON("updateCallKitIcon"),
     CONNECTTOCONFERENCE("connectToConference"),
-    UPDATE_DISPLAY_NAME("updateDisplayName");
-    
+    UPDATE_DISPLAY_NAME("updateDisplayName"),
+    GET_CUSTOM_PARAMS("getCustomParams"),
+    CLEAR_CUSTOM_PARAMS("clearCustomParams");
+
 
     companion object {
         private val map = TVMethodChannels.values().associateBy(TVMethodChannels::method)

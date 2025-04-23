@@ -69,4 +69,21 @@ interface Storage {
      * Clear the storage of all entries, including registered users and default caller name.
      */
     fun clearStorage(): Boolean
+
+     // ── NEW: custom‐params storage ─────────────────────────────────────────────
+
+    /**
+     * Save a JSON‐encoded blob of custom parameters.
+     */
+    fun saveCustomParams(json: String)
+
+    /**
+     * Retrieve the JSON string of saved custom parameters, or null if none.
+     */
+    fun getCustomParamsJson(): String?
+
+    /**
+     * Remove any saved custom parameters.
+     */
+    fun clearCustomParams()
 }

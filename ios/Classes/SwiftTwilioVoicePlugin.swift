@@ -45,6 +45,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     var userInitiatedDisconnect: Bool = false
     var callOutgoing: Bool = false
     
+     // ——————————————————————————————————————
+    // MARK: Shared-Prefs Helpers
+    // ——————————————————————————————————————
+    private let kCustomParamsKey = "TwilioCustomParams"
+
     private var activeCalls: [UUID: CXCall] = [:]
     
     static var appName: String {
@@ -342,7 +347,15 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         updateCurrentCallDisplayName(to: newName)
         result(true)
         return
-    }
+    } else if flutterCall.method == "getCustomParams" {
+            result(getCustomParams())
+            return
+        }
+        else if flutterCall.method == "clearCustomParams" {
+            clearCustomParams()
+            result(true)
+            return
+        }
         result(true)
     }
     
@@ -712,6 +725,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let to = (call.to ?? self.callTo)
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(to)|\(direction)", isError: false)
         
+        if let custom = (call as? TVOCall)?.customParameters {
+            saveCustomParams(custom)
+        }
         //self.placeCallButton.setTitle("Ringing", for: .normal)
     }
     
@@ -723,6 +739,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         if let callKitCompletionCallback = callKitCompletionCallback {
             callKitCompletionCallback(true)
+        }
+
+         if let custom = (call as? TVOCall)?.customParameters {
+            saveCustomParams(custom)
         }
         
         toggleAudioRoute(toSpeaker: false)
@@ -753,6 +773,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     public func callDidDisconnect(call: Call, error: Error?) {
+         clearCustomParams()
         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
         if let error = error {
             self.sendPhoneCallEvents(description: "Call Failed: \(error.localizedDescription)", isError: true)
@@ -1182,6 +1203,27 @@ extension UIWindow {
         default:
             return topViewController(for: presentedViewController)
         }
+    }
+
+   private func saveCustomParams(_ params: [String:Any]) {
+        // 1) serialize to JSON
+        guard let data = try? JSONSerialization.data(withJSONObject: params, options: []),
+              let json = String(data: data, encoding: .utf8)
+        else { return }
+        // 2) persist string
+        UserDefaults.standard.set(json, forKey: kCustomParamsKey)
+    }
+
+    private func getCustomParams() -> [String:Any]? {
+        guard let json = UserDefaults.standard.string(forKey: kCustomParamsKey),
+              let data = json.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String:Any]
+        else { return nil }
+        return dict
+    }
+
+    private func clearCustomParams() {
+        UserDefaults.standard.removeObject(forKey: kCustomParamsKey)
     }
 }
 extension UserDefaults {
