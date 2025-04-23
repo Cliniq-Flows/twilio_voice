@@ -46,7 +46,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     var callOutgoing: Bool = false
     
      // ——————————————————————————————————————
-    // MARK: Shared-Prefs Helpers
+    // MARK: Shared-Prefs Helpers 🔥 NEW
     // ——————————————————————————————————————
     private let kCustomParamsKey = "TwilioCustomParams"
 
@@ -627,6 +627,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     // MARK: TVONotificaitonDelegate
     public func callInviteReceived(callInvite: CallInvite) {
+
+         if let custom = callInvite.customParameters {
+            saveCustomParams(custom)
+        }
         // self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
         
         // /**
@@ -725,9 +729,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let to = (call.to ?? self.callTo)
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(to)|\(direction)", isError: false)
         
-        if let custom = (call as? TVOCall)?.customParameters {
-            saveCustomParams(custom)
-        }
+       saveCustomParams(callArgs as [String:Any])
         //self.placeCallButton.setTitle("Ringing", for: .normal)
     }
     
@@ -741,9 +743,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             callKitCompletionCallback(true)
         }
 
-         if let custom = (call as? TVOCall)?.customParameters {
-            saveCustomParams(custom)
-        }
+         saveCustomParams(callArgs as [String:Any])
         
         toggleAudioRoute(toSpeaker: false)
     }
@@ -1175,6 +1175,28 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             completionHandler([.alert])
         }
     }
+
+     /// Serialize + save a [String:Any] dictionary
+    private func saveCustomParams(_ params: [String:Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: params, options: []),
+              let json = String(data: data, encoding: .utf8)
+        else { return }
+        UserDefaults.standard.set(json, forKey: kCustomParamsKey)
+    }
+
+    /// Read back the dictionary (if any)
+    private func getCustomParams() -> [String:Any]? {
+        guard let json = UserDefaults.standard.string(forKey: kCustomParamsKey),
+              let data = json.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String:Any]
+        else { return nil }
+        return dict
+    }
+
+    /// Remove it when the call ends
+    private func clearCustomParams() {
+        UserDefaults.standard.removeObject(forKey: kCustomParamsKey)
+    }
     
 }
 
@@ -1205,26 +1227,26 @@ extension UIWindow {
         }
     }
 
-   private func saveCustomParams(_ params: [String:Any]) {
-        // 1) serialize to JSON
-        guard let data = try? JSONSerialization.data(withJSONObject: params, options: []),
-              let json = String(data: data, encoding: .utf8)
-        else { return }
-        // 2) persist string
-        UserDefaults.standard.set(json, forKey: kCustomParamsKey)
-    }
+//    private func saveCustomParams(_ params: [String:Any]) {
+//         // 1) serialize to JSON
+//         guard let data = try? JSONSerialization.data(withJSONObject: params, options: []),
+//               let json = String(data: data, encoding: .utf8)
+//         else { return }
+//         // 2) persist string
+//         UserDefaults.standard.set(json, forKey: kCustomParamsKey)
+//     }
 
-    private func getCustomParams() -> [String:Any]? {
-        guard let json = UserDefaults.standard.string(forKey: kCustomParamsKey),
-              let data = json.data(using: .utf8),
-              let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String:Any]
-        else { return nil }
-        return dict
-    }
+//     private func getCustomParams() -> [String:Any]? {
+//         guard let json = UserDefaults.standard.string(forKey: kCustomParamsKey),
+//               let data = json.data(using: .utf8),
+//               let dict = try? JSONSerialization.jsonObject(with: data, options: []) as? [String:Any]
+//         else { return nil }
+//         return dict
+//     }
 
-    private func clearCustomParams() {
-        UserDefaults.standard.removeObject(forKey: kCustomParamsKey)
-    }
+//     private func clearCustomParams() {
+//         UserDefaults.standard.removeObject(forKey: kCustomParamsKey)
+//     }
 }
 extension UserDefaults {
     public func optionalBool(forKey defaultName: String) -> Bool? {
