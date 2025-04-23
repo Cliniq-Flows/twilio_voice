@@ -184,9 +184,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 // TODO - outgoing call check
                 val list = arrayOf("Ringing", call.from ?: "", call.to ?: "", "Incoming")
                 logEvents("", list)
-                // ── NEW: serialize & save ───────────────────────────────
-                val paramsJson = JSONObject(call.customParameters).toString()
-                storage?.saveCustomParams(paramsJson)
+
             }
 
             override fun onConnectFailure(call: Call, error: CallException) {
@@ -206,8 +204,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 val list = arrayOf("Connected", call.from ?: "", call.to ?: "", "Incoming")
                 logEvents("", list)
                  // ── NEW: serialize & save (again, in case they differ) ─
-        val paramsJson = JSONObject(call.customParameters).toString()
-        storage?.saveCustomParams(paramsJson)
+
             }
 
             override fun onReconnecting(call: Call, callException: CallException) {

@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.telecom.*
 import android.util.Log
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import org.json.JSONObject
 import com.twilio.twilio_voice.R
 import com.twilio.twilio_voice.call.TVCallInviteParametersImpl
 import com.twilio.twilio_voice.call.TVCallParametersImpl
@@ -210,7 +211,7 @@ class TVConnectionService : ConnectionService() {
         }
     }
 
-
+    private val storage: Storage by lazy { StorageImpl(applicationContext) }
     private fun stopSelfSafe(): Boolean {
         if (!hasActiveCalls()) {
             stopSelf()
@@ -271,7 +272,8 @@ class TVConnectionService : ConnectionService() {
                     var fromCleaned = callInvite.from ?: ""
                     fromCleaned = fromCleaned.replace("client:", "")
 
-
+                    val incomingJson = JSONObject(callInvite.customParameters).toString()
+                    storage.saveCustomParams(incomingJson)
                      // Log or send events as needed (similar to your iOS logging)
                     Log.d(TAG, "Ringing | $firstName | ${callInvite.to} | Incoming - customParams: ${callInvite.customParameters}")
 
@@ -332,6 +334,9 @@ class TVConnectionService : ConnectionService() {
                        
                     }
 
+
+
+
                     // Add new incoming call to the telecom manager
                     telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
                 }
@@ -355,6 +360,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_HANGUP -> {
+                    storage.clearCustomParams()
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
                         Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
                         return@let
@@ -388,6 +394,9 @@ class TVConnectionService : ConnectionService() {
                             params[key] = value
                         }
                     }
+
+                    val outgoingJson = JSONObject(params as Map<*, *>).toString()
+                    storage.saveCustomParams(outgoingJson)
 
                     // Add required params
                     params[EXTRA_FROM] = from
@@ -441,6 +450,8 @@ class TVConnectionService : ConnectionService() {
                         putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
                         putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
                     }
+
+
 
                     val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
                     telecomManager.placeCall(address, extras)
@@ -756,6 +767,7 @@ class TVConnectionService : ConnectionService() {
             sendBroadcastCallHandle(applicationContext, extra?.getString(TVBroadcastReceiver.EXTRA_CALL_HANDLE))
         }
         val onDisconnect: CompletionHandler<DisconnectCause> = CompletionHandler {
+            storage.clearCustomParams()
             if (activeConnections.containsKey(callSid)) {
                 activeConnections.remove(callSid)
             }
