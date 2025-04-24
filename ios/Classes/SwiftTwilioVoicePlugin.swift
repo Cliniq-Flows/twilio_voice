@@ -779,27 +779,15 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             self.sendPhoneCallEvents(description: "Call Failed: \(error.localizedDescription)", isError: true)
         }
         
-        // if !self.userInitiatedDisconnect {
-        //     var reason = CXCallEndedReason.remoteEnded
-        //     self.sendPhoneCallEvents(description: "LOG|User initiated disconnect", isError: false)
-        //     if error != nil {
-        //         reason = .failed
-        //     }
-            
-        //     self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
-        // }
-        
-     // 👉 Always report to CallKit that *this* call has ended:
-    let reason: CXCallEndedReason = self.userInitiatedDisconnect ? .remoteEnded : .failed
-    self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
+    
+        let reason: CXCallEndedReason = self.userInitiatedDisconnect ? .remoteEnded : .failed
+        self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
 
 
         callDisconnected()
         self.userInitiatedDisconnect = false
 
-    //      DispatchQueue.main.async {
-    //     self.makeCall(to: self.callTo)
-    // }
+  
     }
     
     func callDisconnected() {
@@ -1084,10 +1072,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // Specify the conference parameter so that your TwiML app knows to join the conference.
         builder.params["conference"] = conferenceName
     }
+    let conferenceCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
     let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
     self.call = theCall // Edit error fix here
-    
     self.callKitCompletionCallback = completionHandler
+     sendPhoneCallEvents(description: "Connecting|\(conferenceName)|\(conferenceName)|Outgoing", isError: false)
     }
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {

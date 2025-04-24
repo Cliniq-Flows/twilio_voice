@@ -582,7 +582,8 @@ class TVConnectionService : ConnectionService() {
     
     val tempId = "conference_$conferenceName"
     activeConnections[tempId] = conferenceConnection
-    
+      attachCallEventListeners(conferenceConnection, tempId)
+
     Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
     
     
@@ -771,6 +772,14 @@ class TVConnectionService : ConnectionService() {
             if (activeConnections.containsKey(callSid)) {
                 activeConnections.remove(callSid)
             }
+
+            // ── NEW ── let your Flutter side know that the call really ended
+            sendBroadcastEvent(
+            applicationContext,
+            TVBroadcastReceiver.ACTION_CALL_ENDED,
+            callSid
+            )
+
             stopForegroundService()
             stopSelfSafe()
         }
