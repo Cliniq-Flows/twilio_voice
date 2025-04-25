@@ -329,28 +329,15 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             result(updateCallKitIcon(icon: newIcon))
             return
         }else if flutterCall.method == "connectToConference" {
-            guard let conferenceName = arguments["conferenceName"] as? String else {
-                result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing conferenceName", details: nil))
-                return
-            }
-            let uuid = UUID()
-            let handle = CXHandle(type: .generic, value: conferenceName)
-    let startAction = CXStartCallAction(call: uuid, handle: handle)
-    let transaction = CXTransaction(action: startAction)
-    callKitCallController.request(transaction) { error in
-        if let error = error {
-            // something went wrong with the UI
-            self.sendPhoneCallEvents(description: "StartCallAction failed: \(error)", isError: true)
-            result(false)
-            return
-        }
-
-        // Tell CallKit we’re connecting
-        self.callKitProvider.reportOutgoingCall(with: uuid, startedConnectingAt: Date())
-
-            self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
-                result(success)
-            }
+   
+     guard let conferenceName = arguments["conferenceName"] as? String else {
+                 result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing conferenceName", details: nil))
+                 return
+             }
+             let uuid = UUID()
+             self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
+                 result(success)
+             
     }
         } else  if flutterCall.method == "updateDisplayName" {
         guard let args = flutterCall.arguments as? [String:Any],
@@ -1102,7 +1089,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
     self.call = theCall // Edit error fix here
     self.callKitCompletionCallback = completionHandler
-     sendPhoneCallEvents(description: "Connecting|\(conferenceName)|\(conferenceName)|Outgoing", isError: false)
+    audioDevice.isEnabled = true
     }
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {

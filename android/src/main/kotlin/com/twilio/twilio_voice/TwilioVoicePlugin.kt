@@ -8,11 +8,9 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.telecom.CallAudioState
-import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 import android.util.Log
@@ -1011,42 +1009,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
 
     private fun connectToConference(conferenceName: String, token: String): Boolean {
-        context?.let { ctx ->
-            // 1) Do we have CALL_PHONE (and MANAGE_OWN_CALLS on older APIs)?
-            if (!ctx.hasCallPhonePermission() || !ctx.hasManageOwnCallsPermission()) {
-                // Ask Flutter / the user for it, then retry
-                requestPermissionForCallPhone { granted ->
-                    if (granted) {
-                        connectToConference(conferenceName, token)
-                    }
-                }
-                Log.w(TAG, "connectToConference: missing required phone permissions")
-                return false
-            }
-
-            // 2) Build the Telecom placeCall
-            val tm = ctx.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
-            val phoneAccountHandle = tm.getPhoneAccountHandle(ctx)
-            val extras = Bundle().apply {
-                putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
-                putString(TVConnectionService.EXTRA_CONFERENCE_NAME, conferenceName)
-                putString(TVConnectionService.EXTRA_TOKEN, token)
-            }
-            val uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, conferenceName, null)
-
-            // 3) Safely call placeCall
-            try {
-                tm.placeCall(uri, extras)
-            } catch (e: SecurityException) {
-                Log.e(TAG, "connectToConference: SecurityException, missing permission", e)
-                return false
-            }
-
-            return true
-        }
-        Log.e(TAG, "connectToConference: context is null")
-        return false
-    /*return context?.let { ctx ->
+    return context?.let { ctx ->
         // Check if there is an active call and hang it up
         TVConnectionService.getActiveCallHandle()?.let { activeCallHandle ->
             Log.d(TAG, "Disconnecting active call with handle: $activeCallHandle")
@@ -1075,7 +1038,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     } ?: run {
         Log.e(TAG, "Context is null. Cannot connect to conference.")
         false
-    }*/
+    }
 }
 
 
