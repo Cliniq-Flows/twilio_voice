@@ -572,12 +572,18 @@ class TVConnectionService : ConnectionService() {
     val params = HashMap<String, String>().apply {
         put("conference", conferenceName)  // Use lowercase key as in Swift
     }
+
+
     
     val connectOptions = ConnectOptions.Builder(token)
         .params(params)
         .build()
     
+    
+
     val conferenceConnection = TVCallConnection(applicationContext)
+    conferenceConnection.setInitializing()
+    conferenceConnection.setDialing()
     conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
     
     val tempId = "conference_$conferenceName"

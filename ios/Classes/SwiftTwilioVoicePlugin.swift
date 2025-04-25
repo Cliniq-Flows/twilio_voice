@@ -334,9 +334,24 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                 return
             }
             let uuid = UUID()
+            let handle = CXHandle(type: .generic, value: conferenceName)
+    let startAction = CXStartCallAction(call: uuid, handle: handle)
+    let transaction = CXTransaction(action: startAction)
+    callKitCallController.request(transaction) { error in
+        if let error = error {
+            // something went wrong with the UI
+            self.sendPhoneCallEvents(description: "StartCallAction failed: \(error)", isError: true)
+            result(false)
+            return
+        }
+
+        // Tell CallKit we’re connecting
+        self.callKitProvider.reportOutgoingCall(with: uuid, startedConnectingAt: Date())
+
             self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
                 result(success)
             }
+    }
         } else  if flutterCall.method == "updateDisplayName" {
         guard let args = flutterCall.arguments as? [String:Any],
               let newName = args["name"] as? String
@@ -785,7 +800,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          // First, report to CallKit so the iOS in-call UI goes away:
   let reason: CXCallEndedReason = self.userInitiatedDisconnect
     ? .remoteEnded   // or .failed if you want
-    : .remoteEnded
+    : .failed       
         self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
             let eventName = self.userInitiatedDisconnect
     ? "disconnectedLocal"
