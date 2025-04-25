@@ -1865,9 +1865,11 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
             TVNativeCallActions.ACTION_REJECTED -> {
                 logEvent("Call Rejected")
+                 storage?.clearCustomParams()
             }
 
             TVNativeCallActions.ACTION_ABORT -> {
+                  storage?.clearCustomParams()
                 Log.d(TAG, "handleBroadcastIntent: Abort")
                 logEvent("", "Call Ended")
             }
@@ -1965,6 +1967,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             }
 
             TVNativeCallEvents.EVENT_MISSED -> {
+                   storage?.clearCustomParams()
                 logEvent("", "Missed Call")
                 logEvent("", "Call Ended")
             }

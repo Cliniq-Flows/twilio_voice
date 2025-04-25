@@ -251,7 +251,7 @@ class TVConnectionService : ConnectionService() {
                         Log.e(TAG, "onStartCommand: ACTION_CANCEL_CALL_INVITE is missing parcelable EXTRA_CANCEL_CALL_INVITE")
                         return@let
                     }
-
+                     storage.clearCustomParams()
                     val callHandle = cancelledCallInvite.callSid
                     getConnection(callHandle)?.onAbort() ?: run {
                         Log.e(TAG, "onStartCommand: [ACTION_CANCEL_CALL_INVITE] could not find connection for callHandle: $callHandle")
