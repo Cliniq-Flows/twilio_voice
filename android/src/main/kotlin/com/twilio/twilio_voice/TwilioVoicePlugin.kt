@@ -1009,31 +1009,53 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
 
     private fun connectToConference(conferenceName: String, token: String): Boolean {
-    return context?.let { ctx ->
-        // Check if there is an active call and hang it up
-        TVConnectionService.getActiveCallHandle()?.let { activeCallHandle ->
-            Log.d(TAG, "Disconnecting active call with handle: $activeCallHandle")
-            Intent(ctx, TVConnectionService::class.java).apply {
-                action = TVConnectionService.ACTION_HANGUP
-                putExtra(TVConnectionService.EXTRA_CALL_HANDLE, activeCallHandle)
-                ctx.startService(this)
-            }
-            // Optionally wait briefly to ensure the call is disconnected.
-            // Use a Handler.postDelayed if you're on the main thread.
-            try {
-                Thread.sleep(500)
-            } catch (e: InterruptedException) {
-                Log.e(TAG, "Interrupted while waiting for call disconnect", e)
-            }
+    // return context?.let { ctx ->
+    //     // Check if there is an active call and hang it up
+    //     TVConnectionService.getActiveCallHandle()?.let { activeCallHandle ->
+    //         Log.d(TAG, "Disconnecting active call with handle: $activeCallHandle")
+    //         Intent(ctx, TVConnectionService::class.java).apply {
+    //             action = TVConnectionService.ACTION_HANGUP
+    //             putExtra(TVConnectionService.EXTRA_CALL_HANDLE, activeCallHandle)
+    //             ctx.startService(this)
+    //         }
+    //         // Optionally wait briefly to ensure the call is disconnected.
+    //         // Use a Handler.postDelayed if you're on the main thread.
+    //         try {
+    //             Thread.sleep(500)
+    //         } catch (e: InterruptedException) {
+    //             Log.e(TAG, "Interrupted while waiting for call disconnect", e)
+    //         }
+    //     }
+
+    //     // Now initiate the conference call
+    //     Intent(ctx, TVConnectionService::class.java).apply {
+    //         action = TVConnectionService.ACTION_CONNECT_TO_CONFERENCE
+    //         putExtra(TVConnectionService.EXTRA_CONFERENCE_NAME, conferenceName)
+    //         putExtra(TVConnectionService.EXTRA_TOKEN, token)
+    //         ctx.startService(this)
+    //     }
+    //     true
+    // } ?: run {
+    //     Log.e(TAG, "Context is null. Cannot connect to conference.")
+    //     false
+    // }
+       return context?.let { ctx ->
+        // 1) Ensure we’ve registered a PhoneAccount
+        if (!telecomManager!!.hasCallCapableAccount(ctx, TVConnectionService::class.java.name)) {
+            registerPhoneAccount()
         }
 
-        // Now initiate the conference call
-        Intent(ctx, TVConnectionService::class.java).apply {
-            action = TVConnectionService.ACTION_CONNECT_TO_CONFERENCE
-            putExtra(TVConnectionService.EXTRA_CONFERENCE_NAME, conferenceName)
-            putExtra(TVConnectionService.EXTRA_TOKEN, token)
-            ctx.startService(this)
+        // 2) Build the extras bundle that TVConnectionService will pick up
+        val phoneAccount = telecomManager!!.getPhoneAccountHandle(ctx)
+        val extras = Bundle().apply {
+            putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccount)
+            putString(TVConnectionService.EXTRA_CONFERENCE_NAME, conferenceName)
+            putString(TVConnectionService.EXTRA_TOKEN, token)
         }
+
+        // 3) Kick off the “outgoing” call via TelecomManager
+        val address = Uri.fromParts(PhoneAccount.SCHEME_TEL, conferenceName, null)
+        telecomManager!!.placeCall(address, extras)
         true
     } ?: run {
         Log.e(TAG, "Context is null. Cannot connect to conference.")

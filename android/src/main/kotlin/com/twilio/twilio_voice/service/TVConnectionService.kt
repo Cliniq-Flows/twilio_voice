@@ -537,58 +537,14 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 // ─── New branch for conference connection ───────────────────────────────
-                // ACTION_CONNECT_TO_CONFERENCE -> {
-                //     val conferenceName = intent.getStringExtra(EXTRA_CONFERENCE_NAME)
-                //     if (conferenceName.isNullOrEmpty()){
-                //         Log.e(TAG, "onStartCommand: ACTION_CONNECT_TO_CONFERENCE missing conference name")
-                //         return@let
-                //     }
-                //     // Pass the intent along with the conference name
-                //     joinConference(intent, conferenceName)
-                // }
-                                ACTION_CONNECT_TO_CONFERENCE -> {
+                ACTION_CONNECT_TO_CONFERENCE -> {
                     val conferenceName = intent.getStringExtra(EXTRA_CONFERENCE_NAME)
-                    if (conferenceName.isNullOrEmpty()) {
+                    if (conferenceName.isNullOrEmpty()){
                         Log.e(TAG, "onStartCommand: ACTION_CONNECT_TO_CONFERENCE missing conference name")
                         return@let
                     }
-                    val token = intent.getStringExtra(EXTRA_TOKEN)
-                    if (token.isNullOrEmpty()) {
-                        Log.e(TAG, "onStartCommand: ACTION_CONNECT_TO_CONFERENCE missing token")
-                        return@let
-                    }
-                    val from = intent.getStringExtra(EXTRA_FROM) ?: ""
-
-                    // Build outgoing parameters bundle
-                    val paramsBundle = Bundle().apply {
-                        putString("conference", conferenceName)
-                    }
-                    // Build combined bundle for telecom
-                    val myBundle = Bundle().apply {
-                        putString(EXTRA_TOKEN, token)
-                        putString(EXTRA_FROM, from)
-                        putString(EXTRA_TO, conferenceName)
-                        putString("conference", conferenceName)
-                    }
-
-                    val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
-                    val phoneAccountHandle = telecomManager.getPhoneAccountHandle(applicationContext)
-
-                    // Ensure phone account is registered/enabled
-                    if (!telecomManager.hasCallCapableAccount(applicationContext, phoneAccountHandle.componentName.className)) {
-                        telecomManager.registerPhoneAccount(applicationContext, phoneAccountHandle)
-                    }
-
-                    // Create extras for placeCall
-                    val extras = Bundle().apply {
-                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
-                        putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
-                    }
-
-                    // Fire native dialer UI
-                    val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, conferenceName, null)
-                    telecomManager.placeCall(address, extras)
-                    Log.d(TAG, "Placing conference call via Telecom: $conferenceName")
+                    // Pass the intent along with the conference name
+                    joinConference(intent, conferenceName)
                 }
                 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -700,6 +656,27 @@ class TVConnectionService : ConnectionService() {
 
         super.onCreateOutgoingConnection(connectionManagerPhoneAccount, request)
         Log.d(TAG, "onCreateOutgoingConnection")
+
+        // 1) If this outgoing call is really a conference…
+    val bundle = request?.extras
+    val conferenceName = bundle?.getString(EXTRA_CONFERENCE_NAME)
+    val token = bundle?.getString(EXTRA_TOKEN)
+    if (!conferenceName.isNullOrEmpty() && !token.isNullOrEmpty()) {
+        // 2) Build a TVCallConnection just like an outgoing, but use conference params
+        val connection = TVCallConnection(applicationContext).apply {
+            // mark UI state
+            setInitializing()
+            // actually start the Twilio conference call
+            val opts = ConnectOptions.Builder(token)
+                .params(mapOf("conference" to conferenceName))
+                .build()
+            twilioCall = Voice.connect(applicationContext, opts, this)
+        }
+
+        // 3) Hook up listeners & return it so Telecom shows the native UI
+        attachCallEventListeners(connection, "conf_$conferenceName")
+        return connection
+    }
 
         val extras = request?.extras
         val myBundle: Bundle = extras?.getBundle(EXTRA_OUTGOING_PARAMS) ?: run {
