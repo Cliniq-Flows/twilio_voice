@@ -780,10 +780,18 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         
     
-        let reason: CXCallEndedReason = self.userInitiatedDisconnect ? .remoteEnded : .failed
+        // let reason: CXCallEndedReason = self.userInitiatedDisconnect ? .remoteEnded : .failed
+         // First, report to CallKit so the iOS in-call UI goes away:
+  let reason: CXCallEndedReason = self.userInitiatedDisconnect
+    ? .remoteEnded   // or .failed if you want
+    : .remoteEnded
         self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
+            let eventName = self.userInitiatedDisconnect
+    ? "disconnectedLocal"
+    : "disconnectedRemote"
+  sendPhoneCallEvents(description: eventName, isError: false)
 
-
+ 
         callDisconnected()
         self.userInitiatedDisconnect = false
 

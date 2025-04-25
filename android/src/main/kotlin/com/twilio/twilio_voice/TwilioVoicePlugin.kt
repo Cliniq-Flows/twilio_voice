@@ -227,7 +227,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                     )
                     logEvent(message)
                 }
-                logEvent("", "Call Ended")
+               // logEvent("", "Call Ended")
+                logEvent("", TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE)
             }
         }
     }
@@ -1792,7 +1793,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                  // ── NEW: clear when call ends ─────────────────────────
             storage?.clearCustomParams()
                 Log.d(TAG, "handleBroadcastIntent: Call ended $callHandle")
-                logEvent("", "Call ended")
+                // logEvent("", "Call ended")
+                logEvent("", TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE)
             }
 
             TVBroadcastReceiver.ACTION_CALL_STATE -> {
@@ -1953,11 +1955,13 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             }
 
             TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL -> {
-                logEvent("", "Call Ended")
+                // logEvent("", "Call Ended")
+                 logEvent("", TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL)
             }
 
             TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE -> {
-                logEvent("", "Call Ended")
+                // logEvent("", "Call Ended")
+                logEvent("", TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE)
             }
 
             TVNativeCallEvents.EVENT_MISSED -> {
