@@ -1073,21 +1073,39 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     func connectToConference(uuid: UUID, conferenceName: String, completionHandler: @escaping (Bool) -> Swift.Void) {
    
     
-    guard let token = accessToken else {
+    // guard let token = accessToken else {
+    //     completionHandler(false)
+    //     return
+    // }
+    
+    // let connectOptions = ConnectOptions(accessToken: token) { builder in
+    //     builder.uuid = uuid
+    //     // Specify the conference parameter so that your TwiML app knows to join the conference.
+    //     builder.params["conference"] = conferenceName
+    // }
+    // let conferenceCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
+    // let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
+    // self.call = theCall // Edit error fix here
+    // self.callKitCompletionCallback = completionHandler
+    //  sendPhoneCallEvents(description: "Connecting|\(conferenceName)|\(conferenceName)|Outgoing", isError: false)
+     guard let token = accessToken else {
         completionHandler(false)
         return
     }
-    
-    let connectOptions = ConnectOptions(accessToken: token) { builder in
-        builder.uuid = uuid
-        // Specify the conference parameter so that your TwiML app knows to join the conference.
-        builder.params["conference"] = conferenceName
-    }
-    let conferenceCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
-    let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
-    self.call = theCall // Edit error fix here
-    self.callKitCompletionCallback = completionHandler
-     sendPhoneCallEvents(description: "Connecting|\(conferenceName)|\(conferenceName)|Outgoing", isError: false)
+
+    // 1) Store the conference param so performVoiceCall will include it
+    callArgs = ["conference": conferenceName] as [String: AnyObject]
+    callOutgoing = true
+
+    // 2) Hook up the completion callback (we’ll invoke it after CallKit reports “connected”)
+    callKitCompletionCallback = completionHandler
+
+    // 3) KICK OFF A NORMAL CALLKIT START-CALL ACTION
+    //    This will call provider(_:perform action: CXStartCallAction) below,
+    //    which in turn calls performVoiceCall(...) and joins the conference.
+    performStartCallAction(uuid: uuid, handle: conferenceName)
+
+    sendPhoneCallEvents(description: "Connecting|\(conferenceName)|\(conferenceName)|Outgoing", isError: false)
     }
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
