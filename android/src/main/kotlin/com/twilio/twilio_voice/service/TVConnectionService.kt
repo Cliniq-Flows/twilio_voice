@@ -30,6 +30,7 @@ import com.twilio.twilio_voice.types.ContextExtension.appName
 import com.twilio.twilio_voice.types.ContextExtension.hasCallPhonePermission
 import com.twilio.twilio_voice.types.ContextExtension.hasManageOwnCallsPermission
 import com.twilio.twilio_voice.types.IntentExtension.getParcelableExtraSafe
+import com.twilio.twilio_voice.types.TVNativeCallEvents
 import com.twilio.twilio_voice.types.TelecomManagerExtension.getPhoneAccountHandle
 import com.twilio.twilio_voice.types.TelecomManagerExtension.hasCallCapableAccount
 import com.twilio.twilio_voice.types.TelecomManagerExtension.canReadPhoneState
@@ -537,15 +538,16 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 // ─── New branch for conference connection ───────────────────────────────
-                ACTION_CONNECT_TO_CONFERENCE -> {
-                    val conferenceName = intent.getStringExtra(EXTRA_CONFERENCE_NAME)
-                    if (conferenceName.isNullOrEmpty()){
-                        Log.e(TAG, "onStartCommand: ACTION_CONNECT_TO_CONFERENCE missing conference name")
-                        return@let
-                    }
-                    // Pass the intent along with the conference name
-                    joinConference(intent, conferenceName)
-                }
+                 ACTION_CONNECT_TO_CONFERENCE -> {
+                     val conferenceName = intent.getStringExtra(EXTRA_CONFERENCE_NAME)
+                     if (conferenceName.isNullOrEmpty()){
+                         Log.e(TAG, "onStartCommand: ACTION_CONNECT_TO_CONFERENCE missing conference name")
+                         return@let
+                     }
+                     // Pass the intent along with the conference name
+                     joinConference(intent, conferenceName)
+                 }
+
                 // ─────────────────────────────────────────────────────────────────────────────
 
                 else -> {
@@ -559,43 +561,70 @@ class TVConnectionService : ConnectionService() {
     }
     //endregion
 
-    // New function to join a conference call
-  private fun joinConference(intent: Intent, conferenceName: String) {
-    Log.d(TAG, "Joining conference: $conferenceName")
-    
-    val token = intent.getStringExtra(EXTRA_TOKEN) ?: ""
-    if (token.isEmpty()) {
-        Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
-        return
-    }
-    
-    val params = HashMap<String, String>().apply {
-        put("conference", conferenceName)  // Use lowercase key as in Swift
-    }
 
 
-    
-    val connectOptions = ConnectOptions.Builder(token)
-        .params(params)
-        .build()
-    
-    
+//     // New function to join a conference call
+   private fun joinConference(intent: Intent, conferenceName: String) {
+     Log.d(TAG, "Joining conference: $conferenceName")
 
-    val conferenceConnection = TVCallConnection(applicationContext)
-    conferenceConnection.setInitializing()
-    conferenceConnection.setDialing()
-    conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
-    
-    val tempId = "conference_$conferenceName"
-    activeConnections[tempId] = conferenceConnection
-      attachCallEventListeners(conferenceConnection, tempId)
+     val token = intent.getStringExtra(EXTRA_TOKEN) ?: ""
+     if (token.isEmpty()) {
+         Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
+         return
+     }
 
-    Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
-    
-    
- }
 
-    
+     val params = HashMap<String, String>().apply {
+         put("conference", conferenceName)  // Use lowercase key as in Swift
+     }
+
+
+
+     val connectOptions = ConnectOptions.Builder(token)
+         .params(params)
+         .build()
+
+
+
+     val conferenceConnection = TVCallConnection(applicationContext)
+     conferenceConnection.setInitializing()
+     conferenceConnection.setDialing()
+     conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
+
+     val tempId = "conference_$conferenceName"
+     activeConnections[tempId] = conferenceConnection
+       attachCallEventListeners(conferenceConnection, tempId)
+
+     Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
+        conferenceConnection.setOnCallStateListener(CompletionHandler { state ->
+              if (state == Call.State.RINGING || state == Call.State.CONNECTED) {
+                   conferenceConnection.twilioCall?.sid?.let { sid ->
+                          Log.d(TAG, "Conference SID is: $sid")
+
+                          // swap out the temp key for the real SID
+                          activeConnections.remove(tempId)
+                          activeConnections[sid] = conferenceConnection
+
+                          // fire the standard "EVENT_CONNECTED" broadcast
+                          sendBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_CONNECTED,
+                                sid,
+                                Bundle().apply {
+                                      putString(TVBroadcastReceiver.EXTRA_CALL_HANDLE, sid)
+                                      putString(TVBroadcastReceiver.EXTRA_CALL_FROM, "Unknown Caller")      // or fill if you have a from
+                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO, "Unknown Caller")        // or fill if you have a to
+                        putInt(TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
+                            CallDirection.OUTGOING.id)
+                                 }
+                                )
+                 }
+          }
+        })
+
+  }
+
+
 
     override fun onCreateIncomingConnection(connectionManagerPhoneAccount: PhoneAccountHandle?, request: ConnectionRequest?): Connection {
         assert(request != null) { "ConnectionRequest cannot be null" }
