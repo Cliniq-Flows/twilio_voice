@@ -1793,7 +1793,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                  // ── NEW: clear when call ends ─────────────────────────
             storage?.clearCustomParams()
                 Log.d(TAG, "handleBroadcastIntent: Call ended $callHandle")
-                logEvent("", "Call ended")
+                logEvent("", "Call Ended")
               
             }
 
