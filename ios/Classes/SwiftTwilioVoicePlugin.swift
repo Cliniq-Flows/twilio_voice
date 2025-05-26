@@ -90,12 +90,44 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             let eventChannel = FlutterEventChannel(name: "twilio_voice/events", binaryMessenger: unwrappedRegistrar.messenger())
             eventChannel.setStreamHandler(self)
         }
+
+        NotificationCenter.default.addObserver(
+        self,
+        selector: #selector(appWillTerminate),
+        name: UIApplication.willTerminateNotification,
+        object: nil
+    )
+    NotificationCenter.default.addObserver(
+        self,
+        selector: #selector(appDidEnterBackground),
+        name: UIApplication.didEnterBackgroundNotification,
+        object: nil
+    )
+
     }
     
     
     deinit {
         // CallKit has an odd API contract where the developer must call invalidate or the CXProvider is leaked.
         callKitProvider.invalidate()
+        NotificationCenter.default.removeObserver(self)
+
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // MARK: — App-Lifecycle Hang-Up Handlers
+    // ────────────────────────────────────────────────────────────────────────────
+
+    @objc private func appWillTerminate() {
+        guard let call = self.call else { return }
+        sendPhoneCallEvents(description: "LOG|App terminating – hanging up call", isError: false)
+        performEndCallAction(uuid: call.uuid!)
+    }
+
+    @objc private func appDidEnterBackground() {
+        guard let call = self.call else { return }
+        sendPhoneCallEvents(description: "LOG|App backgrounding – hanging up call", isError: false)
+        performEndCallAction(uuid: call.uuid!)
     }
     
     

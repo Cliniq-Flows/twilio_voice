@@ -3,6 +3,7 @@ package com.twilio.twilio_voice
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.Application
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
@@ -136,6 +137,27 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             flutterPluginBinding.applicationContext
         )
         hasStarted = true
+
+        (flutterPluginBinding.applicationContext as? Application)
+        ?.registerActivityLifecycleCallbacks(appLifecycleCallbacks)
+        
+    }
+
+     private val appLifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
+        override fun onActivityDestroyed(act: Activity) {
+            // If it’s your Flutter Activity being torn down:
+            if (act == activity) {
+                Log.d(TAG, "Activity destroyed -> hanging up active call")
+                hangupIfActive()
+            }
+        }
+        // no-ops for everything else:
+        override fun onActivityCreated(a: Activity, b: Bundle?) {}
+        override fun onActivityStarted(a: Activity) {}
+        override fun onActivityResumed(a: Activity) {}
+        override fun onActivityPaused(a: Activity) {}
+        override fun onActivityStopped(a: Activity) {}
+        override fun onActivitySaveInstanceState(a: Activity, b: Bundle) {}
     }
 
     override fun onDetachedFromEngine(binding: FlutterPluginBinding) {
@@ -145,6 +167,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         methodChannel = null
         eventChannel!!.setStreamHandler(null)
         eventChannel = null
+        (binding.applicationContext as? Application)
+            ?.unregisterActivityLifecycleCallbacks(appLifecycleCallbacks)
     }
     //endregion
 
@@ -1379,6 +1403,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
     override fun onDetachedFromActivityForConfigChanges() {
         Log.d(TAG, "onDetachedFromActivityForConfigChanges")
+         hangupIfActive()
         unregisterReceiver()
         activity = null
     }
@@ -1393,10 +1418,21 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
     override fun onDetachedFromActivity() {
         Log.d(TAG, "onDetachedFromActivity")
+         hangupIfActive()
         unregisterReceiver()
         activity = null
     }
     //endregion
+
+    /** 
+     * If there’s an ongoing call, send the hangup intent before teardown 
+     */
+    private fun hangupIfActive() {
+        if (isOnCall()) {
+            Log.d(TAG, "App is closing/detaching – hanging up active call")
+            hangup()
+        }
+    }
 
     //region Flutter BroadcastReceiver
     private fun registerReceiver() {
