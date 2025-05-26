@@ -1957,8 +1957,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             }
 
             TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL -> {
-                // logEvent("", "Call Ended")
-                 logEvent("", TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL)
+                 logEvent("", "Call Ended")
+               //  logEvent("", TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL)
             }
 
             TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE -> {
