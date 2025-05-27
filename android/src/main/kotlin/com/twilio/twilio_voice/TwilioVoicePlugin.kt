@@ -147,8 +147,14 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         override fun onActivityDestroyed(act: Activity) {
             // If it’s your Flutter Activity being torn down:
             if (act == activity) {
-                Log.d(TAG, "Activity destroyed -> hanging up active call")
-                hangupIfActive()
+                // Log.d(TAG, "Activity destroyed -> hanging up active call")
+                // hangupIfActive()
+                if (act.isFinishing) {
+            Log.d(TAG, "Activity finishing → hanging up active call")
+            hangupIfActive()
+        } else {
+            Log.d(TAG, "Activity destroyed for config-change → no hangup")
+        }
             }
         }
         // no-ops for everything else:
@@ -1403,7 +1409,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
     override fun onDetachedFromActivityForConfigChanges() {
         Log.d(TAG, "onDetachedFromActivityForConfigChanges")
-         hangupIfActive()
+        
         unregisterReceiver()
         activity = null
     }
