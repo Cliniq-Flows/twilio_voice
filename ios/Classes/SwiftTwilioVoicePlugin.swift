@@ -97,12 +97,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         name: UIApplication.willTerminateNotification,
         object: nil
     )
-    NotificationCenter.default.addObserver(
-        self,
-        selector: #selector(appDidEnterBackground),
-        name: UIApplication.didEnterBackgroundNotification,
-        object: nil
-    )
+    // NotificationCenter.default.addObserver(
+    //     self,
+    //     selector: #selector(appDidEnterBackground),
+    //     name: UIApplication.didEnterBackgroundNotification,
+    //     object: nil
+    // )
 
     }
     
@@ -124,11 +124,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         performEndCallAction(uuid: call.uuid!)
     }
 
-    @objc private func appDidEnterBackground() {
-        guard let call = self.call else { return }
-        sendPhoneCallEvents(description: "LOG|App backgrounding – hanging up call", isError: false)
-        performEndCallAction(uuid: call.uuid!)
-    }
+    // @objc private func appDidEnterBackground() {
+    //     guard let call = self.call else { return }
+    //     sendPhoneCallEvents(description: "LOG|App backgrounding – hanging up call", isError: false)
+    //     performEndCallAction(uuid: call.uuid!)
+    // }
     
     
     public static func register(with registrar: FlutterPluginRegistrar) {
