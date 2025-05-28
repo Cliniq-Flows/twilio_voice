@@ -810,7 +810,7 @@ class TVConnectionService : ConnectionService() {
             }
 
             // ── NEW ── let your Flutter side know that the call really ended
-            if (dc.code == DisconnectCause.LOCAL || dc.code == DisconnectCause.REMOTE) {
+            if (dc?.code == DisconnectCause.LOCAL || dc?.code == DisconnectCause.REMOTE) {
             sendBroadcastEvent(
             applicationContext,
             TVBroadcastReceiver.ACTION_CALL_ENDED,
