@@ -809,11 +809,13 @@ class TVConnectionService : ConnectionService() {
             }
 
             // ── NEW ── let your Flutter side know that the call really ended
+            if (cause.code == DisconnectCause.LOCAL || cause.code == DisconnectCause.REMOTE) {
             sendBroadcastEvent(
             applicationContext,
             TVBroadcastReceiver.ACTION_CALL_ENDED,
             callSid
             )
+            }
 
             stopForegroundService()
             stopSelfSafe()
