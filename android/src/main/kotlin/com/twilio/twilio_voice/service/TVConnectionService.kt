@@ -817,17 +817,16 @@ class TVConnectionService : ConnectionService() {
             // callSid
             // )
             // }
-            when (dc.code) {
-                DisconnectCause.LOCAL,
-                DisconnectCause.REMOTE -> sendBroadcastEvent(
+            // safe‐call into dc.code (becomes an Int?), then compare
+            val causeCode = dc?.code
+            if (causeCode == DisconnectCause.LOCAL || causeCode == DisconnectCause.REMOTE) {
+                sendBroadcastEvent(
                 applicationContext,
                 TVBroadcastReceiver.ACTION_CALL_ENDED,
                 callSid
                 )
-                else -> Log.d(
-                TAG,
-                "Skipping CALL_ENDED for cause=${dc.code} (not a real hang-up)"
-                )
+            } else {
+                Log.d(TAG, "Skipping CALL_ENDED for non-hangup cause=$causeCode")
             }
 
             stopForegroundService()
