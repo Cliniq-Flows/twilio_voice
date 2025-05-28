@@ -803,13 +803,14 @@ class TVConnectionService : ConnectionService() {
             sendBroadcastCallHandle(applicationContext, extra?.getString(TVBroadcastReceiver.EXTRA_CALL_HANDLE))
         }
         val onDisconnect: CompletionHandler<DisconnectCause> = CompletionHandler {
+            dc ->
             storage.clearCustomParams()
             if (activeConnections.containsKey(callSid)) {
                 activeConnections.remove(callSid)
             }
 
             // ── NEW ── let your Flutter side know that the call really ended
-            if (cause.code == DisconnectCause.LOCAL || cause.code == DisconnectCause.REMOTE) {
+            if (dc.code == DisconnectCause.LOCAL || dc.code == DisconnectCause.REMOTE) {
             sendBroadcastEvent(
             applicationContext,
             TVBroadcastReceiver.ACTION_CALL_ENDED,
