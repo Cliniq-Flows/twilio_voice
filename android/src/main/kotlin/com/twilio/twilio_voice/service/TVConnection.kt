@@ -66,7 +66,9 @@ class TVCallInviteConnection(
     }
 
     override fun onReject() {
-        // Log.d(TAG, "onReject: onReject")
+
+      Log.d(TAG, "onReject: onReject")
+      rejectInviteInternal()
         // super.onReject()
         // callInvite.reject(context)
         // // if the call was answered, then immediately rejected/ended, we need to disconnect the call also
@@ -79,24 +81,34 @@ class TVCallInviteConnection(
         // onAction?.onChange(TVNativeCallActions.ACTION_REJECTED, null)
         // setDisconnected(DisconnectCause(DisconnectCause.REJECTED))
         // destroy()
-            // 1) If we never accepted this invite, just reject the invite object:
-    if (twilioCall == null) {
-      callInvite.reject(context)
+         
+   
+    }
 
-    // 2) Otherwise it’s a live call—so hang that up:
+    /** 
+   * The one place that actually does the right thing:
+   *  – if it’s still just a ringing invite, callInvite.reject()
+   *  – if you already answered it, hang up that live call
+   */
+  private fun rejectInviteInternal() {
+    if (twilioCall == null) {
+      // just reject the invite, leave any other calls alone
+      callInvite.reject(context)
     } else {
+      // we already accepted, so terminate that live call
       twilioCall?.disconnect()
     }
 
-    // Now fire the telecom & plugin events for “local reject”
+    // tell Telecom / Flutter that we locally hung up
     onEvent?.onChange(TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL, null)
-    onDisconnected?.withValue(DisconnectCause(DisconnectCause.REJECTED))
     onAction?.onChange(TVNativeCallActions.ACTION_REJECTED, null)
+    onDisconnected?.withValue(DisconnectCause(DisconnectCause.REJECTED))
     setDisconnected(DisconnectCause(DisconnectCause.REJECTED))
 
-    // And finally clean up the Connection
+    // cleanup this Connection
     destroy()
-    }
+  }
+
 }
 
 open class TVCallConnection(
@@ -346,18 +358,20 @@ open class TVCallConnection(
 
     override fun onReject(rejectReason: Int) {
         Log.d(TAG, "onReject: onReject $rejectReason")
-        super.onReject(rejectReason)
-        twilioCall?.disconnect()
-        onAction?.onChange(TVNativeCallActions.ACTION_REJECTED, null)
+        // super.onReject(rejectReason)
+        // twilioCall?.disconnect()
+        // onAction?.onChange(TVNativeCallActions.ACTION_REJECTED, null)
+         rejectInviteInternal()
     }
 
     override fun onReject(replyMessage: String?) {
         Log.d(TAG, "onReject: onReject $replyMessage")
-        super.onReject(replyMessage)
-        twilioCall?.disconnect()
-        onAction?.onChange(TVNativeCallActions.ACTION_REJECTED, Bundle().apply {
-            putString(TVNativeCallActions.EXTRA_REJECT_REASON, replyMessage)
-        })
+        rejectInviteInternal()
+        // super.onReject(replyMessage)
+        // twilioCall?.disconnect()
+        // onAction?.onChange(TVNativeCallActions.ACTION_REJECTED, Bundle().apply {
+        //     putString(TVNativeCallActions.EXTRA_REJECT_REASON, replyMessage)
+        // })
     }
 
     @Suppress("DEPRECATION")
