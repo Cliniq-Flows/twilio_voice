@@ -61,7 +61,25 @@ class TVCallInviteConnection(
 
     fun rejectInvite() {
         Log.d(TAG, "rejectInvite: rejectInvite")
-        // 1) If we never accepted this invite, just reject the invite object:
+    
+       onReject()
+    }
+
+    override fun onReject() {
+        // Log.d(TAG, "onReject: onReject")
+        // super.onReject()
+        // callInvite.reject(context)
+        // // if the call was answered, then immediately rejected/ended, we need to disconnect the call also
+        // twilioCall?.let {
+        //     Log.d(TAG, "onReject: disconnecting call")
+        //     it.disconnect()
+        // }
+        // onEvent?.onChange(TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL, null)
+        // onDisconnected?.withValue(DisconnectCause(DisconnectCause.REJECTED))
+        // onAction?.onChange(TVNativeCallActions.ACTION_REJECTED, null)
+        // setDisconnected(DisconnectCause(DisconnectCause.REJECTED))
+        // destroy()
+            // 1) If we never accepted this invite, just reject the invite object:
     if (twilioCall == null) {
       callInvite.reject(context)
 
@@ -78,23 +96,6 @@ class TVCallInviteConnection(
 
     // And finally clean up the Connection
     destroy()
-       // onReject()
-    }
-
-    override fun onReject() {
-        Log.d(TAG, "onReject: onReject")
-        super.onReject()
-        callInvite.reject(context)
-        // if the call was answered, then immediately rejected/ended, we need to disconnect the call also
-        twilioCall?.let {
-            Log.d(TAG, "onReject: disconnecting call")
-            it.disconnect()
-        }
-        onEvent?.onChange(TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL, null)
-        onDisconnected?.withValue(DisconnectCause(DisconnectCause.REJECTED))
-        onAction?.onChange(TVNativeCallActions.ACTION_REJECTED, null)
-        setDisconnected(DisconnectCause(DisconnectCause.REJECTED))
-        destroy()
     }
 }
 
