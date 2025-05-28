@@ -809,13 +809,25 @@ class TVConnectionService : ConnectionService() {
                 activeConnections.remove(callSid)
             }
 
-            // ── NEW ── let your Flutter side know that the call really ended
-            if (dc?.code == DisconnectCause.LOCAL || dc?.code == DisconnectCause.REMOTE) {
-            sendBroadcastEvent(
-            applicationContext,
-            TVBroadcastReceiver.ACTION_CALL_ENDED,
-            callSid
-            )
+            // // ── NEW ── let your Flutter side know that the call really ended
+            // if (dc?.code == DisconnectCause.LOCAL || dc?.code == DisconnectCause.REMOTE) {
+            // sendBroadcastEvent(
+            // applicationContext,
+            // TVBroadcastReceiver.ACTION_CALL_ENDED,
+            // callSid
+            // )
+            // }
+            when (dc.code) {
+                DisconnectCause.LOCAL,
+                DisconnectCause.REMOTE -> sendBroadcastEvent(
+                applicationContext,
+                TVBroadcastReceiver.ACTION_CALL_ENDED,
+                callSid
+                )
+                else -> Log.d(
+                TAG,
+                "Skipping CALL_ENDED for cause=${dc.code} (not a real hang-up)"
+                )
             }
 
             stopForegroundService()
