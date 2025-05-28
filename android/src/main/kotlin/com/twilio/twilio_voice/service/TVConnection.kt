@@ -35,12 +35,19 @@ class TVCallInviteConnection(
     onDisconnected: CompletionHandler<DisconnectCause>? = null
 ) : TVCallConnection(ctx, onEvent, onAction, onDisconnected) {
 
-    override val TAG = "VoipCallInviteConnection"
-    private val callInvite: CallInvite
+    // override val TAG = "VoipCallInviteConnection"
+    // private val callInvite: CallInvite
+    // override val callDirection = CallDirection.INCOMING
+
+    // init {
+    //     callInvite = ci
+    //     setCallParameters(callParams)
+    // }
+     override val TAG = "VoipCallInviteConnection"
+    private val callInvite: CallInvite = ci
     override val callDirection = CallDirection.INCOMING
 
     init {
-        callInvite = ci
         setCallParameters(callParams)
     }
 
