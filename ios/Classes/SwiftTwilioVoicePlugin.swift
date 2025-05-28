@@ -97,12 +97,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         name: UIApplication.willTerminateNotification,
         object: nil
     )
-    // NotificationCenter.default.addObserver(
-    //     self,
-    //     selector: #selector(appDidEnterBackground),
-    //     name: UIApplication.didEnterBackgroundNotification,
-    //     object: nil
-    // )
+    
 
     }
     
@@ -124,12 +119,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         performEndCallAction(uuid: call.uuid!)
     }
 
-    // @objc private func appDidEnterBackground() {
-    //     guard let call = self.call else { return }
-    //     sendPhoneCallEvents(description: "LOG|App backgrounding – hanging up call", isError: false)
-    //     performEndCallAction(uuid: call.uuid!)
-    // }
-    
+   
     
     public static func register(with registrar: FlutterPluginRegistrar) {
         
@@ -814,7 +804,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          clearCustomParams()
         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
         if let error = error {
-            self.sendPhoneCallEvents(description: "Call Failed: \(error.localizedDescription)", isError: true)
+            self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
         }
         
     

@@ -61,7 +61,24 @@ class TVCallInviteConnection(
 
     fun rejectInvite() {
         Log.d(TAG, "rejectInvite: rejectInvite")
-        onReject()
+        // 1) If we never accepted this invite, just reject the invite object:
+    if (twilioCall == null) {
+      callInvite.reject(context)
+
+    // 2) Otherwise it’s a live call—so hang that up:
+    } else {
+      twilioCall?.disconnect()
+    }
+
+    // Now fire the telecom & plugin events for “local reject”
+    onEvent?.onChange(TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL, null)
+    onDisconnected?.withValue(DisconnectCause(DisconnectCause.REJECTED))
+    onAction?.onChange(TVNativeCallActions.ACTION_REJECTED, null)
+    setDisconnected(DisconnectCause(DisconnectCause.REJECTED))
+
+    // And finally clean up the Connection
+    destroy()
+       // onReject()
     }
 
     override fun onReject() {

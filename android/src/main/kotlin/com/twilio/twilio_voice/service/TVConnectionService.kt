@@ -909,20 +909,59 @@ class TVConnectionService : ConnectionService() {
     }
 
     private fun createNotification(): Notification {
+        // val channel = getOrCreateChannel()
+
+        // val intent = Intent(applicationContext, TVConnectionService::class.java)
+        // intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        // val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
+        // val pendingIntent: PendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, flag);
+
+        // return Notification.Builder(this, channel.id).apply {
+        //     setOngoing(true)
+        //     setContentTitle("Voice Calls")
+        //     setCategory(Notification.CATEGORY_SERVICE)
+        //     setContentIntent(pendingIntent)
+        //     setSmallIcon(R.drawable.ic_microphone)
+        // }.build()
         val channel = getOrCreateChannel()
 
-        val intent = Intent(applicationContext, TVConnectionService::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-        val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
-        val pendingIntent: PendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, flag);
+    // 1) Main tap — brings you back into the service UI
+    val mainIntent = Intent(applicationContext, TVConnectionService::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+    }
+    val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    else
+        PendingIntent.FLAG_UPDATE_CURRENT
+    val mainPi = PendingIntent.getActivity(applicationContext, 0, mainIntent, flag)
 
-        return Notification.Builder(this, channel.id).apply {
-            setOngoing(true)
-            setContentTitle("Voice Calls")
-            setCategory(Notification.CATEGORY_SERVICE)
-            setContentIntent(pendingIntent)
-            setSmallIcon(R.drawable.ic_microphone)
-        }.build()
+    // 2) Decline action — send ACTION_HANGUP with the current call’s SID
+    val activeCallHandle = getActiveCallHandle()  // may be null if no call, but safe here
+    val declineIntent = Intent(applicationContext, TVConnectionService::class.java).apply {
+        action = ACTION_HANGUP
+        putExtra(EXTRA_CALL_HANDLE, activeCallHandle)
+    }
+    val declinePi = PendingIntent.getService(
+        applicationContext,
+        activeCallHandle?.hashCode() ?: 0,
+        declineIntent,
+        flag
+    )
+
+    return Notification.Builder(this, channel.id).apply {
+        setOngoing(true)
+        setContentTitle("Voice Calls")
+        setCategory(Notification.CATEGORY_SERVICE)
+        setContentIntent(mainPi)
+        setSmallIcon(R.drawable.ic_microphone)
+
+        // ←— here’s the new Decline button in the notification
+        addAction(
+            R.drawable.ic_decline,    // your decline icon
+            "Decline",                // button label
+            declinePi
+        )
+    }.build()
     }
 
     private fun cancelNotification() {
