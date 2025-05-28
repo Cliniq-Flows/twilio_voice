@@ -72,6 +72,8 @@ class TVCallInviteConnection(
        onReject()
     }
 
+    
+
     // override fun onReject() {
     //     Log.d(TAG, "onReject: onReject")
     //     super.onReject()
@@ -105,6 +107,14 @@ class TVCallInviteConnection(
         Log.d(TAG, "onReject(replyMessage=$replyMessage)")
         rejectInviteInternal()
     }
+
+    /**  ─── 4) Telecom “Decline” from native UI comes in as onAbort()  ─── */
+    override fun onAbort() {
+      Log.d(TAG, "onAbort(): native UI decline")
+      // funnel into the same invite-only logic:
+      rejectInviteInternal()
+    }
+
 
      private fun rejectInviteInternal() {
         if (twilioCall == null) {
