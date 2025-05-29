@@ -44,6 +44,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     var callKitCallController: CXCallController
     var userInitiatedDisconnect: Bool = false
     var callOutgoing: Bool = false
+    private var isRejectingCallInvite = false
     
      // ——————————————————————————————————————
     // MARK: Shared-Prefs Helpers 🔥 NEW
@@ -697,18 +698,31 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     public func cancelledCallInviteReceived(cancelledCallInvite: CancelledCallInvite, error: Error) {
-         clearCustomParams()
-        self.sendPhoneCallEvents(description: "Missed Call", isError: false)
-        self.sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
-        self.showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
-        if (self.callInvite == nil) {
-            self.sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
-            return
-        }
+        //  clearCustomParams()
+        // self.sendPhoneCallEvents(description: "Missed Call", isError: false)
+        // self.sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
+        // self.showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
+        // if (self.callInvite == nil) {
+        //     self.sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
+        //     return
+        // }
         
-        if let ci = self.callInvite {
-            performEndCallAction(uuid: ci.uuid)
-        }
+        // if let ci = self.callInvite {
+        //     performEndCallAction(uuid: ci.uuid)
+        // }
+         clearCustomParams()
+    sendPhoneCallEvents(description: "Missed Call", isError: false)
+    sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
+    showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
+
+    guard let ci = self.callInvite else {
+        sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
+        return
+    }
+
+    // Mark that we’re rejecting, so callDidDisconnect won’t fire “Call Ended”
+    isRejectingCallInvite = true
+    performEndCallAction(uuid: ci.uuid)
     }
     
     func showMissedCallNotification(from:String?, to:String?){
@@ -801,27 +815,51 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     public func callDidDisconnect(call: Call, error: Error?) {
-         clearCustomParams()
-        self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-        if let error = error {
-            self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
-        }
+        clearCustomParams()
+
+  // only fire "Call Ended" when it's a real hang-up, not a reject
+  if !isRejectingCallInvite {
+    self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+    if let error = error {
+      self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
+    }
+
+    let reason: CXCallEndedReason = self.userInitiatedDisconnect
+      ? .remoteEnded
+      : .failed
+    callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
+
+    let eventName = self.userInitiatedDisconnect
+      ? "disconnectedLocal"
+      : "disconnectedRemote"
+    sendPhoneCallEvents(description: eventName, isError: false)
+  }
+
+  // reset your flags and cleanup
+  isRejectingCallInvite = false
+  self.userInitiatedDisconnect = false
+  callDisconnected()
+//          clearCustomParams()
+//         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+//         if let error = error {
+//             self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
+//         }
         
     
-        // let reason: CXCallEndedReason = self.userInitiatedDisconnect ? .remoteEnded : .failed
-         // First, report to CallKit so the iOS in-call UI goes away:
-  let reason: CXCallEndedReason = self.userInitiatedDisconnect
-    ? .remoteEnded   // or .failed if you want
-    : .failed       
-        self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
-            let eventName = self.userInitiatedDisconnect
-    ? "disconnectedLocal"
-    : "disconnectedRemote"
-  sendPhoneCallEvents(description: eventName, isError: false)
+//         // let reason: CXCallEndedReason = self.userInitiatedDisconnect ? .remoteEnded : .failed
+//          // First, report to CallKit so the iOS in-call UI goes away:
+//   let reason: CXCallEndedReason = self.userInitiatedDisconnect
+//     ? .remoteEnded   // or .failed if you want
+//     : .failed       
+//         self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
+//             let eventName = self.userInitiatedDisconnect
+//     ? "disconnectedLocal"
+//     : "disconnectedRemote"
+//   sendPhoneCallEvents(description: eventName, isError: false)
 
  
-        callDisconnected()
-        self.userInitiatedDisconnect = false
+//         callDisconnected()
+//         self.userInitiatedDisconnect = false
 
   
     }
@@ -940,11 +978,13 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         
         if (self.callInvite != nil) {
+            self.isRejectingCallInvite = true
             clearCustomParams()
             self.sendPhoneCallEvents(description: "LOG|provider:performEndCallAction: rejecting call", isError: false)
             self.callInvite?.reject()
             self.callInvite = nil
         }else if let call = self.call {
+            self.userInitiatedDisconnect = true
             clearCustomParams()
             self.sendPhoneCallEvents(description: "LOG|provider:performEndCallAction: disconnecting call", isError: false)
             call.disconnect()
@@ -1059,10 +1099,13 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "LOG|performEndCallAction method invoked", isError: false)
         
         // check if call is still active, preventing a race condition ending the call throwing an End Call Failed transaction error 4 error
-        guard isCallActive(uuid: uuid) else {
-            print("Call not found or already ended. Skipping end request.")
-         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-            return
+        // guard isCallActive(uuid: uuid) else {
+        //     print("Call not found or already ended. Skipping end request.")
+        //  self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+        //     return
+        // }
+         guard isCallActive(uuid: uuid) else {
+        return
         }
         
         let endCallAction = CXEndCallAction(call: uuid)
