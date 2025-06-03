@@ -537,25 +537,6 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials:forType:", isError: false)
         
          guard type == .voIP else { return }
-        
-        // guard registrationRequired() || deviceToken != credentials.token else { return }
-
-        // let deviceToken = credentials.token
-        
-        // self.sendPhoneCallEvents(description: "LOG|pushRegistry:attempting to register with twilio", isError: false)
-        // if let token = accessToken {
-        //     TwilioVoiceSDK.register(accessToken: token, deviceToken: deviceToken) { (error) in
-        //         if let error = error {
-        //             self.sendPhoneCallEvents(description: "LOG|An error occurred while registering: \(error.localizedDescription)", isError: false)
-        //             self.sendPhoneCallEvents(description: "DEVICETOKEN|\(String(decoding: deviceToken, as: UTF8.self))", isError: false)
-        //         }
-        //         else {
-        //             self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP push notifications.", isError: false)
-        //         }
-        //     }
-        // }
-        // self.deviceToken = deviceToken
-        // UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
 
         let newToken = credentials.token
         let previouslySaved = self.deviceToken    
