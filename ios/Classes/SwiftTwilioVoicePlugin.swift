@@ -556,6 +556,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // }
         // self.deviceToken = deviceToken
         // UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
+
+        let newToken = credentials.token
+        let previouslySaved = self.deviceToken    
+
         if registrationRequired() || previouslySaved != newToken {
             self.sendPhoneCallEvents(description: "LOG|PushKit gave us a new token; registering with Twilio…", isError: false)
             if let tokenStr = self.accessToken {
