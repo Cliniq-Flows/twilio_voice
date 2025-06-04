@@ -1185,21 +1185,22 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // Updated connectToConference function without extraOptions:
     func connectToConference(uuid: UUID, conferenceName: String, completionHandler: @escaping (Bool) -> Swift.Void) {
    
-    
-    guard let token = accessToken else {
+        guard let token = accessToken else {
         completionHandler(false)
         return
     }
-    
+
     let connectOptions = ConnectOptions(accessToken: token) { builder in
         builder.uuid = uuid
-        // Specify the conference parameter so that your TwiML app knows to join the conference.
         builder.params["conference"] = conferenceName
     }
+
+    // Only connect once. Assign the returned Call to self.call, so delegate callbacks (callDidConnect, etc.) will fire on that object.
     let conferenceCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
-    let theCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
-    self.call = theCall // Edit error fix here
+    self.call = conferenceCall
     self.callKitCompletionCallback = completionHandler
+
+    // Enable the audio device immediately (so that the call audio will flow correctly once connected)
     audioDevice.isEnabled = true
     }
     
