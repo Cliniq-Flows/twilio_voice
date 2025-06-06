@@ -856,32 +856,56 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: CXCallEndedReason.failed)
         // callDisconnected()
 
-         if let callException = error as? TVOCallException {
-        let code = callException.errorCode
-        let message = callException.localizedDescription.lowercased()
-        sendPhoneCallEvents(description: "LOG|Call failed to connect: \(code) – \(message)", isError: true)
+        // 1) Log the raw SDK error description
+    sendPhoneCallEvents(
+      description: "LOG|Call failed to connect: \(error.localizedDescription)",
+      isError: true
+    )
 
-        // 2) If far end explicitly “Declined” (31603 + “decline”), drop CallKit now.
-        if code == 31603 && message.contains("decline") {
+    // 2) If the error says “Access Token expired”, you can handle that too:
+    if error.localizedDescription.contains("Access Token expired") {
+        sendPhoneCallEvents(description: "DEVICETOKEN", isError: false)
+    }
+
+    // If you have a pending CallKit completion callback, let it know we failed:
+    if let completion = callKitCompletionCallback {
+        completion(false)
+    }
+
+    // 3) Cast to NSError so we can check Twilio’s domain + code
+    let nsError = error as NSError
+    let errorDomain = nsError.domain
+    let errorCode = nsError.code
+    let errorMsg = nsError.localizedDescription.lowercased()
+
+    // Twilio’s SDK v6+ uses this domain constant:
+    //   TwilioVoiceErrorDomain == "com.twilio.voicesdk"
+    if errorDomain == TwilioVoiceErrorDomain {
+        // 2a) If far end explicitly “Declined” (31603 + “decline”), report remoteEnded
+        if errorCode == 31603 && errorMsg.contains("decline") {
             if let uuid = call.uuid {
-                callKitProvider.reportCall(with: uuid,
-                                           endedAt: Date(),
-                                           reason: .remoteEnded)
+                callKitProvider.reportCall(
+                  with: uuid,
+                  endedAt: Date(),
+                  reason: .remoteEnded
+                )
                 callDisconnected()
             }
             return
         }
     }
 
-    // 3) For any other failure, report “.failed” to CallKit.
+    // 3b) For any other Twilio error (or non-Twilio error), report “.failed”
     if let uuid = call.uuid {
-        callKitProvider.reportCall(with: uuid,
-                                   endedAt: Date(),
-                                   reason: .failed)
+        callKitProvider.reportCall(
+          with: uuid,
+          endedAt: Date(),
+          reason: .failed
+        )
     }
     callDisconnected()
 
-    // 4) Finally, notify Flutter layer that the call ended.
+    // 4) Finally, notify your Flutter layer that the call ended
     sendPhoneCallEvents(description: "LOG|Call Ended", isError: false)
     if let callback = callKitCompletionCallback {
         callback(false)
