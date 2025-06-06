@@ -1103,6 +1103,11 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
     private fun hangup() {
         context?.let { ctx ->
+
+            TVConnectionService.getActiveCallHandle()?.let { sid ->
+            TVConnectionService.getConnection(sid)?.disconnect()
+            }
+
             Intent(ctx, TVConnectionService::class.java).apply {
                 action = TVConnectionService.ACTION_HANGUP
                 putExtra(TVConnectionService.EXTRA_CALL_HANDLE, callSid)
