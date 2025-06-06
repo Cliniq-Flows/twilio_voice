@@ -1988,6 +1988,18 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                     return
                 }
                 logEvent("Call Error: ${code}, $message");
+
+                 // Only force-hangup if this was a true “Decline” (Twilio code 31603 + message “Decline”)
+                if (code == 31603 && message.equals("Decline", ignoreCase = true)) {
+                    val handle = TVConnectionService.getActiveCallHandle()
+                    if (handle != null) {
+                        Intent(context, TVConnectionService::class.java).apply {
+                            action = TVConnectionService.ACTION_HANGUP
+                            putExtra(TVConnectionService.EXTRA_CALL_HANDLE, handle)
+                            context?.startService(this)
+                        }
+                    }
+                }
             }
 
             TVNativeCallEvents.EVENT_RECONNECTING -> {
