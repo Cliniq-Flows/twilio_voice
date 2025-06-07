@@ -15,7 +15,6 @@ import android.os.Build
 import android.os.Bundle
 import android.telecom.CallAudioState
 import android.telecom.PhoneAccountHandle
-import android.telecom.PhoneAccount
 import android.telecom.TelecomManager
 import android.util.Log
 import androidx.annotation.RequiresPermission
@@ -1282,84 +1281,54 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     @SuppressLint("MissingPermission")
     @RequiresPermission(allOf = [Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_PHONE_NUMBERS])
     private fun registerPhoneAccount(): Boolean {
-     context?.let { ctx ->
-        telecomManager?.let { tm ->
-            // 1) Dynamically fetch your app’s human-readable name
-            val label = ctx.packageManager
-                          .getApplicationLabel(ctx.applicationInfo)
-                          .toString()
+    
+    return true
+        context?.let { ctx ->
+            telecomManager?.let { tm ->
+                // Get PhoneAccountHandle
+                val phoneAccountHandle = tm.getPhoneAccountHandle(ctx)
 
-            // 2) Build the PhoneAccountHandle
-            val component = ComponentName(ctx, TVConnectionService::class.java)
-            val handle    = PhoneAccountHandle(component, label)
+                if (!tm.canReadPhoneNumbers(ctx)) {
+                    Log.e(TAG, "hasRegisteredPhoneAccount: No read phone numbers permission, call `requestReadPhoneNumbersPermission()` first")
+                    return false;
+                }
 
-            // 3) Build the PhoneAccount itself, with default ringtone
-            val account = PhoneAccount.builder(handle, label)
-                .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER)
-                .setRingtoneUri(
-                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                )
-                // optional: .setIcon(Icon.createWithResource(ctx, R.drawable.ic_call))
-                .build()
+                // Get PhoneAccount, if null it's not registered
+                val phoneAccount = tm.getPhoneAccount(phoneAccountHandle)
+                if (phoneAccount != null) {
+                    if (!phoneAccount.isEnabled) {
+                        Log.e(
+                            TVConnectionService.TAG,
+                            "onStartCommand: PhoneAccount is not enabled, prompt the user to enable the phone account by opening settings with `openPhoneAccountSettings()`"
+                        )
+                        return true
+                    }
 
-            // 4) Register (or re-register) with Telecom
-            tm.registerPhoneAccount(account)
-            Log.d(TAG, "PhoneAccount('$label') registered with system ringtone")
-            return true
+                    // account is ready to use
+                    return true
+                }
+
+                // Get telecom manager
+//                if (!tm.canReadPhoneState(ctx)) {
+//                    Log.e(TAG,"onStartCommand: Permission for READ_PHONE_STATE not granted or requested, call `requestReadPhoneStatePermission()` first")
+//                    return false
+//                }
+
+                if (tm.hasCallCapableAccount(ctx, phoneAccountHandle.componentName.className)) {
+                    Log.w(TAG, "registerPhoneAccount: Phone account already registered, re-registering anyway")
+//                    return true
+                }
+
+                tm.registerPhoneAccount(ctx, phoneAccountHandle)
+                return true;
+            } ?: run {
+                Log.e(TAG, "Telecom Manager is null, cannot check if registered phone account")
+                return false
+            }
         } ?: run {
-            Log.e(TAG, "TelecomManager is null, cannot register phone account")
+            Log.e(TAG, "Context is null, cannot register phone account")
             return false
         }
-    } ?: run {
-        Log.e(TAG, "Context is null, cannot register phone account")
-        return false
-    }
-//         context?.let { ctx ->
-//             telecomManager?.let { tm ->
-//                 // Get PhoneAccountHandle
-//                 val phoneAccountHandle = tm.getPhoneAccountHandle(ctx)
-
-//                 if (!tm.canReadPhoneNumbers(ctx)) {
-//                     Log.e(TAG, "hasRegisteredPhoneAccount: No read phone numbers permission, call `requestReadPhoneNumbersPermission()` first")
-//                     return false;
-//                 }
-
-//                 // Get PhoneAccount, if null it's not registered
-//                 val phoneAccount = tm.getPhoneAccount(phoneAccountHandle)
-//                 if (phoneAccount != null) {
-//                     if (!phoneAccount.isEnabled) {
-//                         Log.e(
-//                             TVConnectionService.TAG,
-//                             "onStartCommand: PhoneAccount is not enabled, prompt the user to enable the phone account by opening settings with `openPhoneAccountSettings()`"
-//                         )
-//                         return true
-//                     }
-
-//                     // account is ready to use
-//                     return true
-//                 }
-
-//                 // Get telecom manager
-// //                if (!tm.canReadPhoneState(ctx)) {
-// //                    Log.e(TAG,"onStartCommand: Permission for READ_PHONE_STATE not granted or requested, call `requestReadPhoneStatePermission()` first")
-// //                    return false
-// //                }
-
-//                 if (tm.hasCallCapableAccount(ctx, phoneAccountHandle.componentName.className)) {
-//                     Log.w(TAG, "registerPhoneAccount: Phone account already registered, re-registering anyway")
-// //                    return true
-//                 }
-
-//                 tm.registerPhoneAccount(ctx, phoneAccountHandle)
-//                 return true;
-//             } ?: run {
-//                 Log.e(TAG, "Telecom Manager is null, cannot check if registered phone account")
-//                 return false
-//             }
-//         } ?: run {
-//             Log.e(TAG, "Context is null, cannot register phone account")
-//             return false
-//         }
     }
 
     /**
