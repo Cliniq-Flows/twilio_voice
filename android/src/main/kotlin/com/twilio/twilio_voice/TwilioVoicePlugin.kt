@@ -1,5 +1,7 @@
 package com.twilio.twilio_voice
 
+import android.media.RingtoneManager
+import android.content.ComponentName
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -1290,7 +1292,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER)
                 .setRingtoneUri(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
                 // optional: set your own icon
-                .setIcon(Icon.createWithResource(ctx, R.drawable.ic_call))
+              // .setIcon(Icon.createWithResource(ctx, R.drawable.ic_call))
                 .build()
 
             // 3) (Re-)register it
