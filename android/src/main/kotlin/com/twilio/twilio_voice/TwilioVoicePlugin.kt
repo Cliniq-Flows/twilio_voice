@@ -1285,10 +1285,10 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         telecomManager?.let { tm ->
             // 1) Create your PhoneAccountHandle
             val component = ComponentName(ctx, TVConnectionService::class.java)
-            val handle = PhoneAccountHandle(component, ctx.getString(R.string.app_name))
+            val handle = PhoneAccountHandle(component, ctx.getString("Cliniq Flows"))
 
             // 2) Build a full PhoneAccount with the default ringtone
-            val account = PhoneAccount.builder(handle, ctx.getString(R.string.app_name))
+            val account = PhoneAccount.builder(handle, ctx.getString("Cliniq Flows"))
                 .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER)
                 .setRingtoneUri(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
                 // optional: set your own icon
