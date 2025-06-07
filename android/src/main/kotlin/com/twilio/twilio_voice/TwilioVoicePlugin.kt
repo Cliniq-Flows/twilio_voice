@@ -1928,6 +1928,7 @@ private fun stopOutgoingRingtone() {
                         put(key, value)
                     }
                 }.toString()
+                 stopOutgoingRingtone()
 //                callSid = callHandle
                 logEvents("", arrayOf("Answer", from, to, CallDirection.INCOMING.label, params))
             }
@@ -2019,6 +2020,7 @@ private fun stopOutgoingRingtone() {
                 val direction = intent.getIntExtra(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, -1)
                 val callDirection = CallDirection.fromId(direction)!!.label
 //                callSid = callHandle
+  stopOutgoingRingtone()
                 logEvents("", arrayOf("Connected", from, to, callDirection))
             }
 
@@ -2028,6 +2030,7 @@ private fun stopOutgoingRingtone() {
                     Log.e(TAG, "No 'EXTRA_MESSAGE' provided or invalid type")
                     return
                 }
+                  stopOutgoingRingtone()
                 logEvent("Call Error: ${code}, $message");
 
                  // Only force-hangup if this was a true “Decline” (Twilio code 31603 + message “Decline”)
@@ -2052,16 +2055,19 @@ private fun stopOutgoingRingtone() {
             }
 
             TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL -> {
+                  stopOutgoingRingtone()
                  logEvent("", "Call Ended")
                //  logEvent("", TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL)
             }
 
             TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE -> {
+                  stopOutgoingRingtone()
                  logEvent("", "Call Ended")
               
             }
 
             TVNativeCallEvents.EVENT_MISSED -> {
+                  stopOutgoingRingtone()
                    storage?.clearCustomParams()
                 logEvent("", "Missed Call")
                 logEvent("", "Call Ended")
