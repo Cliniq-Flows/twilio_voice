@@ -838,7 +838,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
 
          saveCustomParams(callArgs as [String:Any])
-        
+         audioDevice.isEnabled = true
         toggleAudioRoute(toSpeaker: false)
     }
     
@@ -983,7 +983,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
         self.sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
-        audioDevice.isEnabled = true
+        // audioDevice.isEnabled = true
     }
     
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
@@ -1212,7 +1212,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     self.callKitCompletionCallback = completionHandler
 
     // Enable the audio device immediately (so that the call audio will flow correctly once connected)
-    audioDevice.isEnabled = true
+   // audioDevice.isEnabled = true
     }
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
