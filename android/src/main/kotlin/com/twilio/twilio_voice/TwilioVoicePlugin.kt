@@ -70,6 +70,9 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
     private val TAG = "TwilioVoicePlugin"
 
+    // Ringtone
+    private var outgoingRingtone: android.media.Ringtone? = null
+
     // Locals
     private var fcmToken: String? = null
     private var accessToken: String? = null
@@ -211,6 +214,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
              */
             override fun onRinging(call: Call) {
                 Log.d(TAG, "onRinging")
+                 playOutgoingRingtone()
                 // TODO - outgoing call check
                 val list = arrayOf("Ringing", call.from ?: "", call.to ?: "", "Incoming")
                 logEvents("", list)
@@ -219,6 +223,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
             override fun onConnectFailure(call: Call, error: CallException) {
                 Log.d(TAG, "Connect failure")
+                stopOutgoingRingtone()
                 val message = String.format(
                     Locale.getDefault(),
                     "Call Error: %d, %s",
@@ -231,6 +236,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             override fun onConnected(call: Call) {
                 Log.d(TAG, "onConnected")
                 // TODO - outgoing call check
+                 stopOutgoingRingtone()
                 val list = arrayOf("Connected", call.from ?: "", call.to ?: "", "Incoming")
                 logEvents("", list)
                  // ── NEW: serialize & save (again, in case they differ) ─
@@ -247,6 +253,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
             override fun onDisconnected(call: Call, error: CallException?) {
                 Log.d(TAG, "Disconnected")
+                stopOutgoingRingtone()
                 storage?.clearCustomParams()
                 if (error != null) {
                     val message = String.format(
@@ -659,6 +666,9 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                     context?.let { ctx ->
                         val success = placeCall(ctx, token, from, to, params)
                         result.success(success)
+                         if (success) {
+                             playOutgoingRingtone()
+                         }
                     } ?: run {
                         Log.e(TAG, "Context is null, cannot place call")
                         result.success(false)
@@ -1132,6 +1142,32 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 //        return tm.isOnCall(ctx)
         return TVConnectionService.hasActiveCalls()
     }
+
+    private fun playOutgoingRingtone() {
+    // If it’s already playing, do nothing
+    if (outgoingRingtone?.isPlaying == true) return
+
+    context?.let { ctx ->
+        val ringtoneUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
+        val rt = android.media.RingtoneManager.getRingtone(ctx, ringtoneUri)
+        rt?.let {
+            it.isLooping = true
+            it.play()
+            outgoingRingtone = it
+            Log.d(TAG, "Outgoing ringtone started.")
+        }
+    }
+}
+
+private fun stopOutgoingRingtone() {
+    outgoingRingtone?.let {
+        if (it.isPlaying) {
+            it.stop()
+            Log.d(TAG, "Outgoing ringtone stopped.")
+        }
+    }
+    outgoingRingtone = null
+}
 
     private fun toggleSpeaker(ctx: Context, speakerIsOn: Boolean) {
         Intent(ctx, TVConnectionService::class.java).apply {
