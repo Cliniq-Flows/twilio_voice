@@ -223,7 +223,7 @@ open class TVCallConnection(
                 setRinging()
             }
             CallDirection.OUTGOING -> {
-                //setInitialized()
+                setInitialized()
                 setDialing()
             }
         }
