@@ -1281,31 +1281,38 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     @SuppressLint("MissingPermission")
     @RequiresPermission(allOf = [Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_PHONE_NUMBERS])
     private fun registerPhoneAccount(): Boolean {
-          context?.let { ctx ->
+     context?.let { ctx ->
         telecomManager?.let { tm ->
-            // 1) Create your PhoneAccountHandle
-            val component = ComponentName(ctx, TVConnectionService::class.java)
-            val handle = PhoneAccountHandle(component, ctx.getString("Cliniq Flows"))
+            // 1) Dynamically fetch your app’s human-readable name
+            val label = ctx.packageManager
+                          .getApplicationLabel(ctx.applicationInfo)
+                          .toString()
 
-            // 2) Build a full PhoneAccount with the default ringtone
-            val account = PhoneAccount.builder(handle, ctx.getString("Cliniq Flows"))
+            // 2) Build the PhoneAccountHandle
+            val component = ComponentName(ctx, TVConnectionService::class.java)
+            val handle    = PhoneAccountHandle(component, label)
+
+            // 3) Build the PhoneAccount itself, with default ringtone
+            val account = PhoneAccount.builder(handle, label)
                 .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER)
-                .setRingtoneUri(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
-                // optional: set your own icon
-              // .setIcon(Icon.createWithResource(ctx, R.drawable.ic_call))
+                .setRingtoneUri(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                )
+                // optional: .setIcon(Icon.createWithResource(ctx, R.drawable.ic_call))
                 .build()
 
-            // 3) (Re-)register it
+            // 4) Register (or re-register) with Telecom
             tm.registerPhoneAccount(account)
-            Log.d(TAG, "PhoneAccount registered with system ringtone")
+            Log.d(TAG, "PhoneAccount('$label') registered with system ringtone")
             return true
         } ?: run {
             Log.e(TAG, "TelecomManager is null, cannot register phone account")
+            return false
         }
     } ?: run {
         Log.e(TAG, "Context is null, cannot register phone account")
+        return false
     }
-    return false
 //         context?.let { ctx ->
 //             telecomManager?.let { tm ->
 //                 // Get PhoneAccountHandle
