@@ -1282,7 +1282,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     @RequiresPermission(allOf = [Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_PHONE_NUMBERS])
     private fun registerPhoneAccount(): Boolean {
     
-    return true
+
         context?.let { ctx ->
             telecomManager?.let { tm ->
                 // Get PhoneAccountHandle
