@@ -777,7 +777,7 @@ class TVConnectionService : ConnectionService() {
 
         // Setup connection UI parameters
         connection.setInitializing()
-         connection.setDialing()     
+        connection.setDialing()     
         // Apply extras
         connection.extras = request.extras
 
