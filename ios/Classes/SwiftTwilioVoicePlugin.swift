@@ -425,49 +425,49 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
     // MARK: — Ringback Tone Playback
 
-    // private func playRingbackTone() {
-    //      // don’t start twice
-    // guard ringtonePlayer == nil else { return }
+    private func playRingbackTone() {
+         // don’t start twice
+    guard ringtonePlayer == nil else { return }
 
-    // // 1) Get the bundle for *this* plugin pod
-    // let bundle = Bundle(for: SwiftTwilioVoicePlugin.self)
+    // 1) Get the bundle for *this* plugin pod
+    let bundle = Bundle(for: SwiftTwilioVoicePlugin.self)
 
-    // // 2) Look for the exact resource name you declared in your Podspec
-    // guard let url = bundle.url(
-    //     forResource: "phone-outgoing-call-72202",
-    //     withExtension: "mp3"
-    // ) else {
-    //     NSLog("⚠️ ringback file not found in plugin bundle")
-    //     return
-    // }
+    // 2) Look for the exact resource name you declared in your Podspec
+    guard let url = bundle.url(
+        forResource: "phone-outgoing-call-72202",
+        withExtension: "mp3"
+    ) else {
+        NSLog("⚠️ ringback file not found in plugin bundle")
+        return
+    }
 
-    // do {
-    //     // 3) Configure & activate the session so playback actually happens
-    //     let session = AVAudioSession.sharedInstance()
-    //     try session.setCategory(.playAndRecord,
-    //                             mode: .default,
-    //                             options: [.mixWithOthers, .duckOthers])
-    //     try session.setActive(true)
+    do {
+        // 3) Configure & activate the session so playback actually happens
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord,
+                                mode: .default,
+                                options: [.mixWithOthers, .duckOthers,.allowBluetooth])
+        try session.setActive(true)
 
-    //     // 4) Create & start the player
-    //     ringtonePlayer = try AVAudioPlayer(contentsOf: url)
-    //     ringtonePlayer?.numberOfLoops = -1
-    //     ringtonePlayer?.prepareToPlay()
-    //     ringtonePlayer?.play()
-    // } catch {
-    //     NSLog("⚠️ failed to start ringback: \(error)")
-    //     ringtonePlayer = nil
-    // }
-    // }
+        // 4) Create & start the player
+        ringtonePlayer = try AVAudioPlayer(contentsOf: url)
+        ringtonePlayer?.numberOfLoops = -1
+        ringtonePlayer?.prepareToPlay()
+        ringtonePlayer?.play()
+    } catch {
+        NSLog("⚠️ failed to start ringback: \(error)")
+        ringtonePlayer = nil
+    }
+    }
 
-    // private func stopRingbackTone() {
-    //     guard let player = ringtonePlayer else { return }
-    // if player.isPlaying { player.stop() }
-    // ringtonePlayer = nil
+    private func stopRingbackTone() {
+        guard let player = ringtonePlayer else { return }
+    if player.isPlaying { player.stop() }
+    ringtonePlayer = nil
 
-    // // deactivate if you want
-    // try? AVAudioSession.sharedInstance().setActive(false, options: [])
-    // }
+    // deactivate if you want
+    try? AVAudioSession.sharedInstance().setActive(false, options: [])
+    }
 
     func updateCurrentCallDisplayName(to newName: String) {
     guard let activeCall = self.call else {
@@ -871,7 +871,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
        saveCustomParams(callArgs as [String:Any])
        if self.callOutgoing {
-      // playRingbackTone()
+       playRingbackTone()
    }
         //self.placeCallButton.setTitle("Ringing", for: .normal)
     }
@@ -882,8 +882,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let to = (call.to ?? self.callTo)
         self.sendPhoneCallEvents(description: "Connected|\(from)|\(to)|\(direction)", isError: false)
 
-       // stopRingbackTone()
+      
         audioDevice.isEnabled = true
+        callKitCompletionCallback?(true)
+         stopRingbackTone()
         if let callKitCompletionCallback = callKitCompletionCallback {
             callKitCompletionCallback(true)
         }
@@ -907,7 +909,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "LOG|Call failed to connect: \(error.localizedDescription)", isError: false)
         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
         
-       // stopRingbackTone()
+      stopRingbackTone()
         
         if(error.localizedDescription.contains("Access Token expired")){
             self.sendPhoneCallEvents(description: "DEVICETOKEN", isError: false)
@@ -926,7 +928,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func callDidDisconnect(call: Call, error: Error?) {
         clearCustomParams()
 
-       // stopRingbackTone()
+       stopRingbackTone()
 
   // only fire "Call Ended" when it's a real hang-up, not a reject
   if !isRejectingCallInvite {
