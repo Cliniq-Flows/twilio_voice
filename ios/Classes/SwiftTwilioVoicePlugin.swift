@@ -426,33 +426,47 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // MARK: — Ringback Tone Playback
 
     private func playRingbackTone() {
-        // Only start if not already playing
-        guard ringtonePlayer == nil else { return }
+         // don’t start twice
+    guard ringtonePlayer == nil else { return }
 
-        // 1) Locate the ringback file in your app bundle.
-        //    Make sure you have added "ringback.mp3" (or .wav) to your target’s “Copy Bundle Resources.”
-        if let url = Bundle.main.url(forResource: "ringback", withExtension: "mp3") {
-            do {
-                ringtonePlayer = try AVAudioPlayer(contentsOf: url)
-                ringtonePlayer?.delegate = self
-                ringtonePlayer?.numberOfLoops = -1  // loop indefinitely until stopped
-                ringtonePlayer?.prepareToPlay()
-                ringtonePlayer?.play()
-            } catch {
-                NSLog("Failed to initialize ringback player: \(error.localizedDescription)")
-                ringtonePlayer = nil
-            }
-        } else {
-            NSLog("Ringback file not found in bundle")
-        }
+    // 1) Get the bundle for *this* plugin pod
+    let bundle = Bundle(for: SwiftTwilioVoicePlugin.self)
+
+    // 2) Look for the exact resource name you declared in your Podspec
+    guard let url = bundle.url(
+        forResource: "phone-outgoing-call-72202",
+        withExtension: "mp3"
+    ) else {
+        NSLog("⚠️ ringback file not found in plugin bundle")
+        return
+    }
+
+    do {
+        // 3) Configure & activate the session so playback actually happens
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord,
+                                mode: .default,
+                                options: [.mixWithOthers, .duckOthers])
+        try session.setActive(true)
+
+        // 4) Create & start the player
+        ringtonePlayer = try AVAudioPlayer(contentsOf: url)
+        ringtonePlayer?.numberOfLoops = -1
+        ringtonePlayer?.prepareToPlay()
+        ringtonePlayer?.play()
+    } catch {
+        NSLog("⚠️ failed to start ringback: \(error)")
+        ringtonePlayer = nil
+    }
     }
 
     private func stopRingbackTone() {
         guard let player = ringtonePlayer else { return }
-        if player.isPlaying {
-            player.stop()
-        }
-        ringtonePlayer = nil
+    if player.isPlaying { player.stop() }
+    ringtonePlayer = nil
+
+    // deactivate if you want
+    try? AVAudioSession.sharedInstance().setActive(false, options: [])
     }
 
     func updateCurrentCallDisplayName(to newName: String) {
@@ -869,7 +883,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "Connected|\(from)|\(to)|\(direction)", isError: false)
 
         stopRingbackTone()
-
+          audioDevice.isEnabled = true
         if let callKitCompletionCallback = callKitCompletionCallback {
             callKitCompletionCallback(true)
         }

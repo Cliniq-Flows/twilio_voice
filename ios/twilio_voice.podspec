@@ -17,7 +17,7 @@ Pod::Spec.new do |s|
   s.dependency 'Flutter'
   s.dependency 'TwilioVoice','~> 6.13.0'
   s.platform = :ios, '12.0'
-  s.resources = ['Classes/Resources/*.mp3']
+  s.resources = ['Classes/Resources/phone-outgoing-call-72202.mp3']
 
   # Flutter.framework does not contain a i386 slice.
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
