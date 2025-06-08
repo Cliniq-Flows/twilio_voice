@@ -446,7 +446,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playAndRecord,
                                 mode: .default,
-                                options: [.mixWithOthers, .duckOthers,.allowBluetooth])
+                                options: [.duckOthers,.mixWithOthers,.allowBluetooth])
         // try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers])
         // try session.overrideOutputAudioPort(.speaker)                      
         try session.setActive(true)
