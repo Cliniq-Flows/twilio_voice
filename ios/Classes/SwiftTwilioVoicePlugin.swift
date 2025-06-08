@@ -447,10 +447,13 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         try session.setCategory(.playAndRecord,
                                 mode: .default,
                                 options: [.mixWithOthers, .duckOthers,.allowBluetooth])
+        // try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers])
+        // try session.overrideOutputAudioPort(.speaker)                      
         try session.setActive(true)
 
         // 4) Create & start the player
         ringtonePlayer = try AVAudioPlayer(contentsOf: url)
+         ringtonePlayer?.volume = 1.0
         ringtonePlayer?.numberOfLoops = -1
         ringtonePlayer?.prepareToPlay()
         ringtonePlayer?.play()
