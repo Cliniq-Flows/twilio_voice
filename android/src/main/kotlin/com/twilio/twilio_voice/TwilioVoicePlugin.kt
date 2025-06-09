@@ -214,7 +214,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
              */
             override fun onRinging(call: Call) {
                 Log.d(TAG, "onRinging")
-                 playOutgoingRingtone()
+                 //playOutgoingRingtone()
                 // TODO - outgoing call check
                 val list = arrayOf("Ringing", call.from ?: "", call.to ?: "", "Incoming")
                 logEvents("", list)
@@ -223,7 +223,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
             override fun onConnectFailure(call: Call, error: CallException) {
                 Log.d(TAG, "Connect failure")
-                stopOutgoingRingtone()
+               // stopOutgoingRingtone()
                 val message = String.format(
                     Locale.getDefault(),
                     "Call Error: %d, %s",
@@ -236,7 +236,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             override fun onConnected(call: Call) {
                 Log.d(TAG, "onConnected")
                 // TODO - outgoing call check
-                 stopOutgoingRingtone()
+                // stopOutgoingRingtone()
                 val list = arrayOf("Connected", call.from ?: "", call.to ?: "", "Incoming")
                 logEvents("", list)
                  // ── NEW: serialize & save (again, in case they differ) ─
@@ -253,7 +253,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
             override fun onDisconnected(call: Call, error: CallException?) {
                 Log.d(TAG, "Disconnected")
-                stopOutgoingRingtone()
+              //  stopOutgoingRingtone()
                 storage?.clearCustomParams()
                 if (error != null) {
                     val message = String.format(
@@ -667,7 +667,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                         val success = placeCall(ctx, token, from, to, params)
                         result.success(success)
                          if (success) {
-                             playOutgoingRingtone()
+                           //  playOutgoingRingtone()
                          }
                     } ?: run {
                         Log.e(TAG, "Context is null, cannot place call")
@@ -1928,7 +1928,7 @@ private fun stopOutgoingRingtone() {
                         put(key, value)
                     }
                 }.toString()
-                 stopOutgoingRingtone()
+                // stopOutgoingRingtone()
 //                callSid = callHandle
                 logEvents("", arrayOf("Answer", from, to, CallDirection.INCOMING.label, params))
             }
@@ -2020,7 +2020,7 @@ private fun stopOutgoingRingtone() {
                 val direction = intent.getIntExtra(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, -1)
                 val callDirection = CallDirection.fromId(direction)!!.label
 //                callSid = callHandle
-  stopOutgoingRingtone()
+ // stopOutgoingRingtone()
                 logEvents("", arrayOf("Connected", from, to, callDirection))
             }
 
@@ -2030,7 +2030,7 @@ private fun stopOutgoingRingtone() {
                     Log.e(TAG, "No 'EXTRA_MESSAGE' provided or invalid type")
                     return
                 }
-                  stopOutgoingRingtone()
+                //  stopOutgoingRingtone()
                 logEvent("Call Error: ${code}, $message");
 
                  // Only force-hangup if this was a true “Decline” (Twilio code 31603 + message “Decline”)
@@ -2055,19 +2055,19 @@ private fun stopOutgoingRingtone() {
             }
 
             TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL -> {
-                  stopOutgoingRingtone()
+                //  stopOutgoingRingtone()
                  logEvent("", "Call Ended")
                //  logEvent("", TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL)
             }
 
             TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE -> {
-                  stopOutgoingRingtone()
+                 // stopOutgoingRingtone()
                  logEvent("", "Call Ended")
               
             }
 
             TVNativeCallEvents.EVENT_MISSED -> {
-                  stopOutgoingRingtone()
+                //  stopOutgoingRingtone()
                    storage?.clearCustomParams()
                 logEvent("", "Missed Call")
                 logEvent("", "Call Ended")

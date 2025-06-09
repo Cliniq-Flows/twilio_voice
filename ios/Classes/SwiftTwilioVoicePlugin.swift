@@ -874,7 +874,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
        saveCustomParams(callArgs as [String:Any])
        if self.callOutgoing {
-       playRingbackTone()
+     //  playRingbackTone()
    }
         //self.placeCallButton.setTitle("Ringing", for: .normal)
     }
@@ -888,7 +888,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
       
         audioDevice.isEnabled = true
         callKitCompletionCallback?(true)
-         stopRingbackTone()
+       //  stopRingbackTone()
         if let callKitCompletionCallback = callKitCompletionCallback {
             callKitCompletionCallback(true)
         }
@@ -912,7 +912,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "LOG|Call failed to connect: \(error.localizedDescription)", isError: false)
         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
         
-      stopRingbackTone()
+    //  stopRingbackTone()
         
         if(error.localizedDescription.contains("Access Token expired")){
             self.sendPhoneCallEvents(description: "DEVICETOKEN", isError: false)
@@ -931,7 +931,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func callDidDisconnect(call: Call, error: Error?) {
         clearCustomParams()
 
-       stopRingbackTone()
+     // stopRingbackTone()
 
   // only fire "Call Ended" when it's a real hang-up, not a reject
   if !isRejectingCallInvite {

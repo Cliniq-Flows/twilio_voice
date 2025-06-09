@@ -734,6 +734,8 @@ class TVConnectionService : ConnectionService() {
 
         // create outgoing connection
         val connection = TVCallConnection(applicationContext)
+          val props = connection.connectionProperties or Connection.PROPERTY_SELF_MANAGED
+        connection.setConnectionProperties(props)
 
         // create Voice SDK call
         connection.twilioCall = Voice.connect(applicationContext, connectOptions, connection)
