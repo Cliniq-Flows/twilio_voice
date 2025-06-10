@@ -465,7 +465,54 @@ class TVConnectionService : ConnectionService() {
 
 
                     val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
-                    telecomManager.placeCall(address, extras)
+                    // telecomManager.placeCall(address, extras)
+                    // Build the Twilio options
+  val connectOptions = ConnectOptions.Builder(token)
+    .params(params)
+    .build()
+
+  // Kick off the call directly (no Telecom UI)
+  val twilioCall = Voice.connect(
+    applicationContext,
+    connectOptions,
+    object : Call.Listener {
+      override fun onRinging(call: Call) {
+        val sid = call.sid ?: return
+        sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_RINGING, sid, null)
+      }
+      override fun onConnected(call: Call) {
+        val sid = call.sid ?: return
+        sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_CONNECTED, sid, null)
+      }
+      override fun onConnectFailure(call: Call, error: CallException) {
+        val sid = call.sid ?: return
+        sendBroadcastEvent(applicationContext,
+                           TVNativeCallEvents.EVENT_CONNECT_FAILURE,
+                           sid,
+                           Bundle().apply {
+                             putInt(CallExceptionExtension.EXTRA_CODE, error.errorCode)
+                             putString(CallExceptionExtension.EXTRA_MESSAGE, error.message)
+                           })
+      }
+      override fun onDisconnected(call: Call, error: CallException?) {
+        val sid = call.sid ?: return
+        sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE, sid, null)
+      }
+    }
+  )
+
+  // Keep track so hangup/hold/etc still work:
+  twilioCall.sid?.let { sid ->
+    val conn = TVCallConnection(applicationContext)
+    conn.twilioCall = twilioCall
+    attachCallEventListeners(conn, sid)
+    activeConnections[sid] = conn
+  }
+
+  // Make sure the service stays alive in foreground
+  startForegroundService()
+
+  return@let
                 }
 
                 ACTION_TOGGLE_BLUETOOTH -> {
