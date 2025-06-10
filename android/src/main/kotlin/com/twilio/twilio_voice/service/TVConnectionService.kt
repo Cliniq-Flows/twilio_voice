@@ -466,8 +466,19 @@ class TVConnectionService : ConnectionService() {
 
                     val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
                     // telecomManager.placeCall(address, extras)
+
+                    val params1 = HashMap<String, String>()
+        it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
+          ?.keySet()
+          ?.forEach { k ->
+            it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
+              ?.getString(k)
+              ?.let { v -> params1[k] = v }
+          }
+         params1[EXTRA_FROM] = from
+                    params1[EXTRA_TO] = to
                      val connectOptions = ConnectOptions.Builder(token)
-          .params(params)
+          .params(params1)
           .build()
 
         // 4) fire off the call yourself (no Telecom UI)
