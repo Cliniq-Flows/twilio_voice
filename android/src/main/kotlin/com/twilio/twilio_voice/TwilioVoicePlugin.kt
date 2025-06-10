@@ -1114,14 +1114,23 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     private fun hangup() {
         context?.let { ctx ->
         val sid = TVConnectionService.getActiveCallHandle()
-        // 1) *First* tell the Telecom Connection to go away:
-        TVConnectionService.getConnection(sid)?.disconnect()
+        val connection = TVConnectionService.getConnection(sid)
 
-        // 2) Then inform your service/Voice SDK to actually tear down the Twilio call:
+        connection?.let {
+            // if we haven't yet connected, abort the ringing call
+            if (it.state == Connection.STATE_RINGING || it.state == Connection.STATE_DIALING) {
+                it.abort()
+            } else {
+                // if we are already connected, do a normal disconnect
+                it.disconnect()
+            }
+        }
+
+        // now tell your service/Twilio to hang up the actual Voice SDK call
         Intent(ctx, TVConnectionService::class.java).apply {
-        action = TVConnectionService.ACTION_HANGUP
-        putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-        ctx.startService(this)
+            action = TVConnectionService.ACTION_HANGUP
+            putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+            ctx.startService(this)
         }
     } ?: run {
         Log.e(TAG, "Context is null. Cannot hangup.")
@@ -2006,6 +2015,7 @@ private fun stopOutgoingRingtone() {
                 val callDirection = CallDirection.fromId(direction).toString()
 
 //                callSid = callHandle
+                
                 logEvents("", arrayOf("Ringing", from, to, callDirection))
             }
 
