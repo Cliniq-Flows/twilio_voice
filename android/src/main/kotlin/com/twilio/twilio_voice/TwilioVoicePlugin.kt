@@ -1112,33 +1112,35 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun hangup() {
-         context?.let { ctx ->
-            // ① safely unwrap the stored handle
-            val sid: String = TVConnectionService.getActiveCallHandle()
+               val sid: String = TVConnectionService.getActiveCallHandle()
                 ?: run {
                     Log.w(TAG, "hangup(): no active call handle")
                     return
                 }
 
-            // ② safely retrieve the telecom Connection
-            val connection: Connection? = TVConnectionService.getConnection(sid)
-            connection?.let {
-                // ③ abort if still dialing/ringing, otherwise normal disconnect
+            // 2) fetch your TVCallConnection, then cast to android.telecom.Connection
+            val tvConn = TVConnectionService.getConnection(sid)
+            val telecomConn = tvConn as? Connection
+
+            telecomConn?.let {
+                // 3) if it’s still ringing/dialing, send a CANCEL → native UI goes away immediately
                 if (it.state == Connection.STATE_RINGING || it.state == Connection.STATE_DIALING) {
                     it.abort()
                 } else {
+                    // otherwise just disconnect
                     it.disconnect()
                 }
-            } ?: Log.w(TAG, "hangup(): no Telecom Connection for SID=$sid")
-
-            // ④ finally, tell Twilio’s service to tear down the SDK call
-            Intent(ctx, TVConnectionService::class.java).apply {
-                action = TVConnectionService.ACTION_HANGUP
-                putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-                ctx.startService(this)
-            }
-        } ?: Log.e(TAG, "hangup(): Context is null")
-    
+          } ?: Log.w(TAG, "hangup(): no Telecom Connection for SID=$sid")
+ 
+          // 4) finally, tell your ConnectionService (and thus the Voice SDK) to hang up
+             Intent(ctx, TVConnectionService::class.java).apply {
+                 action = TVConnectionService.ACTION_HANGUP
+                 putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+                 ctx.startService(this)
+             }
+         } ?: run {
+             Log.e(TAG, "Context is null. Cannot hangup.")
+         }
     //     context?.let { ctx ->
     //     val sid = TVConnectionService.getActiveCallHandle()
     //     val connection = TVConnectionService.getConnection(sid)
