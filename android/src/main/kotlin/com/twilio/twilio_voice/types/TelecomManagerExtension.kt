@@ -49,7 +49,7 @@ object TelecomManagerExtension {
 
         // register phone account
         val phoneAccount = PhoneAccount.builder(phoneAccountHandle, label)
-            .setCapabilities(PhoneAccount.CAPABILITY_SELF_MANAGED)
+            .setCapabilities(PhoneAccount.CAPABILITY_SELF_MANAGED or PhoneAccount.CAPABILITY_CALL_PROVIDER or PhoneAccount.CAPABILITY_CONNECTION_MANAGER or PhoneAccount.CAPABILITY_CALL_SUBJECT)
            // .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER or PhoneAccount.CAPABILITY_CONNECTION_MANAGER or PhoneAccount.CAPABILITY_CALL_SUBJECT)
             .setShortDescription(description)
 //            .addSupportedUriScheme(TVConnectionService.TWI_SCHEME)
