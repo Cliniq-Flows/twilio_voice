@@ -50,8 +50,7 @@ object TelecomManagerExtension {
         // register phone account
         val phoneAccount = PhoneAccount.builder(phoneAccountHandle, label)
         .setCapabilities(
-    PhoneAccount.CAPABILITY_SELF_MANAGED
-    or PhoneAccount.CAPABILITY_CALL_PROVIDER
+     PhoneAccount.CAPABILITY_CALL_PROVIDER
     or PhoneAccount.CAPABILITY_CONNECTION_MANAGER
     or PhoneAccount.CAPABILITY_CALL_SUBJECT
   )
