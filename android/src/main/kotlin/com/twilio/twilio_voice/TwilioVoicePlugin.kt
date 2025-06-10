@@ -1,5 +1,5 @@
 package com.twilio.twilio_voice
-
+import android.telecom.Connection
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -1112,29 +1112,56 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun hangup() {
-        context?.let { ctx ->
-        val sid = TVConnectionService.getActiveCallHandle()
-        val connection = TVConnectionService.getConnection(sid)
+         context?.let { ctx ->
+            // ① safely unwrap the stored handle
+            val sid: String = TVConnectionService.getActiveCallHandle()
+                ?: run {
+                    Log.w(TAG, "hangup(): no active call handle")
+                    return
+                }
 
-        connection?.let {
-            // if we haven't yet connected, abort the ringing call
-            if (it.state == Connection.STATE_RINGING || it.state == Connection.STATE_DIALING) {
-                it.abort()
-            } else {
-                // if we are already connected, do a normal disconnect
-                it.disconnect()
+            // ② safely retrieve the telecom Connection
+            val connection: Connection? = TVConnectionService.getConnection(sid)
+            connection?.let {
+                // ③ abort if still dialing/ringing, otherwise normal disconnect
+                if (it.state == Connection.STATE_RINGING || it.state == Connection.STATE_DIALING) {
+                    it.abort()
+                } else {
+                    it.disconnect()
+                }
+            } ?: Log.w(TAG, "hangup(): no Telecom Connection for SID=$sid")
+
+            // ④ finally, tell Twilio’s service to tear down the SDK call
+            Intent(ctx, TVConnectionService::class.java).apply {
+                action = TVConnectionService.ACTION_HANGUP
+                putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+                ctx.startService(this)
             }
-        }
+        } ?: Log.e(TAG, "hangup(): Context is null")
+    
+    //     context?.let { ctx ->
+    //     val sid = TVConnectionService.getActiveCallHandle()
+    //     val connection = TVConnectionService.getConnection(sid)
 
-        // now tell your service/Twilio to hang up the actual Voice SDK call
-        Intent(ctx, TVConnectionService::class.java).apply {
-            action = TVConnectionService.ACTION_HANGUP
-            putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-            ctx.startService(this)
-        }
-    } ?: run {
-        Log.e(TAG, "Context is null. Cannot hangup.")
-    }
+    //     connection?.let {
+    //         // if we haven't yet connected, abort the ringing call
+    //         if (it.state == Connection.STATE_RINGING || it.state == Connection.STATE_DIALING) {
+    //             it.abort()
+    //         } else {
+    //             // if we are already connected, do a normal disconnect
+    //             it.disconnect()
+    //         }
+    //     }
+
+    //     // now tell your service/Twilio to hang up the actual Voice SDK call
+    //     Intent(ctx, TVConnectionService::class.java).apply {
+    //         action = TVConnectionService.ACTION_HANGUP
+    //         putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+    //         ctx.startService(this)
+    //     }
+    // } ?: run {
+    //     Log.e(TAG, "Context is null. Cannot hangup.")
+    // }
         // context?.let { ctx ->
 
         //     TVConnectionService.getActiveCallHandle()?.let { sid ->
