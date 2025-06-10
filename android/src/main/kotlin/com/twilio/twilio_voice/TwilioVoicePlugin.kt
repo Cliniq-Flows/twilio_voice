@@ -142,16 +142,18 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         )
         hasStarted = true
 
+         // ── AUTO‐REGISTER HERE ──
+  val tm = flutterPluginBinding.applicationContext
+             .getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+  val handle = tm.getPhoneAccountHandle(flutterPluginBinding.applicationContext)
+  tm.registerPhoneAccount(flutterPluginBinding.applicationContext, handle)
+  Log.d(TAG, "Auto-registered PhoneAccount: ${tm.callCapablePhoneAccounts}")
+  // ────────────────────────
+
         (flutterPluginBinding.applicationContext as? Application)
         ?.registerActivityLifecycleCallbacks(appLifecycleCallbacks)
 
-         // ── ADD THIS ──
-        val tm = binding.applicationContext
-                    .getSystemService(Context.TELECOM_SERVICE) as TelecomManager
-        val handle = tm.getPhoneAccountHandle(binding.applicationContext)
-        tm.registerPhoneAccount(binding.applicationContext, handle)
-        Log.d(TAG, "Auto-registered PhoneAccount: ${tm.callCapablePhoneAccounts}")
-  // ─────────────
+       
         
     }
 
