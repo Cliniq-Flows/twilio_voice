@@ -1113,19 +1113,33 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
     private fun hangup() {
         context?.let { ctx ->
+        val sid = TVConnectionService.getActiveCallHandle()
+        // 1) *First* tell the Telecom Connection to go away:
+        TVConnectionService.getConnection(sid)?.disconnect()
 
-            TVConnectionService.getActiveCallHandle()?.let { sid ->
-            TVConnectionService.getConnection(sid)?.disconnect()
-            }
-
-            Intent(ctx, TVConnectionService::class.java).apply {
-                action = TVConnectionService.ACTION_HANGUP
-                putExtra(TVConnectionService.EXTRA_CALL_HANDLE, callSid)
-                ctx.startService(this)
-            }
-        } ?: run {
-            Log.e(TAG, "Context is null. Cannot hangup.")
+        // 2) Then inform your service/Voice SDK to actually tear down the Twilio call:
+        Intent(ctx, TVConnectionService::class.java).apply {
+        action = TVConnectionService.ACTION_HANGUP
+        putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+        ctx.startService(this)
         }
+    } ?: run {
+        Log.e(TAG, "Context is null. Cannot hangup.")
+    }
+        // context?.let { ctx ->
+
+        //     TVConnectionService.getActiveCallHandle()?.let { sid ->
+        //     TVConnectionService.getConnection(sid)?.disconnect()
+        //     }
+
+        //     Intent(ctx, TVConnectionService::class.java).apply {
+        //         action = TVConnectionService.ACTION_HANGUP
+        //         putExtra(TVConnectionService.EXTRA_CALL_HANDLE, callSid)
+        //         ctx.startService(this)
+        //     }
+        // } ?: run {
+        //     Log.e(TAG, "Context is null. Cannot hangup.")
+        // }
     }
 
     private fun isOnCall(/*ctx: Context, tm: TelecomManager*/): Boolean {
@@ -1877,6 +1891,8 @@ private fun stopOutgoingRingtone() {
             storage?.clearCustomParams()
                 Log.d(TAG, "handleBroadcastIntent: Call ended $callHandle")
                 logEvent("", "Call Ended")
+                
+                
               
             }
 

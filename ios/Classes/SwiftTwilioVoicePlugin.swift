@@ -932,29 +932,51 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         clearCustomParams()
 
      // stopRingbackTone()
-
-  // only fire "Call Ended" when it's a real hang-up, not a reject
-  if !isRejectingCallInvite {
-    self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-    if let error = error {
-      self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
+        if !isRejectingCallInvite {
+      let reason: CXCallEndedReason = self.userInitiatedDisconnect
+        ? .remoteEnded
+        : .failed
+      // ← here you tell CallKit “OK, end that call UI”
+      callKitProvider.reportCall(
+        with: call.uuid!,
+        endedAt: Date(),
+        reason: reason
+      )
+      sendPhoneCallEvents(
+        description: reason == .remoteEnded
+          ? "disconnectedLocal"
+          : "disconnectedRemote",
+        isError: false
+      )
     }
 
-    let reason: CXCallEndedReason = self.userInitiatedDisconnect
-      ? .remoteEnded
-      : .failed
-    callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
+    // reset flags + clear your references
+    isRejectingCallInvite = false
+    userInitiatedDisconnect = false
+    call = nil
+    self.callInvite = nil
+  // only fire "Call Ended" when it's a real hang-up, not a reject
+//   if !isRejectingCallInvite {
+//     self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+//     if let error = error {
+//       self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
+//     }
 
-    let eventName = self.userInitiatedDisconnect
-      ? "disconnectedLocal"
-      : "disconnectedRemote"
-    sendPhoneCallEvents(description: eventName, isError: false)
-  }
+//     let reason: CXCallEndedReason = self.userInitiatedDisconnect
+//       ? .remoteEnded
+//       : .failed
+//     callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
 
-  // reset your flags and cleanup
-  isRejectingCallInvite = false
-  self.userInitiatedDisconnect = false
-  callDisconnected()
+//     let eventName = self.userInitiatedDisconnect
+//       ? "disconnectedLocal"
+//       : "disconnectedRemote"
+//     sendPhoneCallEvents(description: eventName, isError: false)
+//   }
+
+//   // reset your flags and cleanup
+//   isRejectingCallInvite = false
+//   self.userInitiatedDisconnect = false
+//   callDisconnected()
 //          clearCustomParams()
 //         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
 //         if let error = error {

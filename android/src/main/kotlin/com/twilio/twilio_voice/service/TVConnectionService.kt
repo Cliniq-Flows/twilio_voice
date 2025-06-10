@@ -362,14 +362,24 @@ class TVConnectionService : ConnectionService() {
 
                 ACTION_HANGUP -> {
                     storage.clearCustomParams()
-                    val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
-                        Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
-                        return@let
-                    }
+                    val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE)
+                        ?: getActiveCallHandle() ?: return@let
 
-                    getConnection(callHandle)?.disconnect() ?: run {
-                        Log.e(TAG, "onStartCommand: [ACTION_HANGUP] could not find connection for callHandle: $callHandle")
-                    }
+                    val connection = getConnection(callHandle)
+                    connection?.disconnect()             // Twilio side tear-down
+                    // ─── teach Telecom to dismiss its UI ───────────
+                    connection?.setDisconnected(
+                    DisconnectCause(DisconnectCause.LOCAL)
+                    )
+                    connection?.destroy()
+                    // val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
+                    //     Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
+                    //     return@let
+                    // }
+
+                    // getConnection(callHandle)?.disconnect() ?: run {
+                    //     Log.e(TAG, "onStartCommand: [ACTION_HANGUP] could not find connection for callHandle: $callHandle")
+                    // }
                 }
 
                 ACTION_PLACE_OUTGOING_CALL -> {
@@ -806,6 +816,8 @@ class TVConnectionService : ConnectionService() {
         }
         val onDisconnect: CompletionHandler<DisconnectCause> = CompletionHandler {
             dc ->
+            connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
+             connection.destroy()
             storage.clearCustomParams()
             if (activeConnections.containsKey(callSid)) {
                 activeConnections.remove(callSid)
