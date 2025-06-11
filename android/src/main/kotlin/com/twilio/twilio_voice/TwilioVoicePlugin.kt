@@ -2005,7 +2005,9 @@ private fun stopOutgoingRingtone() {
                 val direction = intent.getIntExtra(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, -1)
                 val callDirection = CallDirection.fromId(direction).toString()
                  val sid = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE) 
-                ?: return Log.e("Ringing without SID")
+                ?: return Log.e(
+                     TAG,
+                    "Ringing without SID")
 
 //                callSid = callHandle
                 
@@ -2039,7 +2041,9 @@ private fun stopOutgoingRingtone() {
                 val direction = intent.getIntExtra(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, -1)
                 val callDirection = CallDirection.fromId(direction)!!.label
                   val sid = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE) 
-                ?: return Log.e("Connected without SID")
+                ?: return Log.e(
+                     TAG,
+                    "Connected without SID")
 //                callSid = callHandle
  // stopOutgoingRingtone()
                 logEvents("", arrayOf("Connected", from, to, callDirection))
