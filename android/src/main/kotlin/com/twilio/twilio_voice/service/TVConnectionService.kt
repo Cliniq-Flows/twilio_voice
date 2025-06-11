@@ -387,9 +387,6 @@ class TVConnectionService : ConnectionService() {
 
                 ACTION_PLACE_OUTGOING_CALL -> {
 
-
-
-
                     // check required EXTRA_TOKEN, EXTRA_TO, EXTRA_FROM
                     val token = it.getStringExtra(EXTRA_TOKEN) ?: run {
                         Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
@@ -416,63 +413,63 @@ class TVConnectionService : ConnectionService() {
                     val outgoingJson = JSONObject(params as Map<*, *>).toString()
                     storage.saveCustomParams(outgoingJson)
 
-                    // Add required params
-                    params[EXTRA_FROM] = from
-                    params[EXTRA_TO] = to
-                    params[EXTRA_TOKEN] = token
-
-                    // Create Twilio Param bundles
-                    val myBundle = Bundle().apply {
-                        putBundle(EXTRA_OUTGOING_PARAMS, Bundle().apply {
-                            params.forEach { (key, value) ->
-                                putString(key, value)
-                            }
-                        })
-                    }
-
-                    val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
-                    val phoneAccountHandle = telecomManager.getPhoneAccountHandle(applicationContext)
-
-                    if (!telecomManager.canReadPhoneState(applicationContext)) {
-                        Log.e(TAG, "onStartCommand: Missing READ_PHONE_STATE permission")
-                        return@let
-                    }
-
-                    val phoneAccount = telecomManager.getPhoneAccount(phoneAccountHandle)
-                    if(phoneAccount == null) {
-                        Log.e(TAG, "onStartCommand: PhoneAccount is null, make sure to register one with `registerPhoneAccount()`")
-                        return@let
-                    }
-                    if(!phoneAccount.isEnabled) {
-                        Log.e(TAG, "onStartCommand: PhoneAccount is not enabled, prompt the user to enable the phone account by opening settings with `openPhoneAccountSettings()`")
-                        return@let
-                    }
-
-                    if (!telecomManager.hasCallCapableAccount(applicationContext, phoneAccountHandle.componentName.className)) {
-                        Log.e(TAG, "onStartCommand: No registered phone account for PhoneHandle $phoneAccountHandle")
-                        telecomManager.registerPhoneAccount(applicationContext, phoneAccountHandle)
-                    }
-
-                    if (!applicationContext.hasCallPhonePermission()) {
-                        Log.e(TAG, "onStartCommand: Missing CALL_PHONE permission, request permission with `requestCallPhonePermission()`")
-                        return@let
-                    }
-
-                    if (!applicationContext.hasManageOwnCallsPermission()) {
-                        Log.e(TAG, "onStartCommand: Missing MANAGE_OWN_CALLS permission, request permission with `requestManageOwnCallsPermission()`")
-                        return@let
-                    }
-
-                   //  Create outgoing extras
-                     val extras = Bundle().apply {
-                         putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
-                         putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
-                     }
-
-
-
-                    val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
-                     telecomManager.placeCall(address, extras)
+//                    // Add required params
+//                    params[EXTRA_FROM] = from
+//                    params[EXTRA_TO] = to
+//                    params[EXTRA_TOKEN] = token
+//
+//                    // Create Twilio Param bundles
+//                    val myBundle = Bundle().apply {
+//                        putBundle(EXTRA_OUTGOING_PARAMS, Bundle().apply {
+//                            params.forEach { (key, value) ->
+//                                putString(key, value)
+//                            }
+//                        })
+//                    }
+//
+//                    val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
+//                    val phoneAccountHandle = telecomManager.getPhoneAccountHandle(applicationContext)
+//
+//                    if (!telecomManager.canReadPhoneState(applicationContext)) {
+//                        Log.e(TAG, "onStartCommand: Missing READ_PHONE_STATE permission")
+//                        return@let
+//                    }
+//
+//                    val phoneAccount = telecomManager.getPhoneAccount(phoneAccountHandle)
+//                    if(phoneAccount == null) {
+//                        Log.e(TAG, "onStartCommand: PhoneAccount is null, make sure to register one with `registerPhoneAccount()`")
+//                        return@let
+//                    }
+//                    if(!phoneAccount.isEnabled) {
+//                        Log.e(TAG, "onStartCommand: PhoneAccount is not enabled, prompt the user to enable the phone account by opening settings with `openPhoneAccountSettings()`")
+//                        return@let
+//                    }
+//
+//                    if (!telecomManager.hasCallCapableAccount(applicationContext, phoneAccountHandle.componentName.className)) {
+//                        Log.e(TAG, "onStartCommand: No registered phone account for PhoneHandle $phoneAccountHandle")
+//                        telecomManager.registerPhoneAccount(applicationContext, phoneAccountHandle)
+//                    }
+//
+//                    if (!applicationContext.hasCallPhonePermission()) {
+//                        Log.e(TAG, "onStartCommand: Missing CALL_PHONE permission, request permission with `requestCallPhonePermission()`")
+//                        return@let
+//                    }
+//
+//                    if (!applicationContext.hasManageOwnCallsPermission()) {
+//                        Log.e(TAG, "onStartCommand: Missing MANAGE_OWN_CALLS permission, request permission with `requestManageOwnCallsPermission()`")
+//                        return@let
+//                    }
+//
+//                   //  Create outgoing extras
+//                     val extras = Bundle().apply {
+//                         putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
+//                         putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
+//                     }
+//
+//
+//
+//                    val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
+//                     telecomManager.placeCall(address, extras)
 
                     val params1 = HashMap<String, String>()
         it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
@@ -493,19 +490,19 @@ class TVConnectionService : ConnectionService() {
 
                     val twilioListener = object : Call.Listener {
                         override fun onRinging(call: Call) {
-                            sendBroadcastEvent(
-                                applicationContext,
-                                TVNativeCallEvents.EVENT_RINGING,
-                                call.sid
-                            )
+                            conn.twilioCall = call
+                            call.sid?.let { sid ->
+                                attachCallEventListeners(conn, sid)
+                                activeConnections[sid] = conn
+                                sendBroadcastCallHandle(applicationContext, sid)
+                            }
+                            sendBroadcastEvent(applicationContext,
+                                TVNativeCallEvents.EVENT_RINGING, call.sid)
                         }
 
                         override fun onConnected(call: Call) {
-                            sendBroadcastEvent(
-                                applicationContext,
-                                TVNativeCallEvents.EVENT_CONNECTED,
-                                call.sid
-                            )
+                            sendBroadcastEvent(applicationContext,
+                                TVNativeCallEvents.EVENT_CONNECTED, call.sid)
                         }
 
                         override fun onReconnecting(
@@ -530,11 +527,11 @@ class TVConnectionService : ConnectionService() {
 
                         override fun onDisconnected(call: Call, error: CallException?) {
 
-                                sendBroadcastEvent(
-                                    applicationContext,
-                                    TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
-                                    call.sid
-                                )
+                            sendBroadcastEvent(applicationContext,
+                                TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
+                                call.sid)
+                            sendBroadcastCallHandle(applicationContext, null)
+                            activeConnections.remove(call.sid)
 
                         }
                     }
