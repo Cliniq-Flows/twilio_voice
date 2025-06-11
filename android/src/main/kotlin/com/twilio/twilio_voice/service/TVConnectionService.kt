@@ -386,7 +386,9 @@ class TVConnectionService : ConnectionService() {
 
                 ACTION_PLACE_OUTGOING_CALL -> {
 
-                 
+                
+
+
                     // check required EXTRA_TOKEN, EXTRA_TO, EXTRA_FROM
                     val token = it.getStringExtra(EXTRA_TOKEN) ?: run {
                         Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
@@ -401,233 +403,139 @@ class TVConnectionService : ConnectionService() {
                         return@let
                     }
 
-                    // gather params
+                    // Get all params from bundle
                     val params = HashMap<String, String>()
-                    it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
-                        ?.keySet()
-                        ?.forEach { key ->
-                            it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
-                                ?.getString(key)
-                                ?.let { v -> params[key] = v }
+                    val outGoingParams = it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
+                    outGoingParams?.keySet()?.forEach { key ->
+                        outGoingParams.getString(key)?.let { value ->
+                            params[key] = value
                         }
-                    params[EXTRA_FROM] = from
-                    params[EXTRA_TO] = to
+                    }
 
-                    // save for later
                     val outgoingJson = JSONObject(params as Map<*, *>).toString()
                     storage.saveCustomParams(outgoingJson)
 
-                    // build ConnectOptions
-                    val connectOptions = ConnectOptions.Builder(token)
-                        .params(params)
-                        .build()
+                    // Add required params
+                    params[EXTRA_FROM] = from
+                    params[EXTRA_TO] = to
+                    params[EXTRA_TOKEN] = token
 
-                    // 1) create a single TVCallConnection and use it directly as the SDK listener
-                    val conn = TVCallConnection(applicationContext)
-
-                    // 2) initiate the Twilio call; conn implements Call.Listener
-                    conn.twilioCall = Voice.connect(
-                        applicationContext,
-                        connectOptions,
-                        conn
-                    )
-
-                    // 3) once we have a SID, attach telecom and event listeners
-                    conn.twilioCall?.sid?.let { sid ->
-                        attachCallEventListeners(conn, sid)
-                        activeConnections[sid] = conn
+                    // Create Twilio Param bundles
+                    val myBundle = Bundle().apply {
+                        putBundle(EXTRA_OUTGOING_PARAMS, Bundle().apply {
+                            params.forEach { (key, value) ->
+                                putString(key, value)
+                            }
+                        })
                     }
 
-                    // 4) ensure the service stays in foreground
-                    startForegroundService()
-                    return@let
-                
+                    val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
+                    val phoneAccountHandle = telecomManager.getPhoneAccountHandle(applicationContext)
 
+                    if (!telecomManager.canReadPhoneState(applicationContext)) {
+                        Log.e(TAG, "onStartCommand: Missing READ_PHONE_STATE permission")
+                        return@let
+                    }
 
-        //             // check required EXTRA_TOKEN, EXTRA_TO, EXTRA_FROM
-        //             val token = it.getStringExtra(EXTRA_TOKEN) ?: run {
-        //                 Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
-        //                 return@let
-        //             }
-        //             val to = it.getStringExtra(EXTRA_TO) ?: run {
-        //                 Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TO")
-        //                 return@let
-        //             }
-        //             val from = it.getStringExtra(EXTRA_FROM) ?: run {
-        //                 Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_FROM")
-        //                 return@let
-        //             }
+                    val phoneAccount = telecomManager.getPhoneAccount(phoneAccountHandle)
+                    if(phoneAccount == null) {
+                        Log.e(TAG, "onStartCommand: PhoneAccount is null, make sure to register one with `registerPhoneAccount()`")
+                        return@let
+                    }
+                    if(!phoneAccount.isEnabled) {
+                        Log.e(TAG, "onStartCommand: PhoneAccount is not enabled, prompt the user to enable the phone account by opening settings with `openPhoneAccountSettings()`")
+                        return@let
+                    }
 
-        //             // Get all params from bundle
-        //             val params = HashMap<String, String>()
-        //             val outGoingParams = it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
-        //             outGoingParams?.keySet()?.forEach { key ->
-        //                 outGoingParams.getString(key)?.let { value ->
-        //                     params[key] = value
-        //                 }
-        //             }
+                    if (!telecomManager.hasCallCapableAccount(applicationContext, phoneAccountHandle.componentName.className)) {
+                        Log.e(TAG, "onStartCommand: No registered phone account for PhoneHandle $phoneAccountHandle")
+                        telecomManager.registerPhoneAccount(applicationContext, phoneAccountHandle)
+                    }
 
-        //             val outgoingJson = JSONObject(params as Map<*, *>).toString()
-        //             storage.saveCustomParams(outgoingJson)
+                    if (!applicationContext.hasCallPhonePermission()) {
+                        Log.e(TAG, "onStartCommand: Missing CALL_PHONE permission, request permission with `requestCallPhonePermission()`")
+                        return@let
+                    }
 
-        //             // Add required params
-        //             params[EXTRA_FROM] = from
-        //             params[EXTRA_TO] = to
-        //             params[EXTRA_TOKEN] = token
+                    if (!applicationContext.hasManageOwnCallsPermission()) {
+                        Log.e(TAG, "onStartCommand: Missing MANAGE_OWN_CALLS permission, request permission with `requestManageOwnCallsPermission()`")
+                        return@let
+                    }
 
-        //             // Create Twilio Param bundles
-        //             val myBundle = Bundle().apply {
-        //                 putBundle(EXTRA_OUTGOING_PARAMS, Bundle().apply {
-        //                     params.forEach { (key, value) ->
-        //                         putString(key, value)
-        //                     }
-        //                 })
-        //             }
-
-        //             val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
-        //             val phoneAccountHandle = telecomManager.getPhoneAccountHandle(applicationContext)
-
-        //             if (!telecomManager.canReadPhoneState(applicationContext)) {
-        //                 Log.e(TAG, "onStartCommand: Missing READ_PHONE_STATE permission")
-        //                 return@let
-        //             }
-
-        //             val phoneAccount = telecomManager.getPhoneAccount(phoneAccountHandle)
-        //             if(phoneAccount == null) {
-        //                 Log.e(TAG, "onStartCommand: PhoneAccount is null, make sure to register one with `registerPhoneAccount()`")
-        //                 return@let
-        //             }
-        //             if(!phoneAccount.isEnabled) {
-        //                 Log.e(TAG, "onStartCommand: PhoneAccount is not enabled, prompt the user to enable the phone account by opening settings with `openPhoneAccountSettings()`")
-        //                 return@let
-        //             }
-
-        //             if (!telecomManager.hasCallCapableAccount(applicationContext, phoneAccountHandle.componentName.className)) {
-        //                 Log.e(TAG, "onStartCommand: No registered phone account for PhoneHandle $phoneAccountHandle")
-        //                 telecomManager.registerPhoneAccount(applicationContext, phoneAccountHandle)
-        //             }
-
-        //             if (!applicationContext.hasCallPhonePermission()) {
-        //                 Log.e(TAG, "onStartCommand: Missing CALL_PHONE permission, request permission with `requestCallPhonePermission()`")
-        //                 return@let
-        //             }
-
-        //             if (!applicationContext.hasManageOwnCallsPermission()) {
-        //                 Log.e(TAG, "onStartCommand: Missing MANAGE_OWN_CALLS permission, request permission with `requestManageOwnCallsPermission()`")
-        //                 return@let
-        //             }
-
-        //             // Create outgoing extras
-        //             // val extras = Bundle().apply {
-        //             //     putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
-        //             //     putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
-        //             // }
+                    // Create outgoing extras
+                    // val extras = Bundle().apply {
+                    //     putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
+                    //     putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
+                    // }
 
 
 
-        //            // val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
-        //             // telecomManager.placeCall(address, extras)
+                   // val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
+                    // telecomManager.placeCall(address, extras)
 
-        //             val params1 = HashMap<String, String>()
-        // it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
-        //   ?.keySet()
-        //   ?.forEach { k ->
-        //     it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
-        //       ?.getString(k)
-        //       ?.let { v -> params1[k] = v }
-        //   }
-        //  params1[EXTRA_FROM] = from
-        //             params1[EXTRA_TO] = to
-        //              val connectOptions = ConnectOptions.Builder(token)
-        //   .params(params1)
-        //   .build()
+                    val params1 = HashMap<String, String>()
+        it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
+          ?.keySet()
+          ?.forEach { k ->
+            it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
+              ?.getString(k)
+              ?.let { v -> params1[k] = v }
+          }
+         params1[EXTRA_FROM] = from
+                    params1[EXTRA_TO] = to
+                     val connectOptions = ConnectOptions.Builder(token)
+          .params(params1)
+          .build()
 
-        // // 4) fire off the call yourself (no Telecom UI)
-        // val twilioCall = Voice.connect(
-        //   applicationContext,
-        //   connectOptions,
-        //   object : Call.Listener {
-        //       override fun onConnectFailure(
-        //           p0: Call,
-        //           p1: com.twilio.voice.CallException
-        //       ) {
-        //           val sid = p0.sid ?: return
-        //           sendBroadcastEvent(
-        //               applicationContext,
-        //               TVNativeCallEvents.EVENT_CONNECT_FAILURE,
-        //               sid,
-        //               Bundle().apply {
-        //                   putInt(CallExceptionExtension.EXTRA_CODE,error(""))
-        //                   putString(CallExceptionExtension.EXTRA_MESSAGE, error(""))
-        //               }
-        //           )
-        //       }
-
-        //       override fun onRinging(call: Call) {
-        //           val sid = call.sid ?: return
-        //           sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE, sid, null)
-        //     }
-        //     override fun onConnected(call: Call) {
-        //       val sid = call.sid ?: return
-        //       sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_CONNECTED, sid, null)
-        //     }
-
-        //       override fun onReconnecting(
-        //           p0: Call,
-        //           p1: com.twilio.voice.CallException
-        //       ) {
-        //           val sid = p0.sid ?: return
-        //           sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_RECONNECTING, sid, null)
-        //       }
+        // 4) fire off the call yourself (no Telecom UI)
+        val conn = TVCallConnection(applicationContext)
+        val twilioCall = Voice.connect(
+          applicationContext,
+          connectOptions,
+          conn
+       
+        )
+          attachCallEventListeners(conn, sid)
+          activeConnections[sid] = conn
 
 
+          conn.setOnCallStateListener(CompletionHandler { state ->
+              if (state == Call.State.RINGING || state == Call.State.CONNECTED) {
+                   conn.twilioCall?.sid?.let { sid ->
+                          Log.d(TAG, "Conference SID is: $sid")
 
+                          // swap out the temp key for the real SID
+                          activeConnections.remove(tempId)
+                          activeConnections[sid] = conferenceConnection
 
-        //     override fun onReconnected(call: Call) {
-        //       val sid = call.sid ?: return
-        //       sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_RECONNECTED, sid, null)
-        //     }
+                          // fire the standard "EVENT_CONNECTED" broadcast
+                          sendBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_CONNECTED,
+                                sid,
+                                Bundle().apply {
+                                      putString(TVBroadcastReceiver.EXTRA_CALL_HANDLE, sid)
+                                      putString(TVBroadcastReceiver.EXTRA_CALL_FROM, "Unknown Caller")      // or fill if you have a from
+                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO, "Unknown Caller")        // or fill if you have a to
+                        putInt(TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
+                            CallDirection.OUTGOING.id)
+                                 }
+                                )
+                 }
+          }
+        })
 
-        //       override fun onDisconnected(
-        //          call: Call,
+        // 5) keep track for hangup/hold/etc
+        
+        
+        
 
-        //          error: CallException?
-        //       ) {
-        //         val sid = call.sid ?: return
-               
-        //          if (error == null) {
-        //               sendBroadcastEvent(
-        //             applicationContext,
-        //             TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL,
-        //             sid,
-        //             null
-        //         )
-        //          }else{
-        //              sendBroadcastEvent(
-        //             applicationContext,
-        //             TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
-        //             sid,
-        //             null
-        //         )
+       
 
-        //          }
-        //           Log.d(TAG, "Call disconnected (SID=$sid), error=${error?.message}")
-        //       }
-        //   }
-        // )
+        // 6) ensure foreground
+        startForegroundService()
 
-        // // 5) keep track for hangup/hold/etc
-        // twilioCall.sid?.let { sid ->
-        //   val conn = TVCallConnection(applicationContext)
-        //   conn.twilioCall = twilioCall
-        //   attachCallEventListeners(conn, sid)
-        //   activeConnections[sid] = conn
-        // }
-
-        // // 6) ensure foreground
-        // startForegroundService()
-
-        // return@let
+        return@let
                  
                 }
 
