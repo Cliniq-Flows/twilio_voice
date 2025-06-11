@@ -493,10 +493,13 @@ class TVConnectionService : ConnectionService() {
                     val twilioListener = object : Call.Listener {
                         override fun onRinging(call: Call) {
                             // store call on connection if needed…
+                            val sid = call.sid
+                            // 1) tell Flutter “here’s the active call”
+                            sendBroadcastCallHandle(applicationContext, sid)
                             sendBroadcastEvent(
                                 applicationContext,
                                 TVNativeCallEvents.EVENT_RINGING,
-                                call.sid,
+                                sid,
                                 Bundle().apply {
                                     putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
@@ -507,10 +510,13 @@ class TVConnectionService : ConnectionService() {
                         }
 
                         override fun onConnected(call: Call) {
+                            val sid = call.sid
+                            // 1) tell Flutter “here’s the active call”
+                            sendBroadcastCallHandle(applicationContext, sid)
                             sendBroadcastEvent(
                                 applicationContext,
                                 TVNativeCallEvents.EVENT_CONNECTED,
-                                call.sid,
+                                sid,
                                 Bundle().apply {
                                     putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
@@ -534,10 +540,13 @@ class TVConnectionService : ConnectionService() {
                         override fun onReconnected(call: Call)               { /* optional */ }
 
                         override fun onDisconnected(call: Call, error: CallException?) {
+                            val sid = call.sid
+                            // Clear the active handle now that it’s gone
+                            sendBroadcastCallHandle(applicationContext, null)
                             sendBroadcastEvent(
                                 applicationContext,
                                 TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
-                                call.sid,
+                                sid,
                                 Bundle().apply {
                                     putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
