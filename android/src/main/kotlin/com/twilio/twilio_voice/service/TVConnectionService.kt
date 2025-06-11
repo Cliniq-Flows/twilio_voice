@@ -535,14 +535,24 @@ class TVConnectionService : ConnectionService() {
                  error: CallException?
               ) {
                 val sid = call.sid ?: return
-                 Log.d(TAG, "Call disconnected (SID=$sid), error=${error?.message}")
-
-                  sendBroadcastEvent(
+               
+                 if (error == null) {
+                      sendBroadcastEvent(
                     applicationContext,
-                    TVNativeCallEvents.EVENT_CALL_ENDED,
+                    TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL,
                     sid,
                     null
                 )
+                 }else{
+                     sendBroadcastEvent(
+                    applicationContext,
+                    TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
+                    sid,
+                    null
+                )
+
+                 }
+                  Log.d(TAG, "Call disconnected (SID=$sid), error=${error?.message}")
               }
           }
         )
