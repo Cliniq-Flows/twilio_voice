@@ -1841,6 +1841,7 @@ private fun stopOutgoingRingtone() {
             }
 
             TVBroadcastReceiver.ACTION_ACTIVE_CALL_CHANGED -> {
+                 val sid = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE)
                 Log.d(TAG, "handleBroadcastIntent: Active call changed to $callSid")
             }
 
