@@ -524,15 +524,6 @@ class TVConnectionService : ConnectionService() {
                  }
           }
         })
-
-        // 5) keep track for hangup/hold/etc
-        
-        
-        
-
-       
-
-        // 6) ensure foreground
         startForegroundService()
 
         return@let
