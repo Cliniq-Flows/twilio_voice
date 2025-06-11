@@ -495,10 +495,10 @@ class TVConnectionService : ConnectionService() {
           conn
        
         )
-           conn.twilioCall?.sid?.let { sid ->
-                        attachCallEventListeners(conn, sid)
-                        activeConnections[sid] = conn
-                    }
+        //    conn.twilioCall?.sid?.let { sid ->
+        //                 attachCallEventListeners(conn, sid)
+        //                 activeConnections[sid] = conn
+        //             }
 
 
           conn.setOnCallStateListener(CompletionHandler { state ->
@@ -507,7 +507,7 @@ class TVConnectionService : ConnectionService() {
                           Log.d(TAG, "Conference SID is: $sid")
 
                           // swap out the temp key for the real SID
-                          activeConnections.remove(tempId)
+                       
                           activeConnections[sid] = conn
 
                           // fire the standard "EVENT_CONNECTED" broadcast
