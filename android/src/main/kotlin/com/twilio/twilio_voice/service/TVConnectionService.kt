@@ -488,29 +488,66 @@ class TVConnectionService : ConnectionService() {
                         .params(custom)
                         .build()
 
+
+
+                    val twilioListener = object : Call.Listener {
+                        override fun onRinging(call: Call) {
+                            // store call on connection if needed…
+                            sendLocalBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_RINGING,
+                                call.sid
+                            )
+                        }
+
+                        override fun onConnected(call: Call) {
+                            sendLocalBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_CONNECTED,
+                                call.sid
+                            )
+                        }
+
+                        override fun onConnectFailure(call: Call, error: CallException) {
+                            // you can broadcast a failure event if you want
+                            sendLocalBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_CONNECT_FAILURE,
+                                call.sid,
+                                Bundle().apply { putString("error", error.message) }
+                            )
+                        }
+
+                        override fun onReconnecting(call: Call, error: CallException) { /* optional */ }
+                        override fun onReconnected(call: Call)               { /* optional */ }
+
+                        override fun onDisconnected(call: Call, error: CallException?) {
+                            sendLocalBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
+                                call.sid
+                            )
+                        }
+                    }
+
+
+                    val twilioCall = Voice.connect(
+                        applicationContext,
+                        connectOptions,
+                        twilioListener
+                    )
+
+                    // 5) (Optional) keep a reference if you use TVCallConnection for other things
                     // 3) Create & configure your TVCallConnection
-                    val conn = TVCallConnection(applicationContext).apply {
-                        // drive the TelecomService UI state if you still want it,
-                        // otherwise you can skip these
-                        setInitializing()
-                        setDialing()
-                    }
-
-                    // 4) Connect — no TelecomManager.placeCall here!
-                    val call = Voice.connect(applicationContext, connectOptions, conn)
-                    conn.twilioCall = call
-
-                    // 5) Cache & hook up your event listeners so that
-                    //    attachCallEventListeners will fire your local broadcasts
-                    call.sid?.let { sid ->
+                    val conn = TVCallConnection(applicationContext)
+                    conn.twilioCall = twilioCall
+                    twilioCall.sid?.let { sid ->
                         activeConnections[sid] = conn
-                        attachCallEventListeners(conn, sid)
+                        attachCallEventListeners(conn, sid)  // still needed for your telecom‐side cleanup
                     }
 
-                    // 6) If you still need a persistent Notification
+                    // 6) Keep service alive
                     startForegroundService()
-
-                    return@let
                 }
 
                 ACTION_TOGGLE_BLUETOOTH -> {
@@ -935,6 +972,20 @@ class TVConnectionService : ConnectionService() {
         TelecomManager.PRESENTATION_ALLOWED
     )
     connection.setCallerDisplayName(name, TelecomManager.PRESENTATION_ALLOWED)
+    }
+
+    private fun sendLocalBroadcastEvent(
+        ctx: Context,
+        action: String,
+        callSid: String?,
+        extras: Bundle? = null
+    ) {
+        Intent(action).apply {
+            putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callSid)
+            extras?.let(::putExtras)
+        }.also { intent ->
+            LocalBroadcastManager.getInstance(ctx).sendBroadcast(intent)
+        }
     }
 
     private fun sendBroadcastEvent(ctx: Context, event: String, callSid: String?, extras: Bundle? = null) {
