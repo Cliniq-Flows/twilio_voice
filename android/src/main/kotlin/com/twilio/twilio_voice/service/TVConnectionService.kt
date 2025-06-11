@@ -387,7 +387,7 @@ class TVConnectionService : ConnectionService() {
 
                 ACTION_PLACE_OUTGOING_CALL -> {
 
-                
+
 
 
                     // check required EXTRA_TOKEN, EXTRA_TO, EXTRA_FROM
@@ -463,16 +463,16 @@ class TVConnectionService : ConnectionService() {
                         return@let
                     }
 
-                    // Create outgoing extras
-                    // val extras = Bundle().apply {
-                    //     putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
-                    //     putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
-                    // }
+                   //  Create outgoing extras
+                     val extras = Bundle().apply {
+                         putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
+                         putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
+                     }
 
 
 
-                   // val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
-                    // telecomManager.placeCall(address, extras)
+                    val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
+                     telecomManager.placeCall(address, extras)
 
                     val params1 = HashMap<String, String>()
         it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
