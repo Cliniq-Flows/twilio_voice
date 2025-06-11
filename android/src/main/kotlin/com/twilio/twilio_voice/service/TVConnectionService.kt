@@ -495,16 +495,16 @@ class TVConnectionService : ConnectionService() {
           conn
        
         )
-        //    conn.twilioCall?.sid?.let { sid ->
-        //                 attachCallEventListeners(conn, sid)
-        //                 activeConnections[sid] = conn
-        //             }
-
+           conn.twilioCall?.sid?.let { sid ->
+                        attachCallEventListeners(conn, sid)
+                        activeConnections[sid] = conn
+                    }
+       // attachCallEventListeners(conferenceConnection, tempId)
 
           conn.setOnCallStateListener(CompletionHandler { state ->
               if (state == Call.State.RINGING || state == Call.State.CONNECTED) {
                    conn.twilioCall?.sid?.let { sid ->
-                          Log.d(TAG, "Conference SID is: $sid")
+                          Log.d(TAG, "OUTGOING SID is: $sid")
 
                           // swap out the temp key for the real SID
                        
@@ -517,8 +517,8 @@ class TVConnectionService : ConnectionService() {
                                 sid,
                                 Bundle().apply {
                                       putString(TVBroadcastReceiver.EXTRA_CALL_HANDLE, sid)
-                                      putString(TVBroadcastReceiver.EXTRA_CALL_FROM, "Unknown Caller")      // or fill if you have a from
-                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO, "Unknown Caller")        // or fill if you have a to
+                                      putString(TVBroadcastReceiver.EXTRA_CALL_FROM, from)    
+                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO, to)      
                         putInt(TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
                             CallDirection.OUTGOING.id)
                                  }
