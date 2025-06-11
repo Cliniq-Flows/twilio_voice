@@ -496,7 +496,13 @@ class TVConnectionService : ConnectionService() {
                             sendBroadcastEvent(
                                 applicationContext,
                                 TVNativeCallEvents.EVENT_RINGING,
-                                call.sid
+                                call.sid,
+                                Bundle().apply {
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
+                                    putInt   (TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
+                                        CallDirection.OUTGOING.id)
+                                }
                             )
                         }
 
@@ -504,7 +510,13 @@ class TVConnectionService : ConnectionService() {
                             sendBroadcastEvent(
                                 applicationContext,
                                 TVNativeCallEvents.EVENT_CONNECTED,
-                                call.sid
+                                call.sid,
+                                Bundle().apply {
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
+                                    putInt   (TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
+                                        CallDirection.OUTGOING.id)
+                                }
                             )
                         }
 
@@ -525,7 +537,13 @@ class TVConnectionService : ConnectionService() {
                             sendBroadcastEvent(
                                 applicationContext,
                                 TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
-                                call.sid
+                                call.sid,
+                                Bundle().apply {
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
+                                    putInt   (TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
+                                        CallDirection.OUTGOING.id)
+                                }
                             )
                         }
                     }
