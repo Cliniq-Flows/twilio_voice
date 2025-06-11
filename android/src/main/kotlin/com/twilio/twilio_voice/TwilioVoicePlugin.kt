@@ -145,7 +145,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         (flutterPluginBinding.applicationContext as? Application)
         ?.registerActivityLifecycleCallbacks(appLifecycleCallbacks)
 
-       
+        registerReceiver()
         
     }
 
