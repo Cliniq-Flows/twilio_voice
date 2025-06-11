@@ -1,5 +1,6 @@
 package com.twilio.twilio_voice.service
 
+import android.telecom.Connection
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -489,154 +490,66 @@ class TVConnectionService : ConnectionService() {
 
         // 4) fire off the call yourself (no Telecom UI)
         val conn = TVCallConnection(applicationContext)
-         conn.setInitializing()
-     conn.setDialing()
+
+                    val twilioListener = object : Call.Listener {
+                        override fun onRinging(call: Call) {
+                            sendBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_RINGING,
+                                call.sid
+                            )
+                        }
+
+                        override fun onConnected(call: Call) {
+                            sendBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_CONNECTED,
+                                call.sid
+                            )
+                        }
+
+                        override fun onReconnecting(
+                            p0: Call,
+                            p1: CallException
+                        ) {
+                            TODO("Not yet implemented")
+                        }
+
+                        override fun onReconnected(p0: Call) {
+                            TODO("Not yet implemented")
+                        }
+
+                        override fun onConnectFailure(call: Call, error: CallException) {
+                            sendBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_CONNECT_FAILURE,
+                                call.sid,
+                                Bundle().apply { putString("error", error.message) }
+                            )
+                        }
+
+                        override fun onDisconnected(call: Call, error: CallException?) {
+
+                                sendBroadcastEvent(
+                                    applicationContext,
+                                    TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
+                                    call.sid
+                                )
+
+                        }
+                    }
         val twilioCall = Voice.connect(
           applicationContext,
           connectOptions,
-          conn,
-            // object : Call.Listener {
-            //     override fun onConnectFailure(
-            //         p0: Call,
-            //         p1: com.twilio.voice.CallException
-            //     ) {
-            //         val sid = p0.sid ?: return
-            //         sendBroadcastEvent(
-            //             applicationContext,
-            //             TVNativeCallEvents.EVENT_CONNECT_FAILURE,
-            //             sid,
-            //             Bundle().apply {
-            //                 putInt(CallExceptionExtension.EXTRA_CODE,error(""))
-            //                 putString(CallExceptionExtension.EXTRA_MESSAGE, error(""))
-            //             }
-            //         )
-            //     }
-
-            //     override fun onRinging(call: Call) {
-            //         val sid = call.sid ?: return
-            //         sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_RINGING, sid, null)
-            //     }
-            //     override fun onConnected(call: Call) {
-            //         val sid = call.sid ?: return
-            //         sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_CONNECTED, sid, null)
-            //     }
-
-            //     override fun onReconnecting(
-            //         p0: Call,
-            //         p1: com.twilio.voice.CallException
-            //     ) {
-            //         val sid = p0.sid ?: return
-            //         sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_RECONNECTING, sid, null)
-            //     }
-
-
-
-
-            //     override fun onReconnected(call: Call) {
-            //         val sid = call.sid ?: return
-            //         sendBroadcastEvent(applicationContext, TVNativeCallEvents.EVENT_RECONNECTED, sid, null)
-            //     }
-
-            //     override fun onDisconnected(
-            //         call: Call,
-
-            //         error: CallException?
-            //     ) {
-            //         val sid = call.sid ?: return
-
-            //         if (error == null) {
-            //             sendBroadcastEvent(
-            //                 applicationContext,
-            //                 TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL,
-            //                 sid,
-            //                 null
-            //             )
-            //         }else{
-            //             sendBroadcastEvent(
-            //                 applicationContext,
-            //                 TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
-            //                 sid,
-            //                 null
-            //             )
-
-            //         }
-            //         Log.d(TAG, "Call disconnected (SID=$sid), error=${error?.message}")
-            //     }
-            // }
+            twilioListener,
+            
 
         )
+                    conn.twilioCall = twilioCall
        
        // attachCallEventListeners(conferenceConnection, tempId)
 
-         conn.setOnCallStateListener(CompletionHandler { state ->
-                       val sid = conn.twilioCall?.sid ?: return@CompletionHandler
-                       when (state) {
-                           Call.State.RINGING, Call.State.CONNECTED -> {
-                               Log.d(TAG, "Call ringing/connected: SID=$sid")
-                               activeConnections[sid] = conn
-                               sendBroadcastEvent(
-                                   applicationContext,
-                                   TVNativeCallEvents.EVENT_CONNECTED,
-                                   sid,
-                                   Bundle().apply {
-                                       putString(TVBroadcastReceiver.EXTRA_CALL_HANDLE, sid)
-                                       putString(TVBroadcastReceiver.EXTRA_CALL_FROM, from)
-                                       putString(TVBroadcastReceiver.EXTRA_CALL_TO, to)
-                                       putInt(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, CallDirection.OUTGOING.id)
-                                   }
-                               )
-                           }
-                           Call.State.DISCONNECTED -> {
-                               // Fetch the last error (if any)
-                               val error = conn.twilioCall?.let { call -> call.error as? CallException }
-
-                               when {
-                                   error == null -> {
-                                       // normal hang-up
-                                       sendBroadcastEvent(
-                                           applicationContext,
-                                           TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL,
-                                           sid,
-                                           null
-                                       )
-                                   }
-                                   // replace ERROR_NOT_ANSWERED_CODE & ERROR_DECLINE_CODE with actual codes
-                                   error.code == CallException.ERROR_CODE_NOT_ANSWERED -> {
-                                       // missed (no answer)
-                                       sendBroadcastEvent(
-                                           applicationContext,
-                                           TVNativeCallEvents.EVENT_MISSED,
-                                           sid,
-                                           null
-                                       )
-                                   }
-                                   error.code == CallException.ERROR_CODE_CALL_DECLINED -> {
-                                       // declined by callee
-                                       sendBroadcastEvent(
-                                           applicationContext,
-                                           TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
-                                           sid,
-                                           null
-                                       )
-                                   }
-                                   else -> {
-                                       // other remote disconnect
-                                       sendBroadcastEvent(
-                                           applicationContext,
-                                           TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
-                                           sid,
-                                           null
-                                       )
-                                   }
-                               }
-                               Log.d(TAG, "Call finished: SID=$sid, error=${error?.message}")
-                           }
-                           else -> {
-                               // handle other states if needed
-                           }
-                       }
-                   })
-        
+       
             conn.twilioCall?.sid?.let { sid ->
                         attachCallEventListeners(conn, sid)
                         activeConnections[sid] = conn
