@@ -79,6 +79,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     private var accessToken: String? = null
     private var context: Context? = null
     private var activity: Activity? = null
+    private var activeCallSid: String? = null
 
     // Flag indicating whether TVBroadcastReceiver has been registered/unregistered with LocalBroadcastManager
     private var isReceiverRegistered = false
@@ -1115,16 +1116,45 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun hangup() {
-        
-        context?.let { ctx ->
-    TVConnectionService.getActiveCallHandle()?.let { sid ->
-      Intent(ctx, TVConnectionService::class.java).apply {
+
+        val ctx = context
+    if (ctx == null) {
+        Log.e(TAG, "hangup(): Context is null, cannot hang up")
+        return
+    }
+
+    // Try the plugin’s stored SID first, then fall back to whatever the service thinks is active
+    val sid = activeCallSid ?: TVConnectionService.getActiveCallHandle()
+    if (sid == null) {
+        Log.w(TAG, "hangup(): no active call handle")
+        return
+    }
+
+    Intent(ctx, TVConnectionService::class.java).apply {
         action = TVConnectionService.ACTION_HANGUP
         putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
         ctx.startService(this)
-      }
-    } ?: Log.w(TAG, "hangup(): no active call handle")
-  } ?: Log.e(TAG, "hangup(): Context is null, cannot hang up")
+    }
+        
+//         context?.let { ctx ->
+//     activeCallSid?.let { sid ->
+//       Intent(ctx, TVConnectionService::class.java).apply {
+//         action = TVConnectionService.ACTION_HANGUP
+//         putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+//         ctx.startService(this)
+//       }
+//     } ?: Log.w(TAG, "hangup(): no activeCallSid in plugin")
+//   } ?: Log.e(TAG, "hangup(): Context is null, cannot hang up")
+
+//         context?.let { ctx ->
+//     TVConnectionService.getActiveCallHandle()?.let { sid ->
+//       Intent(ctx, TVConnectionService::class.java).apply {
+//         action = TVConnectionService.ACTION_HANGUP
+//         putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+//         ctx.startService(this)
+//       }
+//     } ?: Log.w(TAG, "hangup(): no active call handle")
+//   } ?: Log.e(TAG, "hangup(): Context is null, cannot hang up")
 
         // context?.let { ctx ->
 
@@ -1841,8 +1871,9 @@ private fun stopOutgoingRingtone() {
             }
 
             TVBroadcastReceiver.ACTION_ACTIVE_CALL_CHANGED -> {
-                 val sid = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE)
-                Log.d(TAG, "handleBroadcastIntent: Active call changed to $callSid")
+               val sid = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE)
+               activeCallSid = sid
+              Log.d(TAG, "handleBroadcastIntent: Active call changed to $activeCallSid")
             }
 
             TVBroadcastReceiver.ACTION_INCOMING_CALL -> {
