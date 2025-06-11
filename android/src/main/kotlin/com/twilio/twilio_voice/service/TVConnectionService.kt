@@ -386,33 +386,29 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_PLACE_OUTGOING_CALL -> {
-
-                    // check required EXTRA_TOKEN, EXTRA_TO, EXTRA_FROM
-                    val token = it.getStringExtra(EXTRA_TOKEN) ?: run {
-                        Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
-                        return@let
-                    }
-                    val to = it.getStringExtra(EXTRA_TO) ?: run {
-                        Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TO")
-                        return@let
-                    }
-                    val from = it.getStringExtra(EXTRA_FROM) ?: run {
-                        Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_FROM")
-                        return@let
-                    }
-
-                    // Get all params from bundle
-                    val params = HashMap<String, String>()
-                    val outGoingParams = it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
-                    outGoingParams?.keySet()?.forEach { key ->
-                        outGoingParams.getString(key)?.let { value ->
-                            params[key] = value
-                        }
-                    }
-
-                    val outgoingJson = JSONObject(params as Map<*, *>).toString()
-                    storage.saveCustomParams(outgoingJson)
-
+//                    // check required EXTRA_TOKEN, EXTRA_TO, EXTRA_FROM
+//                    val token = it.getStringExtra(EXTRA_TOKEN) ?: run {
+//                        Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
+//                        return@let
+//                    }
+//                    val to = it.getStringExtra(EXTRA_TO) ?: run {
+//                        Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TO")
+//                        return@let
+//                    }
+//                    val from = it.getStringExtra(EXTRA_FROM) ?: run {
+//                        Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_FROM")
+//                        return@let
+//                    }
+//
+//                    // Get all params from bundle
+//                    val params = HashMap<String, String>()
+//                    val outGoingParams = it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
+//                    outGoingParams?.keySet()?.forEach { key ->
+//                        outGoingParams.getString(key)?.let { value ->
+//                            params[key] = value
+//                        }
+//                    }
+//
 //                    // Add required params
 //                    params[EXTRA_FROM] = from
 //                    params[EXTRA_TO] = to
@@ -460,102 +456,61 @@ class TVConnectionService : ConnectionService() {
 //                        return@let
 //                    }
 //
-//                   //  Create outgoing extras
-//                     val extras = Bundle().apply {
-//                         putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
-//                         putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
-//                     }
-//
-//
+//                    // Create outgoing extras
+//                    val extras = Bundle().apply {
+//                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
+//                        putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
+//                    }
 //
 //                    val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
-//                     telecomManager.placeCall(address, extras)
+//                    telecomManager.placeCall(address, extras)
+                    // 1) Extract & build your params
+                    val token = it.getStringExtra(EXTRA_TOKEN) ?: return@let
+                    val to    = it.getStringExtra(EXTRA_TO)    ?: return@let
+                    val from  = it.getStringExtra(EXTRA_FROM)  ?: return@let
 
-                    val params1 = HashMap<String, String>()
-        it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
-          ?.keySet()
-          ?.forEach { k ->
-            it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
-              ?.getString(k)
-              ?.let { v -> params1[k] = v }
-          }
-         params1[EXTRA_FROM] = from
-                    params1[EXTRA_TO] = to
-                     val connectOptions = ConnectOptions.Builder(token)
-          .params(params1)
-          .build()
-
-        // 4) fire off the call yourself (no Telecom UI)
-        val conn = TVCallConnection(applicationContext)
-
-                    val twilioListener = object : Call.Listener {
-                        override fun onRinging(call: Call) {
-                            conn.twilioCall = call
-                            call.sid?.let { sid ->
-                                attachCallEventListeners(conn, sid)
-                                activeConnections[sid] = conn
-                                sendBroadcastCallHandle(applicationContext, sid)
-                            }
-                            sendBroadcastEvent(applicationContext,
-                                TVNativeCallEvents.EVENT_RINGING, call.sid)
+                    // collect any custom params the Flutter side sent
+                    val custom = HashMap<String, String>()
+                    it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
+                        ?.keySet()
+                        ?.forEach { k ->
+                            it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
+                                ?.getString(k)
+                                ?.let { v -> custom[k] = v }
                         }
+                    // and always add the required ones
+                    custom[EXTRA_FROM] = from
+                    custom[EXTRA_TO]   = to
+                    custom[EXTRA_TOKEN]= token
 
-                        override fun onConnected(call: Call) {
-                            sendBroadcastEvent(applicationContext,
-                                TVNativeCallEvents.EVENT_CONNECTED, call.sid)
-                        }
+                    // 2) Build your Twilio ConnectOptions
+                    val connectOptions = ConnectOptions.Builder(token)
+                        .params(custom)
+                        .build()
 
-                        override fun onReconnecting(
-                            p0: Call,
-                            p1: CallException
-                        ) {
-                            TODO("Not yet implemented")
-                        }
-
-                        override fun onReconnected(p0: Call) {
-                            TODO("Not yet implemented")
-                        }
-
-                        override fun onConnectFailure(call: Call, error: CallException) {
-                            sendBroadcastEvent(
-                                applicationContext,
-                                TVNativeCallEvents.EVENT_CONNECT_FAILURE,
-                                call.sid,
-                                Bundle().apply { putString("error", error.message) }
-                            )
-                        }
-
-                        override fun onDisconnected(call: Call, error: CallException?) {
-
-                            sendBroadcastEvent(applicationContext,
-                                TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
-                                call.sid)
-                            sendBroadcastCallHandle(applicationContext, null)
-                            activeConnections.remove(call.sid)
-
-                        }
+                    // 3) Create & configure your TVCallConnection
+                    val conn = TVCallConnection(applicationContext).apply {
+                        // drive the TelecomService UI state if you still want it,
+                        // otherwise you can skip these
+                        setInitializing()
+                        setDialing()
                     }
-        val twilioCall = Voice.connect(
-          applicationContext,
-          connectOptions,
-            twilioListener,
-            
 
-        )
-                    conn.twilioCall = twilioCall
-       
-       // attachCallEventListeners(conferenceConnection, tempId)
+                    // 4) Connect — no TelecomManager.placeCall here!
+                    val call = Voice.connect(applicationContext, connectOptions, conn)
+                    conn.twilioCall = call
 
-       
-            conn.twilioCall?.sid?.let { sid ->
-                        attachCallEventListeners(conn, sid)
+                    // 5) Cache & hook up your event listeners so that
+                    //    attachCallEventListeners will fire your local broadcasts
+                    call.sid?.let { sid ->
                         activeConnections[sid] = conn
+                        attachCallEventListeners(conn, sid)
                     }
-        
-        startForegroundService()
 
-        return@let
-                 
+                    // 6) If you still need a persistent Notification
+                    startForegroundService()
+
+                    return@let
                 }
 
                 ACTION_TOGGLE_BLUETOOTH -> {
