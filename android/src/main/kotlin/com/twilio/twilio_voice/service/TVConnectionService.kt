@@ -530,10 +530,19 @@ class TVConnectionService : ConnectionService() {
             }
 
               override fun onDisconnected(
-                  p0: Call,
-                  p1: com.twilio.voice.CallException?
+                 call: Call,
+
+                 error: CallException?
               ) {
-                  TODO("Not yet implemented")
+                val sid = call.sid ?: return
+                 Log.d(TAG, "Call disconnected (SID=$sid), error=${error?.message}")
+
+                  sendBroadcastEvent(
+                    applicationContext,
+                    TVNativeCallEvents.EVENT_CALL_ENDED,
+                    sid,
+                    null
+                )
               }
           }
         )
