@@ -559,13 +559,13 @@ class TVConnectionService : ConnectionService() {
                         override fun onReconnected(call: Call)               { /* optional */ }
 
                         override fun onDisconnected(call: Call, error: CallException?) {
-                            val sid = call.sid
+                            conn.disconnect()
                             // Clear the active handle now that it’s gone
                             sendBroadcastCallHandle(applicationContext, null)
                             sendBroadcastEvent(
                                 applicationContext,
                                 TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
-                                sid,
+                                call.sid,
                                 Bundle().apply {
                                     putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
@@ -955,8 +955,8 @@ class TVConnectionService : ConnectionService() {
           TVBroadcastReceiver.ACTION_CALL_ENDED,
           callSid
       )
-      //sendBroadcastCallHandle(applicationContext, null)
-     // activeCallSid = null;
+      sendBroadcastCallHandle(applicationContext, null)
+     
       stopForegroundService()
       stopSelfSafe()
             //  connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))

@@ -79,7 +79,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     private var accessToken: String? = null
     private var context: Context? = null
     private var activity: Activity? = null
-//    private var activeCallSid: String? = null
+
 
     // Flag indicating whether TVBroadcastReceiver has been registered/unregistered with LocalBroadcastManager
     private var isReceiverRegistered = false
@@ -1136,15 +1136,7 @@ val ctx = context
     ctx.startService(this)
   }
         
-//         context?.let { ctx ->
-//     activeCallSid?.let { sid ->
-//       Intent(ctx, TVConnectionService::class.java).apply {
-//         action = TVConnectionService.ACTION_HANGUP
-//         putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-//         ctx.startService(this)
-//       }
-//     } ?: Log.w(TAG, "hangup(): no activeCallSid in plugin")
-//   } ?: Log.e(TAG, "hangup(): Context is null, cannot hang up")
+
 
 //         context?.let { ctx ->
 //     TVConnectionService.getActiveCallHandle()?.let { sid ->
@@ -1873,8 +1865,6 @@ private fun stopOutgoingRingtone() {
 
             TVBroadcastReceiver.ACTION_ACTIVE_CALL_CHANGED -> {
                 Log.d(TAG, "handleBroadcastIntent: Active call changed to $callSid")
-
-              //Log.d(TAG, "handleBroadcastIntent: Active call changed to $activeCallSid")
             }
 
             TVBroadcastReceiver.ACTION_INCOMING_CALL -> {
@@ -1919,7 +1909,7 @@ private fun stopOutgoingRingtone() {
                         )
                         return
                     }
-             //   activeCallSid = null
+             
 //                callSid = null
                  // ── NEW: clear when call ends ─────────────────────────
             storage?.clearCustomParams()
@@ -2043,7 +2033,7 @@ private fun stopOutgoingRingtone() {
             Log.e(TAG, "Ringing without SID")
             return          // <-- return Unit
         }else{
-         //   activeCallSid = sid
+
         }
 
 //                callSid = callHandle
@@ -2082,7 +2072,7 @@ private fun stopOutgoingRingtone() {
             Log.e(TAG, "Ringing without SID")
             return          // <-- return Unit
         }else{
-          //  activeCallSid = sid
+  
         }
 //                callSid = callHandle
  // stopOutgoingRingtone()
