@@ -956,6 +956,7 @@ class TVConnectionService : ConnectionService() {
           callSid
       )
       sendBroadcastCallHandle(applicationContext, null)
+     // activeCallSid = null;
       stopForegroundService()
       stopSelfSafe()
             //  connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
