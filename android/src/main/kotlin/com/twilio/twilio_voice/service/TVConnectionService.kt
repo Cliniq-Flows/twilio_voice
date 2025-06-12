@@ -366,23 +366,34 @@ class TVConnectionService : ConnectionService() {
                 ACTION_HANGUP -> {
                     storage.clearCustomParams()
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE)
-                        ?: getActiveCallHandle() ?: return@let
+                                    ?: getActiveCallHandle() ?: return@let
 
                     val connection = getConnection(callHandle)
-                    connection?.disconnect()             // Twilio side tear-down
-                    // ─── teach Telecom to dismiss its UI ───────────
-                    connection?.setDisconnected(
-                    DisconnectCause(DisconnectCause.LOCAL)
-                    )
-                    connection?.destroy()
-                    // val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
-                    //     Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
-                    //     return@let
-                    // }
-
-                    getConnection(callHandle)?.disconnect() ?: run {
-                        Log.e(TAG, "onStartCommand: [ACTION_HANGUP] could not find connection for callHandle: $callHandle")
+                    if (connection != null) {
+                        connection.disconnect() // this kicks off your onCallDisconnected callback
+                    } else {
+                        Log.e(TAG, "hangup(): could not find connection for $callHandle")
                     }
+                //     storage.clearCustomParams()
+                //      val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
+                //         Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
+                //         return@let
+                //     }
+                //     // val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE)
+                //     //     ?: getActiveCallHandle() ?: return@let
+
+                //   // val connection = getConnection(callHandle)
+                //   //  connection?.disconnect()             // Twilio side tear-down
+                   
+                //    // connection?.setDisconnected(
+                //     // DisconnectCause(DisconnectCause.LOCAL)
+                //     // )
+                //    // connection?.destroy()
+                   
+
+                //     getConnection(callHandle)?.disconnect() ?: run {
+                //         Log.e(TAG, "onStartCommand: [ACTION_HANGUP] could not find connection for callHandle: $callHandle")
+                //     }
                 }
 
                 ACTION_PLACE_OUTGOING_CALL -> {
@@ -494,6 +505,8 @@ class TVConnectionService : ConnectionService() {
                         override fun onRinging(call: Call) {
                             // store call on connection if needed…
                             val sid = call.sid
+                             activeConnections[sid] = conn
+                                attachCallEventListeners(conn, sid)
                             // 1) tell Flutter “here’s the active call”
                             sendBroadcastCallHandle(applicationContext, sid)
                             sendBroadcastEvent(
@@ -926,44 +939,56 @@ class TVConnectionService : ConnectionService() {
         }
         val onDisconnect: CompletionHandler<DisconnectCause> = CompletionHandler {
             dc ->
+           
             connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
-             connection.destroy()
+          
+            connection.destroy()
+           
+            activeConnections.remove(callSid)
             storage.clearCustomParams()
-            if (activeConnections.containsKey(callSid)) {
-                activeConnections.remove(callSid)
-            }
-
-            // // ── NEW ── let your Flutter side know that the call really ended
-            // if (dc?.code == DisconnectCause.LOCAL || dc?.code == DisconnectCause.REMOTE) {
-            // sendBroadcastEvent(
-            // applicationContext,
-            // TVBroadcastReceiver.ACTION_CALL_ENDED,
-            // callSid
-            // )
-            // }
-            // safe‐call into dc.code (becomes an Int?), then compare
-            val causeCode = dc?.code
-            if (causeCode == DisconnectCause.LOCAL || causeCode == DisconnectCause.REMOTE) {
-                sendBroadcastEvent(
-                applicationContext,
-                TVBroadcastReceiver.ACTION_CALL_ENDED,
-                callSid
-                )
-            } else {
-                Log.d(TAG, "Skipping CALL_ENDED for non-hangup cause=$causeCode")
-            }
-
+           
+            sendBroadcastEvent(applicationContext, TVBroadcastReceiver.ACTION_CALL_ENDED, callSid)
+           
             stopForegroundService()
             stopSelfSafe()
-        }
+        //     connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
+        //      connection.destroy()
+        //     storage.clearCustomParams()
+        //     if (activeConnections.containsKey(callSid)) {
+        //         activeConnections.remove(callSid)
+        //     }
 
-        // Add to local connection cache
-        activeConnections[callSid] = connection
+        //     // // ── NEW ── let your Flutter side know that the call really ended
+        //     // if (dc?.code == DisconnectCause.LOCAL || dc?.code == DisconnectCause.REMOTE) {
+        //     // sendBroadcastEvent(
+        //     // applicationContext,
+        //     // TVBroadcastReceiver.ACTION_CALL_ENDED,
+        //     // callSid
+        //     // )
+        //     // }
+        //     // safe‐call into dc.code (becomes an Int?), then compare
+        //     val causeCode = dc?.code
+        //     if (causeCode == DisconnectCause.LOCAL || causeCode == DisconnectCause.REMOTE) {
+        //         sendBroadcastEvent(
+        //         applicationContext,
+        //         TVBroadcastReceiver.ACTION_CALL_ENDED,
+        //         callSid
+        //         )
+        //     } else {
+        //         Log.d(TAG, "Skipping CALL_ENDED for non-hangup cause=$causeCode")
+        //     }
 
-        // attach listeners
-        connection.setOnCallActionListener(onAction)
-        connection.setOnCallEventListener(onEvent)
-        connection.setOnCallDisconnected(onDisconnect)
+        //     stopForegroundService()
+        //     stopSelfSafe()
+        // }
+
+        // // Add to local connection cache
+        // activeConnections[callSid] = connection
+
+        // // attach listeners
+        // connection.setOnCallActionListener(onAction)
+        // connection.setOnCallEventListener(onEvent)
+        // connection.setOnCallDisconnected(onDisconnect)
     }
 
     /**
