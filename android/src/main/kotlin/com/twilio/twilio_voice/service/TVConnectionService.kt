@@ -943,22 +943,25 @@ class TVConnectionService : ConnectionService() {
         }
         val onDisconnect: CompletionHandler<DisconnectCause> = CompletionHandler {
             dc ->
-//            // 1) teach Telecom to close its UI
-//            connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
-//            // 2) destroy the ConnectionService connection
-//            connection.destroy()
-//            // 3) clear your map so getActiveCallHandle() goes to null
-//            activeConnections.remove(callSid)
-//            storage.clearCustomParams()
-//            // 4) let your Flutter side know it's really over
-//
-//            // 5) stop your foreground notification & service
-//
-//            stopSelfSafe()
-             connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
-              connection.destroy()
-             storage.clearCustomParams()
-            activeConnections.remove(callSid)
+            connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
+      connection.destroy()
+      storage.clearCustomParams()
+      activeConnections.remove(callSid)
+
+      // ←— INSERT “no active call” broadcast HERE
+      sendBroadcastCallHandle(applicationContext, null)
+
+      sendBroadcastEvent(
+          applicationContext,
+          TVBroadcastReceiver.ACTION_CALL_ENDED,
+          callSid
+      )
+      stopForegroundService()
+      stopSelfSafe()
+            //  connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
+            //   connection.destroy()
+            //  storage.clearCustomParams()
+            // activeConnections.remove(callSid)
 //             if (activeConnections.containsKey(callSid)) {
 //                 activeConnections.remove(callSid)
 //             }
@@ -982,13 +985,16 @@ class TVConnectionService : ConnectionService() {
 //             } else {
 //                 Log.d(TAG, "Skipping CALL_ENDED for non-hangup cause=$causeCode")
 //             }
-            sendBroadcastEvent(
-                applicationContext,
-                TVBroadcastReceiver.ACTION_CALL_ENDED,
-                callSid
-            )
-             stopForegroundService()
-             stopSelfSafe()
+
+            // sendBroadcastEvent(
+            //     applicationContext,
+            //     TVBroadcastReceiver.ACTION_CALL_ENDED,
+            //     callSid
+            // )
+            
+
+            //  stopForegroundService()
+            //  stopSelfSafe()
          }
 
          // Add to local connection cache
