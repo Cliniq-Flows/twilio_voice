@@ -955,7 +955,7 @@ class TVConnectionService : ConnectionService() {
           TVBroadcastReceiver.ACTION_CALL_ENDED,
           callSid
       )
-      sendBroadcastCallHandle(applicationContext, null)
+      //sendBroadcastCallHandle(applicationContext, null)
      // activeCallSid = null;
       stopForegroundService()
       stopSelfSafe()

@@ -79,7 +79,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     private var accessToken: String? = null
     private var context: Context? = null
     private var activity: Activity? = null
-    private var activeCallSid: String? = null
+//    private var activeCallSid: String? = null
 
     // Flag indicating whether TVBroadcastReceiver has been registered/unregistered with LocalBroadcastManager
     private var isReceiverRegistered = false
@@ -1123,7 +1123,7 @@ val ctx = context
   }
 
   // first prefer the plugin’s stored SID, then fallback to the service’s
-  val sid = activeCallSid ?: TVConnectionService.getActiveCallHandle()
+  val sid =  TVConnectionService.getActiveCallHandle()
   if (sid == null) {
     Log.w(TAG, "hangup(): no active call SID to hang up")
     return
@@ -1185,7 +1185,7 @@ val ctx = context
 //        }
 //        return tm.isOnCall(ctx)
        // return TVConnectionService.hasActiveCalls()
-        return  activeCallSid != null && TVConnectionService.hasActiveCalls()
+        return  TVConnectionService.hasActiveCalls()
     }
 
     private fun playOutgoingRingtone() {
@@ -1872,9 +1872,9 @@ private fun stopOutgoingRingtone() {
             }
 
             TVBroadcastReceiver.ACTION_ACTIVE_CALL_CHANGED -> {
-               val sid = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE)
-               activeCallSid = sid
-              Log.d(TAG, "handleBroadcastIntent: Active call changed to $activeCallSid")
+                Log.d(TAG, "handleBroadcastIntent: Active call changed to $callSid")
+
+              //Log.d(TAG, "handleBroadcastIntent: Active call changed to $activeCallSid")
             }
 
             TVBroadcastReceiver.ACTION_INCOMING_CALL -> {
@@ -1919,7 +1919,7 @@ private fun stopOutgoingRingtone() {
                         )
                         return
                     }
-                activeCallSid = null
+             //   activeCallSid = null
 //                callSid = null
                  // ── NEW: clear when call ends ─────────────────────────
             storage?.clearCustomParams()
@@ -2043,7 +2043,7 @@ private fun stopOutgoingRingtone() {
             Log.e(TAG, "Ringing without SID")
             return          // <-- return Unit
         }else{
-            activeCallSid = sid
+         //   activeCallSid = sid
         }
 
 //                callSid = callHandle
@@ -2082,7 +2082,7 @@ private fun stopOutgoingRingtone() {
             Log.e(TAG, "Ringing without SID")
             return          // <-- return Unit
         }else{
-            activeCallSid = sid
+          //  activeCallSid = sid
         }
 //                callSid = callHandle
  // stopOutgoingRingtone()
