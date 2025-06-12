@@ -955,7 +955,6 @@ class TVConnectionService : ConnectionService() {
           TVBroadcastReceiver.ACTION_CALL_ENDED,
           callSid
       )
-       // ←— INSERT “no active call” broadcast HERE
       sendBroadcastCallHandle(applicationContext, null)
       stopForegroundService()
       stopSelfSafe()
