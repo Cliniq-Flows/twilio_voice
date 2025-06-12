@@ -948,14 +948,15 @@ class TVConnectionService : ConnectionService() {
       storage.clearCustomParams()
       activeConnections.remove(callSid)
 
-      // ←— INSERT “no active call” broadcast HERE
-      sendBroadcastCallHandle(applicationContext, null)
+     
 
       sendBroadcastEvent(
           applicationContext,
           TVBroadcastReceiver.ACTION_CALL_ENDED,
           callSid
       )
+       // ←— INSERT “no active call” broadcast HERE
+      sendBroadcastCallHandle(applicationContext, null)
       stopForegroundService()
       stopSelfSafe()
             //  connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
