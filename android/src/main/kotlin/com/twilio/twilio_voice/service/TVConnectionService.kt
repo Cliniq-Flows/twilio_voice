@@ -375,10 +375,10 @@ class TVConnectionService : ConnectionService() {
                     DisconnectCause(DisconnectCause.LOCAL)
                     )
                     connection?.destroy()
-                    val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
-                        Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
-                        return@let
-                    }
+                    // val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
+                    //     Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
+                    //     return@let
+                    // }
 
                     getConnection(callHandle)?.disconnect() ?: run {
                         Log.e(TAG, "onStartCommand: [ACTION_HANGUP] could not find connection for callHandle: $callHandle")
