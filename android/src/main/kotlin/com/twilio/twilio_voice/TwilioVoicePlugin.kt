@@ -1184,7 +1184,8 @@ val ctx = context
 //            Log.d(TAG, "isOnCall: CallSid is null.")
 //        }
 //        return tm.isOnCall(ctx)
-        return TVConnectionService.hasActiveCalls()
+       // return TVConnectionService.hasActiveCalls()
+        return  activeCallSid != null && TVConnectionService.hasActiveCalls()
     }
 
     private fun playOutgoingRingtone() {
@@ -1918,6 +1919,7 @@ private fun stopOutgoingRingtone() {
                         )
                         return
                     }
+                activeCallSid = null
 //                callSid = null
                  // ── NEW: clear when call ends ─────────────────────────
             storage?.clearCustomParams()
