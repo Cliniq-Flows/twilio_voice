@@ -586,10 +586,10 @@ class TVConnectionService : ConnectionService() {
                     // 5) (Optional) keep a reference if you use TVCallConnection for other things
                     // 3) Create & configure your TVCallConnection
 
-//                    twilioCall.sid?.let { sid ->
-//                        activeConnections[sid] = conn
-//                        attachCallEventListeners(conn, sid)  // still needed for your telecom‐side cleanup
-//                    }
+                    twilioCall.sid?.let { sid ->
+                    activeConnections[sid] = conn
+                    attachCallEventListeners(conn, sid)
+                    }
 
                     // 6) Keep service alive
                     startForegroundService()
