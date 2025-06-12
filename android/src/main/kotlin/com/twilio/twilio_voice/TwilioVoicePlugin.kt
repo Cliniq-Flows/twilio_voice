@@ -1116,25 +1116,25 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun hangup() {
+val ctx = context
+  if (ctx == null) {
+    Log.e(TAG, "hangup(): Context is null, cannot hang up")
+    return
+  }
 
-        val ctx = context
-    if (ctx == null) {
-        Log.e(TAG, "hangup(): Context is null, cannot hang up")
-        return
-    }
+  // first prefer the plugin’s stored SID, then fallback to the service’s
+  val sid = activeCallSid ?: TVConnectionService.getActiveCallHandle()
+  if (sid == null) {
+    Log.w(TAG, "hangup(): no active call SID to hang up")
+    return
+  }
 
-    // Try the plugin’s stored SID first, then fall back to whatever the service thinks is active
-    val sid = activeCallSid ?: TVConnectionService.getActiveCallHandle()
-    if (sid == null) {
-        Log.w(TAG, "hangup(): no active call handle")
-        return
-    }
-
-    Intent(ctx, TVConnectionService::class.java).apply {
-        action = TVConnectionService.ACTION_HANGUP
-        putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-        ctx.startService(this)
-    }
+  Log.d(TAG, "hangup(): sending ACTION_HANGUP for $sid")
+  Intent(ctx, TVConnectionService::class.java).apply {
+    action = TVConnectionService.ACTION_HANGUP
+    putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+    ctx.startService(this)
+  }
         
 //         context?.let { ctx ->
 //     activeCallSid?.let { sid ->
@@ -2040,6 +2040,8 @@ private fun stopOutgoingRingtone() {
                if (sid == null) {
             Log.e(TAG, "Ringing without SID")
             return          // <-- return Unit
+        }else{
+            activeCallSid = sid
         }
 
 //                callSid = callHandle
@@ -2077,6 +2079,8 @@ private fun stopOutgoingRingtone() {
               if (sid == null) {
             Log.e(TAG, "Ringing without SID")
             return          // <-- return Unit
+        }else{
+            activeCallSid = sid
         }
 //                callSid = callHandle
  // stopOutgoingRingtone()
