@@ -21,6 +21,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     let kCachedBindingDate = "CachedBindingDate"
     let kClientList = "TwilioContactList"
     private var clients: [String:String]!
+    private var lastLoggedEvent: String?
+    private var lastLoggedTime: Date?
+    
     
     var accessToken:String?
     var identity = "alice"
@@ -1340,15 +1343,34 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     private func sendPhoneCallEvents(description: String, isError: Bool) {
-        NSLog(description)
+        // NSLog(description)
         
-        if isError
-        {
-            let err = FlutterError(code: "unavailable", message: description, details: nil);
-            sendEvent(err)
+        // if isError
+        // {
+        //     let err = FlutterError(code: "unavailable", message: description, details: nil);
+        //     sendEvent(err)
+        // }
+        // else
+        // {
+        //     sendEvent(description)
+        // }
+        // ── debounce duplicate events ───────────────────────
+        let now = Date()
+        if description == lastLoggedEvent,
+            let lastTime = lastLoggedTime,
+            now.timeIntervalSince(lastTime) < 1.0 {
+            return
         }
-        else
-        {
+        lastLoggedEvent = description
+        lastLoggedTime = now
+        // ── end debounce ───────────────────────────────────
+
+        // existing logic
+        NSLog(description)
+        if isError {
+            let err = FlutterError(code: "unavailable", message: description, details: nil)
+            sendEvent(err)
+        } else {
             sendEvent(description)
         }
     }
