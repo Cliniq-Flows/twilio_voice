@@ -568,6 +568,7 @@ class TVConnectionService : ConnectionService() {
                     // 3) Create & configure your TVCallConnection
                     val conn = TVCallConnection(applicationContext)
                     conn.twilioCall = twilioCall
+                    conn.setDialing()
                     twilioCall.sid?.let { sid ->
                         activeConnections[sid] = conn
                         attachCallEventListeners(conn, sid)  // still needed for your telecom‐side cleanup
