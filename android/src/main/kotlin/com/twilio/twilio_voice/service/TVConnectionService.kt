@@ -698,68 +698,172 @@ class TVConnectionService : ConnectionService() {
     }
     //endregion
 
+    private fun joinConference(intent: Intent, conferenceName: String) {
+        Log.d(TAG, "Joining conference: $conferenceName")
 
+        val token = intent.getStringExtra(EXTRA_TOKEN) ?: ""
+        if (token.isEmpty()) {
+            Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
+            return
+        }
+
+        // build the Twilio connect options
+        val params = hashMapOf("conference" to conferenceName)
+        val connectOptions = ConnectOptions.Builder(token)
+            .params(params)
+            .build()
+
+        // 1) Create your telecom Connection
+        val conferenceConnection = TVCallConnection(applicationContext).apply {
+            setInitializing()
+            setDialing()
+        }
+
+        // 2) Create a Twilio Call.Listener just like you do for ACTION_PLACE_OUTGOING_CALL
+        val conferenceListener = object : Call.Listener {
+            override fun onRinging(call: Call) {
+                Log.d(TAG, "Conference ringing")
+                // tell Telecom/Flutter the conference is ringing
+                sendBroadcastCallHandle(applicationContext, call.sid)
+                sendBroadcastEvent(
+                    applicationContext,
+                    TVNativeCallEvents.EVENT_RINGING,
+                    call.sid,
+                    Bundle().apply {
+                        putString(TVBroadcastReceiver.EXTRA_CALL_FROM, "Conf")
+                        putString(TVBroadcastReceiver.EXTRA_CALL_TO, conferenceName)
+                        putInt(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, CallDirection.OUTGOING.id)
+                    }
+                )
+            }
+
+            override fun onConnected(call: Call) {
+                Log.d(TAG, "Conference connected with SID=${call.sid}")
+                // swap your temp ID → real SID
+                conferenceConnection.twilioCall?.sid?.let { realSid ->
+                    activeConnections.remove("conference_$conferenceName")
+                    activeConnections[realSid] = conferenceConnection
+                    sendBroadcastCallHandle(applicationContext, realSid)
+                    sendBroadcastEvent(
+                        applicationContext,
+                        TVNativeCallEvents.EVENT_CONNECTED,
+                        realSid,
+                        Bundle().apply {
+                            putString(TVBroadcastReceiver.EXTRA_CALL_FROM, "Conf")
+                            putString(TVBroadcastReceiver.EXTRA_CALL_TO, conferenceName)
+                            putInt(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, CallDirection.OUTGOING.id)
+                        }
+                    )
+                }
+            }
+
+            override fun onConnectFailure(call: Call, error: CallException) {
+                Log.e(TAG, "Conference connect failure: ${error.message}")
+                sendBroadcastEvent(
+                    applicationContext,
+                    TVNativeCallEvents.EVENT_CONNECT_FAILURE,
+                    call.sid,
+                    Bundle().apply {
+                        putString(CallExceptionExtension.EXTRA_MESSAGE, error.message)
+                        putInt(CallExceptionExtension.EXTRA_CODE, error.errorCode)
+                    }
+                )
+                // clean up
+                conferenceConnection.disconnect()
+            }
+
+            override fun onDisconnected(call: Call, error: CallException?) {
+                Log.d(TAG, "Conference disconnected")
+                // this kicks off your telecom onDisconnect handler, which will remove from activeConnections
+                conferenceConnection.disconnect()
+                sendBroadcastCallHandle(applicationContext, null)
+                sendBroadcastEvent(
+                    applicationContext,
+                    TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
+                    call.sid,
+                    Bundle().apply {
+                        putString("reason", error?.message ?: "remote hangup")
+                    }
+                )
+
+            }
+
+            // you can override onReconnecting/onReconnected here if you like
+            override fun onReconnecting(call: Call, error: CallException) { /* … */ }
+            override fun onReconnected(call: Call)                { /* … */ }
+        }
+
+        // 3) Kick off the Twilio connect with your listener
+        val twilioCall = Voice.connect(applicationContext, connectOptions, conferenceListener)
+        conferenceConnection.twilioCall = twilioCall
+
+        // 4) Prime your telecom‐side event hooks
+        activeConnections["conference_$conferenceName"] = conferenceConnection
+        attachCallEventListeners(conferenceConnection, "conference_$conferenceName")
+
+        Log.d(TAG, "Conference call initiated with temporary ID: conference_$conferenceName")
+    }
 
 //     // New function to join a conference call
-   private fun joinConference(intent: Intent, conferenceName: String) {
-     Log.d(TAG, "Joining conference: $conferenceName")
-
-     val token = intent.getStringExtra(EXTRA_TOKEN) ?: ""
-     if (token.isEmpty()) {
-         Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
-         return
-     }
-
-
-     val params = HashMap<String, String>().apply {
-         put("conference", conferenceName)  // Use lowercase key as in Swift
-     }
-
-
-
-     val connectOptions = ConnectOptions.Builder(token)
-         .params(params)
-         .build()
-
-
-
-     val conferenceConnection = TVCallConnection(applicationContext)
-     conferenceConnection.setInitializing()
-     conferenceConnection.setDialing()
-     conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
-
-     val tempId = "conference_$conferenceName"
-     activeConnections[tempId] = conferenceConnection
-       attachCallEventListeners(conferenceConnection, tempId)
-
-     Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
-        conferenceConnection.setOnCallStateListener(CompletionHandler { state ->
-              if (state == Call.State.RINGING || state == Call.State.CONNECTED) {
-                   conferenceConnection.twilioCall?.sid?.let { sid ->
-                          Log.d(TAG, "Conference SID is: $sid")
-
-                          // swap out the temp key for the real SID
-                          activeConnections.remove(tempId)
-                          activeConnections[sid] = conferenceConnection
-
-                          // fire the standard "EVENT_CONNECTED" broadcast
-                          sendBroadcastEvent(
-                                applicationContext,
-                                TVNativeCallEvents.EVENT_CONNECTED,
-                                sid,
-                                Bundle().apply {
-                                      putString(TVBroadcastReceiver.EXTRA_CALL_HANDLE, sid)
-                                      putString(TVBroadcastReceiver.EXTRA_CALL_FROM, "Unknown Caller")      // or fill if you have a from
-                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO, "Unknown Caller")        // or fill if you have a to
-                        putInt(TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
-                            CallDirection.OUTGOING.id)
-                                 }
-                                )
-                 }
-          }
-        })
-
-  }
+//   private fun joinConference(intent: Intent, conferenceName: String) {
+//     Log.d(TAG, "Joining conference: $conferenceName")
+//
+//     val token = intent.getStringExtra(EXTRA_TOKEN) ?: ""
+//     if (token.isEmpty()) {
+//         Log.e(TAG, "joinConference: Access token is null or empty. Cannot join conference.")
+//         return
+//     }
+//
+//
+//     val params = HashMap<String, String>().apply {
+//         put("conference", conferenceName)  // Use lowercase key as in Swift
+//     }
+//
+//
+//
+//     val connectOptions = ConnectOptions.Builder(token)
+//         .params(params)
+//         .build()
+//
+//
+//
+//     val conferenceConnection = TVCallConnection(applicationContext)
+//     conferenceConnection.setInitializing()
+//     conferenceConnection.setDialing()
+//     conferenceConnection.twilioCall = Voice.connect(applicationContext, connectOptions, conferenceConnection)
+//
+//     val tempId = "conference_$conferenceName"
+//     activeConnections[tempId] = conferenceConnection
+//       attachCallEventListeners(conferenceConnection, tempId)
+//
+//     Log.d(TAG, "Conference call initiated with temporary ID: $tempId")
+//        conferenceConnection.setOnCallStateListener(CompletionHandler { state ->
+//              if (state == Call.State.RINGING || state == Call.State.CONNECTED) {
+//                   conferenceConnection.twilioCall?.sid?.let { sid ->
+//                          Log.d(TAG, "Conference SID is: $sid")
+//
+//                          // swap out the temp key for the real SID
+//                          activeConnections.remove(tempId)
+//                          activeConnections[sid] = conferenceConnection
+//
+//                          // fire the standard "EVENT_CONNECTED" broadcast
+//                          sendBroadcastEvent(
+//                                applicationContext,
+//                                TVNativeCallEvents.EVENT_CONNECTED,
+//                                sid,
+//                                Bundle().apply {
+//                                      putString(TVBroadcastReceiver.EXTRA_CALL_HANDLE, sid)
+//                                      putString(TVBroadcastReceiver.EXTRA_CALL_FROM, "Unknown Caller")      // or fill if you have a from
+//                                     putString(TVBroadcastReceiver.EXTRA_CALL_TO, "Unknown Caller")        // or fill if you have a to
+//                        putInt(TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
+//                            CallDirection.OUTGOING.id)
+//                                 }
+//                                )
+//                 }
+//          }
+//        })
+//
+//  }
 
 
 
