@@ -546,13 +546,41 @@ class TVConnectionService : ConnectionService() {
                         }
 
                         override fun onConnectFailure(call: Call, error: CallException) {
+                            if (error.errorCode == 31603) {
+                                sendBroadcastEvent(
+                                    applicationContext, TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE, call.sid, Bundle().apply {
+                                        putInt("code", error.errorCode)
+                                        putString("message", error.message)
+                                    }
+                                )
+                            } else {
+                                sendBroadcastEvent(
+                                    applicationContext, TVNativeCallEvents.EVENT_CONNECT_FAILURE, call.sid, Bundle().apply {
+                                        putInt("code", error.errorCode)
+                                        putString("message", error.message)
+                                    }
+                                )
+                            }
+                            // tear down your ConnectionService connection if needed
+                            conn.disconnect()
                             // you can broadcast a failure event if you want
-                            sendBroadcastEvent(
-                                applicationContext,
-                                TVNativeCallEvents.EVENT_CONNECT_FAILURE,
-                                call.sid,
-                                Bundle().apply { putString("error", error.message) }
-                            )
+//                            sendBroadcastEvent(
+//                                applicationContext,
+//                                TVNativeCallEvents.EVENT_CONNECT_FAILURE,
+//                                call.sid,
+//                                Bundle().apply { putString("error", error.message) }
+//                            )
+//                            conn.disconnect()
+//                            sendBroadcastCallHandle(applicationContext, null)
+//                            sendBroadcastEvent(
+//                                applicationContext,
+//                                TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL,
+//                                call.sid,
+//                                Bundle().apply {
+//                                    putString("error", error.message)
+//                                    putInt("errorCode", error.errorCode)
+//                                }
+//                            )
                         }
 
                         override fun onReconnecting(call: Call, error: CallException) { /* optional */ }
@@ -759,15 +787,32 @@ class TVConnectionService : ConnectionService() {
 
             override fun onConnectFailure(call: Call, error: CallException) {
                 Log.e(TAG, "Conference connect failure: ${error.message}")
-                sendBroadcastEvent(
-                    applicationContext,
-                    TVNativeCallEvents.EVENT_CONNECT_FAILURE,
-                    call.sid,
-                    Bundle().apply {
-                        putString(CallExceptionExtension.EXTRA_MESSAGE, error.message)
-                        putInt(CallExceptionExtension.EXTRA_CODE, error.errorCode)
-                    }
-                )
+                if (error.errorCode == 31603) {
+                    sendBroadcastEvent(
+                        applicationContext, TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE, call.sid, Bundle().apply {
+                            putInt("code", error.errorCode)
+                            putString("message", error.message)
+                        }
+                    )
+                } else {
+                    sendBroadcastEvent(
+                        applicationContext, TVNativeCallEvents.EVENT_CONNECT_FAILURE, call.sid, Bundle().apply {
+                            putInt("code", error.errorCode)
+                            putString("message", error.message)
+                        }
+                    )
+                }
+                // tear down your ConnectionService connection if needed
+          //      conn.disconnect()
+//                sendBroadcastEvent(
+//                    applicationContext,
+//                    TVNativeCallEvents.EVENT_CONNECT_FAILURE,
+//                    call.sid,
+//                    Bundle().apply {
+//                        putString(CallExceptionExtension.EXTRA_MESSAGE, error.message)
+//                        putInt(CallExceptionExtension.EXTRA_CODE, error.errorCode)
+//                    }
+//                )
                 // clean up
                 conferenceConnection.disconnect()
             }

@@ -954,7 +954,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     isRejectingCallInvite = false
     userInitiatedDisconnect = false
     call = nil
-    self.callInvite = nil
+    callInvite = nil
   // only fire "Call Ended" when it's a real hang-up, not a reject
 //   if !isRejectingCallInvite {
 //     self.sendPhoneCallEvents(description: "Call Ended", isError: false)
