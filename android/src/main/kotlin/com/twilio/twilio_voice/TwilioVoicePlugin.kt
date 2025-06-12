@@ -74,11 +74,14 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     // Ringtone
     private var outgoingRingtone: android.media.Ringtone? = null
 
+
     // Locals
     private var fcmToken: String? = null
     private var accessToken: String? = null
     private var context: Context? = null
     private var activity: Activity? = null
+    private var lastLoggedEvent: String? = null
+    private var lastLoggedTime: Long = 0
 
 
     // Flag indicating whether TVBroadcastReceiver has been registered/unregistered with LocalBroadcastManager
@@ -1628,16 +1631,30 @@ private fun stopOutgoingRingtone() {
         description: String,
         isError: Boolean = false
     ) {
-        if (eventSink == null) {
-            return
-        }
+        // --- dedupe guard -----------------
+        val message = if (prefix.isEmpty()) description else "$prefix$separator$description"
+        val now = System.currentTimeMillis()
+        if (message == lastLoggedEvent && now - lastLoggedTime < 1_000) return
+        lastLoggedEvent = message
+        lastLoggedTime = now
+        // --- end dedupe -------------------
+
         if (isError) {
-            eventSink!!.error(FlutterErrorCodes.UNAVAILABLE_ERROR, description, null)
+            eventSink?.error(FlutterErrorCodes.UNAVAILABLE_ERROR, message, null)
         } else {
-            val message = if (prefix.isEmpty()) description else "$prefix$separator$description"
             Log.d(TAG, "logEvent: $message")
-            eventSink!!.success(message)
+            eventSink?.success(message)
         }
+        // if (eventSink == null) {
+        //     return
+        // }
+        // if (isError) {
+        //     eventSink!!.error(FlutterErrorCodes.UNAVAILABLE_ERROR, description, null)
+        // } else {
+        //     val message = if (prefix.isEmpty()) description else "$prefix$separator$description"
+        //     Log.d(TAG, "logEvent: $message")
+        //     eventSink!!.success(message)
+        // }
     }
     //endregion
 
