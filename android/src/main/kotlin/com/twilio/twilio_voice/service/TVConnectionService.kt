@@ -19,6 +19,7 @@ import com.twilio.twilio_voice.types.CallExceptionExtension
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import org.json.JSONObject
 import com.twilio.twilio_voice.R
+import com.twilio.twilio_voice.TwilioVoicePlugin
 import com.twilio.twilio_voice.call.TVCallInviteParametersImpl
 import com.twilio.twilio_voice.call.TVCallParametersImpl
 import com.twilio.twilio_voice.call.TVParameters
@@ -342,7 +343,13 @@ class TVConnectionService : ConnectionService() {
 
 
                     // Add new incoming call to the telecom manager
-                    telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+                    if(!TwilioVoicePlugin.isAppInForeground){
+                        telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+                    }
+                     LocalBroadcastManager.getInstance(applicationContext)
+                        .sendBroadcast(Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL).apply {
+                            putExtra(TVBroadcastReceiver.EXTRA_CALL_INVITE, callInvite)
+                        })
                 }
 
                 ACTION_ANSWER -> {
