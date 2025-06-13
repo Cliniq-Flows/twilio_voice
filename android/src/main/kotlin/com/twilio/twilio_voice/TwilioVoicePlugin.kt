@@ -1,6 +1,8 @@
 package com.twilio.twilio_voice
 
 import android.telecom.Connection
+import android.telecom.DisconnectCause
+import com.twilio.twilio_voice.types.AppState
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -121,6 +123,9 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     // Provides a mapping of permission to result handler for when the permission is granted or denied via the PluginRegistry, then responds via future to the Flutter side
     private val permissionResultHandler: MutableMap<Int, (Boolean) -> Unit> = mutableMapOf()
 
+
+
+
     private fun register(
         messenger: BinaryMessenger,
         plugin: TwilioVoicePlugin,
@@ -170,8 +175,18 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         // no-ops for everything else:
         override fun onActivityCreated(a: Activity, b: Bundle?) {}
         override fun onActivityStarted(a: Activity) {}
-        override fun onActivityResumed(a: Activity) {}
-        override fun onActivityPaused(a: Activity) {}
+        override fun onActivityResumed(a: Activity) {
+            if (a == activity) {
+                AppState.isFlutterForeground = true
+                tearDownNativeUi()
+            }
+        }
+
+        override fun onActivityPaused(a: Activity) {
+            if (a == activity) {
+                AppState.isFlutterForeground = false
+            }
+        }
         override fun onActivityStopped(a: Activity) {}
         override fun onActivitySaveInstanceState(a: Activity, b: Bundle) {}
     }
@@ -1181,6 +1196,17 @@ val ctx = context
 //        return tm.isOnCall(ctx)
        // return TVConnectionService.hasActiveCalls()
         return  TVConnectionService.hasActiveCalls()
+    }
+
+    private fun tearDownNativeUi() {
+        // 1) find the one incoming call that’s been answered
+        val handle = TVConnectionService.getIncomingCallHandle() ?: return
+        val conn   = TVConnectionService.getConnection(handle) ?: return
+
+        // 2) disconnect the telecom ConnectionService UI without touching Twilio
+        conn.setDisconnected(DisconnectCause(DisconnectCause.LOCAL))
+        conn.destroy()
+        TVConnectionService.activeConnections.remove(handle)
     }
 
     private fun playOutgoingRingtone() {

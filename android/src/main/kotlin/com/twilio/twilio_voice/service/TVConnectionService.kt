@@ -1,6 +1,7 @@
 package com.twilio.twilio_voice.service
 
 import android.telecom.Connection
+import com.twilio.twilio_voice.types.AppState
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -340,9 +341,21 @@ class TVConnectionService : ConnectionService() {
 
 
 
-
                     // Add new incoming call to the telecom manager
-                    telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+                  //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+                    if (AppState.isFlutterForeground) {
+                        // app is open → skip system UI, just notify your plugin
+                        LocalBroadcastManager.getInstance(applicationContext)
+                            .sendBroadcast(
+                                Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL).apply {
+                                    putExtra(EXTRA_INCOMING_CALL_INVITE, callInvite)
+                                }
+                            )
+                    } else {
+                        // app is background/terminated → show native UI
+                        telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+                    }
+
                 }
 
                 ACTION_ANSWER -> {
