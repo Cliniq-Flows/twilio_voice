@@ -178,6 +178,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         override fun onActivityResumed(a: Activity) {
             if (a == activity) {
                 AppState.isFlutterForeground = true
+                //////
                 tearDownNativeUi()
             }
         }
