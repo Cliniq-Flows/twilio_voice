@@ -488,6 +488,14 @@ class MethodChannelTwilioVoice extends TwilioVoicePlatform {
   }
 
   @override
+  Future<void> tearDownNativeUI() {
+    return _channel.invokeMethod(
+      'tearDownNativeUI',
+      <String, dynamic>{},
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>?> getCustomParams() async {
     final Map? raw = await _channel.invokeMethod<Map>(
       'getCustomParams',

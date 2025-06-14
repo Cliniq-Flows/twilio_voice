@@ -97,6 +97,7 @@ abstract class TwilioCallPlatform extends SharedPlatformInterface {
   Future<bool?> updateDisplayName({
     required String displayName,
   });
+  Future<void> tearDownNativeUI();
 
   /// Returns the last‐saved custom parameters for the current call, or null.
   Future<Map<String, dynamic>?> getCustomParams();

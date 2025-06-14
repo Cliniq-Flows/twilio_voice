@@ -179,7 +179,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             if (a == activity) {
                 AppState.isFlutterForeground = true
                 //////
-                tearDownNativeUi()
+               // tearDownNativeUi()
             }
         }
 
@@ -957,6 +957,15 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 // deprecated
                 result.success(true)
             }
+            TVMethodChannels.TEAR_DOWN_NATIVE_UI -> {
+
+                Log.d(TAG, "Flutter → NativeUI teardown request")
+                tearDownNativeUi()
+                context?.startService(Intent(context, TVConnectionService::class.java).apply {
+                    action = TVConnectionService.ACTION_TEAR_DOWN_NATIVE_UI
+                })
+                result.success(true)
+            }
 
             TVMethodChannels.UPDATE_DISPLAY_NAME -> {
                 // Retrieve the new display name from the arguments.
@@ -1200,14 +1209,20 @@ val ctx = context
     }
 
     private fun tearDownNativeUi() {
-        // 1) find the one incoming call that’s been answered
-        val handle = TVConnectionService.getIncomingCallHandle() ?: return
-        val conn   = TVConnectionService.getConnection(handle) ?: return
 
-        // 2) disconnect the telecom ConnectionService UI without touching Twilio
-        conn.setDisconnected(DisconnectCause(DisconnectCause.LOCAL))
-        conn.destroy()
-        TVConnectionService.activeConnections.remove(handle)
+        if (!AppState.isFlutterForeground) return
+
+            val handle = TVConnectionService.getIncomingCallHandle() ?: return
+            val conn   = TVConnectionService.getConnection(handle) ?: return
+
+            // only tear down if connection is still “ringing”
+            if (conn.state == Connection.STATE_RINGING) {
+                // cancel the native Telecom UI…
+                conn.setDisconnected(DisconnectCause(DisconnectCause.CANCELED))
+                conn.destroy()
+                TVConnectionService.activeConnections.remove(handle)
+                Log.d(TAG, "Native call UI torn down for $handle (call still live in-app)")
+            }
     }
 
     private fun playOutgoingRingtone() {

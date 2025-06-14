@@ -151,6 +151,14 @@ class MethodChannelTwilioCall extends TwilioCallPlatform {
     return _channel.invokeMethod('updateDisplayName', args);
   }
 
+  @override
+  Future<void> tearDownNativeUI() {
+    return _channel.invokeMethod(
+      'tearDownNativeUI',
+      <String, dynamic>{},
+    );
+  }
+
   /// Retrieves the last‐saved custom parameters (or null).
   @override
   Future<Map<String, dynamic>?> getCustomParams() async {

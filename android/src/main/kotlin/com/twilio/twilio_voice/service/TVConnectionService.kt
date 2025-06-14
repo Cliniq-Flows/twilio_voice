@@ -67,6 +67,7 @@ class TVConnectionService : ConnectionService() {
         // ─────────────────────────────────────────────────────────────────────────────
 
         const val ACTION_UPDATE_DISPLAY_NAME: String = "updateDisplayName"
+        const val ACTION_TEAR_DOWN_NATIVE_UI: String = "tearDownNativeUI"
 
 
 
@@ -732,6 +733,22 @@ class TVConnectionService : ConnectionService() {
                     val activeCallHandle = getActiveCallHandle()
                     sendBroadcastCallHandle(applicationContext, activeCallHandle)
                 }
+
+                ACTION_TEAR_DOWN_NATIVE_UI -> {
+                    if (!AppState.isFlutterForeground) return@let
+
+                    val handle = getIncomingCallHandle() ?: return@let
+                    val conn   = getConnection(handle)       ?: return@let
+
+                    // only tear down if it’s still ringing
+//                    if (conn.state == Connection.STATE_RINGING) {
+                        conn.setDisconnected(DisconnectCause(DisconnectCause.CANCELED))
+                        conn.destroy()
+                        activeConnections.remove(handle)
+                        Log.d(TAG, "Native call UI torn down…")
+                  //  }
+                }
+
 
                 ACTION_UPDATE_DISPLAY_NAME -> {
                     val newDisplayName = it.getStringExtra("name")

@@ -198,6 +198,8 @@ abstract class TwilioVoicePlatform extends SharedPlatformInterface {
     required String displayName,
   });
 
+  Future<void> tearDownNativeUI();
+
   /// Returns the last-saved custom parameters, or null.
   Future<Map<String, dynamic>?> getCustomParams();
 
