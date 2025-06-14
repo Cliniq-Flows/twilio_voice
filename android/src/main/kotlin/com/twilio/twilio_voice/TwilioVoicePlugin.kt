@@ -1210,19 +1210,17 @@ val ctx = context
 
     private fun tearDownNativeUi() {
 
-        if (!AppState.isFlutterForeground) return
-
             val handle = TVConnectionService.getIncomingCallHandle() ?: return
             val conn   = TVConnectionService.getConnection(handle) ?: return
 
             // only tear down if connection is still “ringing”
-            if (conn.state == Connection.STATE_RINGING) {
+
                 // cancel the native Telecom UI…
                 conn.setDisconnected(DisconnectCause(DisconnectCause.CANCELED))
                 conn.destroy()
                 TVConnectionService.activeConnections.remove(handle)
                 Log.d(TAG, "Native call UI torn down for $handle (call still live in-app)")
-            }
+
     }
 
     private fun playOutgoingRingtone() {

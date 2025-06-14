@@ -735,7 +735,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_TEAR_DOWN_NATIVE_UI -> {
-                    if (!AppState.isFlutterForeground) return@let
+
 
                     val handle = getIncomingCallHandle() ?: return@let
                     val conn   = getConnection(handle)       ?: return@let
