@@ -48,6 +48,8 @@ class TVConnectionService : ConnectionService() {
     companion object {
         val TAG = "TwilioVoiceConnectionService"
 
+        private var pendingInvite: CallInvite? = null
+
         val activeConnections = HashMap<String, TVCallConnection>()
 
         val TWI_SCHEME: String = "twi"
@@ -344,6 +346,7 @@ class TVConnectionService : ConnectionService() {
                     // Add new incoming call to the telecom manager
                   //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
                     if (AppState.isFlutterForeground) {
+                         pendingInvite = callInvite
                         // app is open → skip system UI, just notify your plugin
                         LocalBroadcastManager.getInstance(applicationContext)
                             .sendBroadcast(
@@ -359,21 +362,135 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_ANSWER -> {
+
+
+                  
+                if (AppState.isFlutterForeground && pendingInvite != null) {
+                    val conn = TVCallConnection(applicationContext)
+                    conn.setInitialized()
+                    conn.setDialing()
+                    val invite = pendingInvite!!
+                    val firstName = invite.customParameters["firstname"] ?: ""
+                    val lastName = invite.customParameters["lastname"] ?: ""
+                    var from = "$firstName $lastName".trim()
+                    var to = invite.to
+                    // Also clean up the default 'from' value (remove any unwanted prefix)
+                    var fromCleaned = invite.from ?: ""
+                    fromCleaned = fromCleaned.replace("client:", "")
+                    val listener = object : Call.Listener {
+                        override fun onRinging(call: Call) {
+                            // store call on connection if needed…
+                            val sid = call.sid ?: return
+                            conn.twilioCall = call
+                            activeConnections[sid] = conn
+                            attachCallEventListeners(conn, sid)
+                            // 1) tell Flutter “here’s the active call”
+                            sendBroadcastCallHandle(applicationContext, sid)
+                            sendBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_RINGING,
+                                sid,
+                                Bundle().apply {
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
+                                    putInt   (TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
+                                        CallDirection.OUTGOING.id)
+                                }
+                            )
+                        }
+
+                        override fun onConnected(call: Call) {
+                            val sid = call.sid ?: return
+                            activeConnections[sid] = conn
+                            // 1) tell Flutter “here’s the active call”
+                            sendBroadcastCallHandle(applicationContext, sid)
+                            sendBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_CONNECTED,
+                                sid,
+                                Bundle().apply {
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
+                                    putInt   (TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
+                                        CallDirection.OUTGOING.id)
+                                }
+                            )
+                        }
+
+                        override fun onConnectFailure(call: Call, error: CallException) {
+                            if (error.errorCode == 31603) {
+                                sendBroadcastEvent(
+                                    applicationContext, TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE, call.sid, Bundle().apply {
+                                        putInt("code", error.errorCode)
+                                        putString("message", error.message)
+                                    }
+                                )
+                            } else {
+                                sendBroadcastEvent(
+                                    applicationContext, TVNativeCallEvents.EVENT_CONNECT_FAILURE, call.sid, Bundle().apply {
+                                        putInt("code", error.errorCode)
+                                        putString("message", error.message)
+                                    }
+                                )
+                            }
+                            // tear down your ConnectionService connection if needed
+                            conn.disconnect()
+                         
+                        }
+
+                        override fun onReconnecting(call: Call, error: CallException) { /* optional */ }
+                        override fun onReconnected(call: Call)               { /* optional */ }
+
+                        override fun onDisconnected(call: Call, error: CallException?) {
+                            conn.disconnect()
+                            // Clear the active handle now that it’s gone
+                            sendBroadcastCallHandle(applicationContext, null)
+                            sendBroadcastEvent(
+                                applicationContext,
+                                TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
+                                call.sid,
+                                Bundle().apply {
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_FROM,  from)
+                                    putString(TVBroadcastReceiver.EXTRA_CALL_TO  ,  to)
+                                    putInt   (TVBroadcastReceiver.EXTRA_CALL_DIRECTION,
+                                        CallDirection.OUTGOING.id)
+                                }
+                            )
+                        }
+                    }
+
+                   
+                    val twilioCall = invite.accept(applicationContext, listener)
+
+                 
+                    activeConnections[twilioCall.sid!!] = TVCallConnection(applicationContext).apply {
+                    this.twilioCall = twilioCall
+                  
+                    attachCallEventListeners(this, twilioCall.sid!!)
+                    }
+
+                   
+                    pendingInvite = null
+
+                    return@let
+                }else{
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: run {
-                        Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
-                        return@let
-                    }
+                                        Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
+                                        return@let
+                                    }
 
-                    val connection = getConnection(callHandle) ?: run {
-                        Log.e(TAG, "onStartCommand: [ACTION_HANGUP] could not find connection for callHandle: $callHandle")
-                        return@let
-                    }
+                                    val connection = getConnection(callHandle) ?: run {
+                                        Log.e(TAG, "onStartCommand: [ACTION_HANGUP] could not find connection for callHandle: $callHandle")
+                                        return@let
+                                    }
 
-                    if(connection is TVCallInviteConnection) {
-                        connection.acceptInvite()
-                    } else {
-                        Log.e(TAG, "onStartCommand: [ACTION_ANSWER] could not find connection for callHandle: $callHandle")
-                    }
+                                    if(connection is TVCallInviteConnection) {
+                                        connection.acceptInvite()
+                                    } else {
+                                        Log.e(TAG, "onStartCommand: [ACTION_ANSWER] could not find connection for callHandle: $callHandle")
+                                    }
+                }
+                  
                 }
 
                 ACTION_HANGUP -> {
@@ -410,85 +527,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_PLACE_OUTGOING_CALL -> {
-//                    // check required EXTRA_TOKEN, EXTRA_TO, EXTRA_FROM
-//                    val token = it.getStringExtra(EXTRA_TOKEN) ?: run {
-//                        Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
-//                        return@let
-//                    }
-//                    val to = it.getStringExtra(EXTRA_TO) ?: run {
-//                        Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TO")
-//                        return@let
-//                    }
-//                    val from = it.getStringExtra(EXTRA_FROM) ?: run {
-//                        Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_FROM")
-//                        return@let
-//                    }
-//
-//                    // Get all params from bundle
-//                    val params = HashMap<String, String>()
-//                    val outGoingParams = it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)
-//                    outGoingParams?.keySet()?.forEach { key ->
-//                        outGoingParams.getString(key)?.let { value ->
-//                            params[key] = value
-//                        }
-//                    }
-//
-//                    // Add required params
-//                    params[EXTRA_FROM] = from
-//                    params[EXTRA_TO] = to
-//                    params[EXTRA_TOKEN] = token
-//
-//                    // Create Twilio Param bundles
-//                    val myBundle = Bundle().apply {
-//                        putBundle(EXTRA_OUTGOING_PARAMS, Bundle().apply {
-//                            params.forEach { (key, value) ->
-//                                putString(key, value)
-//                            }
-//                        })
-//                    }
-//
-//                    val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
-//                    val phoneAccountHandle = telecomManager.getPhoneAccountHandle(applicationContext)
-//
-//                    if (!telecomManager.canReadPhoneState(applicationContext)) {
-//                        Log.e(TAG, "onStartCommand: Missing READ_PHONE_STATE permission")
-//                        return@let
-//                    }
-//
-//                    val phoneAccount = telecomManager.getPhoneAccount(phoneAccountHandle)
-//                    if(phoneAccount == null) {
-//                        Log.e(TAG, "onStartCommand: PhoneAccount is null, make sure to register one with `registerPhoneAccount()`")
-//                        return@let
-//                    }
-//                    if(!phoneAccount.isEnabled) {
-//                        Log.e(TAG, "onStartCommand: PhoneAccount is not enabled, prompt the user to enable the phone account by opening settings with `openPhoneAccountSettings()`")
-//                        return@let
-//                    }
-//
-//                    if (!telecomManager.hasCallCapableAccount(applicationContext, phoneAccountHandle.componentName.className)) {
-//                        Log.e(TAG, "onStartCommand: No registered phone account for PhoneHandle $phoneAccountHandle")
-//                        telecomManager.registerPhoneAccount(applicationContext, phoneAccountHandle)
-//                    }
-//
-//                    if (!applicationContext.hasCallPhonePermission()) {
-//                        Log.e(TAG, "onStartCommand: Missing CALL_PHONE permission, request permission with `requestCallPhonePermission()`")
-//                        return@let
-//                    }
-//
-//                    if (!applicationContext.hasManageOwnCallsPermission()) {
-//                        Log.e(TAG, "onStartCommand: Missing MANAGE_OWN_CALLS permission, request permission with `requestManageOwnCallsPermission()`")
-//                        return@let
-//                    }
-//
-//                    // Create outgoing extras
-//                    val extras = Bundle().apply {
-//                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
-//                        putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
-//                    }
-//
-//                    val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
-//                    telecomManager.placeCall(address, extras)
-                    // 1) Extract & build your params
+             
                     val token = it.getStringExtra(EXTRA_TOKEN) ?: return@let
                     val to    = it.getStringExtra(EXTRA_TO)    ?: return@let
                     val from  = it.getStringExtra(EXTRA_FROM)  ?: return@let
@@ -576,24 +615,7 @@ class TVConnectionService : ConnectionService() {
                             }
                             // tear down your ConnectionService connection if needed
                             conn.disconnect()
-                            // you can broadcast a failure event if you want
-//                            sendBroadcastEvent(
-//                                applicationContext,
-//                                TVNativeCallEvents.EVENT_CONNECT_FAILURE,
-//                                call.sid,
-//                                Bundle().apply { putString("error", error.message) }
-//                            )
-//                            conn.disconnect()
-//                            sendBroadcastCallHandle(applicationContext, null)
-//                            sendBroadcastEvent(
-//                                applicationContext,
-//                                TVNativeCallEvents.EVENT_DISCONNECTED_LOCAL,
-//                                call.sid,
-//                                Bundle().apply {
-//                                    putString("error", error.message)
-//                                    putInt("errorCode", error.errorCode)
-//                                }
-//                            )
+                         
                         }
 
                         override fun onReconnecting(call: Call, error: CallException) { /* optional */ }
