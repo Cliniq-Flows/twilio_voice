@@ -380,7 +380,7 @@ class TVConnectionService : ConnectionService() {
                     val listener = object : Call.Listener {
 
                         override fun onRinging(call: Call) {
-                           
+                           conn.setRinging()
                             val sid = call.sid ?: return
                             conn.twilioCall = call
                             activeConnections[sid] = conn
@@ -401,6 +401,7 @@ class TVConnectionService : ConnectionService() {
                         }
 
                         override fun onConnected(call: Call) {
+
                             val sid = call.sid ?: return
                             activeConnections[sid] = conn
                             // 1) tell Flutter “here’s the active call”
