@@ -380,7 +380,7 @@ class TVConnectionService : ConnectionService() {
                     val listener = object : Call.Listener {
 
                         override fun onRinging(call: Call) {
-                            // store call on connection if needed…
+                           
                             val sid = call.sid ?: return
                             conn.twilioCall = call
                             activeConnections[sid] = conn
