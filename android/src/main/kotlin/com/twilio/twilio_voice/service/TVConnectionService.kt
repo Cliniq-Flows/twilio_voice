@@ -462,13 +462,19 @@ class TVConnectionService : ConnectionService() {
 
 
                     val twilioCall = invite.accept(applicationContext, listener)
-
-                    val connect = TVCallConnection(applicationContext).apply {
-                        this.twilioCall = twilioCall
+                    conn.twilioCall = twilioCall
+                    twilioCall.sid?.let { sid ->
+                        activeConnections[sid] = conn
+                        attachCallEventListeners(conn, sid)
                     }
-                    activeConnections[twilioCall.sid!!] = connect
-                    attachCallEventListeners(connect, twilioCall.sid!!)
+
+//                    val connect = TVCallConnection(applicationContext).apply {
+//                        this.twilioCall = twilioCall
+//                    }
+//                    activeConnections[twilioCall.sid!!] = connect
+//                    attachCallEventListeners(connect, twilioCall.sid!!)
                     pendingInvite = null
+                    startForegroundService()
                     return@let
                 }else{
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: run {
