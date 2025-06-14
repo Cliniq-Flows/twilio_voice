@@ -378,6 +378,7 @@ class TVConnectionService : ConnectionService() {
                     var fromCleaned = invite.from ?: ""
                     fromCleaned = fromCleaned.replace("client:", "")
                     val listener = object : Call.Listener {
+
                         override fun onRinging(call: Call) {
                             // store call on connection if needed…
                             val sid = call.sid ?: return
@@ -459,19 +460,15 @@ class TVConnectionService : ConnectionService() {
                         }
                     }
 
-                   
+
                     val twilioCall = invite.accept(applicationContext, listener)
 
-                 
-                    activeConnections[twilioCall.sid!!] = TVCallConnection(applicationContext).apply {
-                    this.twilioCall = twilioCall
-                  
-                    attachCallEventListeners(this, twilioCall.sid!!)
+                    val connect = TVCallConnection(applicationContext).apply {
+                        this.twilioCall = twilioCall
                     }
-
-                   
+                    activeConnections[twilioCall.sid!!] = connect
+                    attachCallEventListeners(connect, twilioCall.sid!!)
                     pendingInvite = null
-
                     return@let
                 }else{
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: run {
