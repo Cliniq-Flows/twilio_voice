@@ -960,10 +960,13 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             TVMethodChannels.TEAR_DOWN_NATIVE_UI -> {
 
                 Log.d(TAG, "Flutter → NativeUI teardown request")
+                 context?.let { ctx ->
+    val i = Intent(ctx, TVConnectionService::class.java)
+      .setAction(TVConnectionService.ACTION_TEAR_DOWN_NATIVE_UI)
+    ctx.startService(i)
+  }
                 tearDownNativeUi()
-                context?.startService(Intent(context, TVConnectionService::class.java).apply {
-                    action = TVConnectionService.ACTION_TEAR_DOWN_NATIVE_UI
-                })
+                
                 result.success(true)
             }
 
