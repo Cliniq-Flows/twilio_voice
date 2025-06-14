@@ -49,6 +49,7 @@ class TVConnectionService : ConnectionService() {
         val TAG = "TwilioVoiceConnectionService"
 
         private var pendingInvite: CallInvite? = null
+        private var ringtone: Ringtone? = null
 
         val activeConnections = HashMap<String, TVCallConnection>()
 
@@ -347,6 +348,12 @@ class TVConnectionService : ConnectionService() {
                   //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
                     if (AppState.isFlutterForeground) {
                          pendingInvite = callInvite
+                          val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                        ringtone = RingtoneManager.getRingtone(applicationContext, uri)?.apply {
+                            streamType = AudioManager.STREAM_RING
+                            isLooping = true
+                            play()
+                        }
                         // app is open → skip system UI, just notify your plugin
                         LocalBroadcastManager.getInstance(applicationContext)
                             .sendBroadcast(
@@ -369,6 +376,7 @@ class TVConnectionService : ConnectionService() {
                     val conn = TVCallConnection(applicationContext)
                     conn.setInitialized()
                     conn.setDialing()
+                    ringtone?.stop(); ringtone = null
                     val invite = pendingInvite!!
                     val firstName = invite.customParameters["firstname"] ?: ""
                     val lastName = invite.customParameters["lastname"] ?: ""
@@ -498,6 +506,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_HANGUP -> {
+                    ringtone?.stop(); ringtone = null
                     storage.clearCustomParams()
   val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE)
                  ?: getActiveCallHandle() ?: return@let
