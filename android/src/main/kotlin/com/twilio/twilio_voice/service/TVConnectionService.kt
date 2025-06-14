@@ -385,7 +385,7 @@ class TVConnectionService : ConnectionService() {
                             conn.twilioCall = call
                             activeConnections[sid] = conn
                             attachCallEventListeners(conn, sid)
-                            // 1) tell Flutter “here’s the active call”
+                           
                             sendBroadcastCallHandle(applicationContext, sid)
                             sendBroadcastEvent(
                                 applicationContext,
