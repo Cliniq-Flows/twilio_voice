@@ -595,8 +595,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                     alertController.addAction(cancel)
                     guard let currentViewController = 
                     //UIApplication.shared.keyWindow?.topMostViewController() 
-                    UIApplication.shared.connectedScenes
-                    .compactMap { $0 as? UIWindowScene }
+                   UIApplication.shared.connectedScenes
+                        .compactMap else { permissionGranted as? UIWindowScene }
                     .flatMap { $0.windows }
                     .first { $0.isKeyWindow }?
                     .topMostViewController()
@@ -1446,7 +1446,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         UserDefaults.standard.removeObject(forKey: kCustomParamsKey)
     }
     
-}
+
 
 extension UIWindow {
     func topMostViewController() -> UIViewController? {
