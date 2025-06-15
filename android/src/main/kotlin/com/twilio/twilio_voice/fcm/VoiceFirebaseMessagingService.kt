@@ -14,6 +14,7 @@ import com.google.firebase.messaging.RemoteMessage
 import com.twilio.twilio_voice.receivers.TVBroadcastReceiver
 import com.twilio.twilio_voice.service.TVConnectionService
 import com.twilio.twilio_voice.storage.StorageImpl
+import com.twilio.twilio_voice.types.AppState
 import com.twilio.twilio_voice.types.TelecomManagerExtension.canReadPhoneNumbers
 import com.twilio.voice.CallException
 import com.twilio.voice.CallInvite
@@ -147,14 +148,17 @@ class VoiceFirebaseMessagingService : FirebaseMessagingService(), MessageListene
          if (AppState.isFlutterForeground) {
             
         // 1) Send a LocalBroadcast that TwilioVoicePlugin already knows how to handle:
-       LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
-      Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL).apply {
-        putExtra(TVBroadcastReceiver.EXTRA_INCOMING_CALL_INVITE, callInvite)
-        putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callInvite.callSid)
-      }
-    )
+             Log.d(TAG, "App in foreground → skipping native UI, broadcasting to plugin")
+             LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
+                 Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL).apply {
+                     putExtra(TVBroadcastReceiver.EXTRA_CALL_INVITE, callInvite)
+                     putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callInvite.callSid)
+                 }
+             )
         return
     }
+
+       
 
         // send broadcast to TVConnectionService, we notify the TelecomManager about incoming call
         Intent(applicationContext, TVConnectionService::class.java).apply {
