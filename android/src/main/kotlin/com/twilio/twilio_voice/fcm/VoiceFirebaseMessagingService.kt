@@ -145,18 +145,18 @@ class VoiceFirebaseMessagingService : FirebaseMessagingService(), MessageListene
             return
         }
 
-         if (AppState.isFlutterForeground) {
+    //      if (AppState.isFlutterForeground) {
             
-        // 1) Send a LocalBroadcast that TwilioVoicePlugin already knows how to handle:
-             Log.d(TAG, "App in foreground → skipping native UI, broadcasting to plugin")
-             LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
-                 Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL).apply {
-                     putExtra(TVBroadcastReceiver.EXTRA_CALL_INVITE, callInvite)
-                     putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callInvite.callSid)
-                 }
-             )
-        return
-    }
+    //     // 1) Send a LocalBroadcast that TwilioVoicePlugin already knows how to handle:
+    //          Log.d(TAG, "App in foreground → skipping native UI, broadcasting to plugin")
+    //          LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
+    //              Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL).apply {
+    //                  putExtra(TVBroadcastReceiver.EXTRA_CALL_INVITE, callInvite)
+    //                  putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callInvite.callSid)
+    //              }
+    //          )
+    //     return
+    // }
 
        
 
