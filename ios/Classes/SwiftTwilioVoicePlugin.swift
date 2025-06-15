@@ -149,6 +149,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
 
 
+
     @objc private func appWillTerminate() {
         guard let call = self.call else { return }
         sendPhoneCallEvents(description: "LOG|App terminating – hanging up call", isError: false)
@@ -814,14 +815,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         var fromx1: String = callInvite.from ?? ""
         fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
         
-        if(isAppActive == true){
-             pendingInvite = callInvite
-              playRingbackTone()
-                self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        }else{
+        // if(isAppActive == true){
+        //      pendingInvite = callInvite
+        //       playRingbackTone()
+        //         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
+        // }else{
              self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
         reportIncomingCall(from: from!, fromx: fromx!, fromx1: fromx1, uuid: callInvite.uuid)
-        }
+       // }
 
        
         self.callInvite = callInvite
