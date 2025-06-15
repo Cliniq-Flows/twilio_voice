@@ -9,9 +9,7 @@ import UserNotifications
 public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate, CXCallObserverDelegate {
     let callObserver = CXCallObserver()
 
-    ///// NEW ...
-    private(set) var isAppActive = false
-    var pendingInvite: CallInvite?
+  
 
 
     final let defaultCallKitIcon = "callkit_icon"
@@ -64,6 +62,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private let kCustomParamsKey = "TwilioCustomParams"
 
     private var activeCalls: [UUID: CXCall] = [:]
+    
+      ///// NEW ...
+    private(set) var isAppActive = false
+    var pendingInvite: CallInvite?
+
     
     static var appName: String {
         get {
