@@ -372,10 +372,10 @@ class TVConnectionService : ConnectionService() {
                                     putExtra(EXTRA_INCOMING_CALL_INVITE, callInvite)
                                 }
                             )
-                    } else {
-                        // app is background/terminated → show native UI
-                        telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+
+                              return@let
                     }
+                      telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
 
                 }
 
@@ -745,6 +745,7 @@ class TVConnectionService : ConnectionService() {
                         conn.setDisconnected(DisconnectCause(DisconnectCause.CANCELED))
                         conn.destroy()
                         activeConnections.remove(handle)
+                        telecomManager.endCall()
                         Log.d(TAG, "Native call UI torn down…")
                   //  }
                 }

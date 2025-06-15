@@ -159,6 +159,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
      private val appLifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
+      
         override fun onActivityDestroyed(act: Activity) {
             // If it’s your Flutter Activity being torn down:
             if (act == activity) {
@@ -178,18 +179,16 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         override fun onActivityResumed(a: Activity) {
             if (a == activity) {
                 AppState.isFlutterForeground = true
-                //////
-               // tearDownNativeUi()
+               Log.d(TAG, "FlutterForeground? $AppState.isFlutterForeground")
             }
         }
 
         override fun onActivityPaused(a: Activity) {
-            if (a == activity) {
-                AppState.isFlutterForeground = false
-            }
+            if (a == activity) AppState.isFlutterForeground = false
         }
         override fun onActivityStopped(a: Activity) {}
         override fun onActivitySaveInstanceState(a: Activity, b: Bundle) {}
+     
     }
 
     override fun onDetachedFromEngine(binding: FlutterPluginBinding) {

@@ -127,6 +127,8 @@ class VoiceFirebaseMessagingService : FirebaseMessagingService(), MessageListene
             
             Log.e(TAG, "onCallInvite: Rejecting incoming call\nSID: ${callInvite.callSid}")
 
+
+
             // send broadcast to TVBroadcastReceiver, we notify Flutter about incoming call
             Intent(applicationContext, TVBroadcastReceiver::class.java).apply {
                 action = TVBroadcastReceiver.ACTION_INCOMING_CALL_IGNORED
@@ -142,12 +144,26 @@ class VoiceFirebaseMessagingService : FirebaseMessagingService(), MessageListene
             return
         }
 
+         if (AppState.isFlutterForeground) {
+            
+        // 1) Send a LocalBroadcast that TwilioVoicePlugin already knows how to handle:
+       LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
+      Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL).apply {
+        putExtra(TVBroadcastReceiver.EXTRA_INCOMING_CALL_INVITE, callInvite)
+        putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callInvite.callSid)
+      }
+    )
+        return
+    }
+
         // send broadcast to TVConnectionService, we notify the TelecomManager about incoming call
         Intent(applicationContext, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_INCOMING_CALL
             putExtra(TVConnectionService.EXTRA_INCOMING_CALL_INVITE, callInvite)
             applicationContext.startService(this)
         }
+
+       
 
         // send broadcast to TVBroadcastReceiver, we notify Flutter about incoming call
         Intent(applicationContext, TVBroadcastReceiver::class.java).apply {
