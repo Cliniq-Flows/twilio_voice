@@ -745,7 +745,7 @@ class TVConnectionService : ConnectionService() {
                         conn.setDisconnected(DisconnectCause(DisconnectCause.CANCELED))
                         conn.destroy()
                         activeConnections.remove(handle)
-                        telecomManager.endCall()
+                        //telecomManager.endCall()
                         Log.d(TAG, "Native call UI torn down…")
                   //  }
                 }
