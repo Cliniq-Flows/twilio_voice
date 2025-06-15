@@ -880,18 +880,6 @@ class TVConnectionService : ConnectionService() {
                         }
                     )
                 }
-                // tear down your ConnectionService connection if needed
-          //      conn.disconnect()
-//                sendBroadcastEvent(
-//                    applicationContext,
-//                    TVNativeCallEvents.EVENT_CONNECT_FAILURE,
-//                    call.sid,
-//                    Bundle().apply {
-//                        putString(CallExceptionExtension.EXTRA_MESSAGE, error.message)
-//                        putInt(CallExceptionExtension.EXTRA_CODE, error.errorCode)
-//                    }
-//                )
-                // clean up
                 conferenceConnection.disconnect()
             }
 

@@ -8,7 +8,12 @@ import UserNotifications
 
 public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate, CXCallObserverDelegate {
     let callObserver = CXCallObserver()
-    
+
+    ///// NEW ...
+    private(set) var isAppActive = false
+    var pendingInvite: CallInvite?
+
+
     final let defaultCallKitIcon = "callkit_icon"
     var callKitIcon: String?
 
@@ -20,6 +25,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     let kCachedDeviceToken = "CachedDeviceToken"
     let kCachedBindingDate = "CachedBindingDate"
     let kClientList = "TwilioContactList"
+    
     private var clients: [String:String]!
     private var lastLoggedEvent: String?
     private var lastLoggedTime: Date?
@@ -105,6 +111,19 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         name: UIApplication.willTerminateNotification,
         object: nil
     )
+
+     NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(appDidBecomeActive),
+      name: UIApplication.didBecomeActiveNotification,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(appWillResignActive),
+      name: UIApplication.willResignActiveNotification,
+      object: nil
+    )
     
 
     }
@@ -120,6 +139,17 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // ────────────────────────────────────────────────────────────────────────────
     // MARK: — App-Lifecycle Hang-Up Handlers
     // ────────────────────────────────────────────────────────────────────────────
+
+        @objc private func appDidBecomeActive() {
+        isAppActive = true
+          sendPhoneCallEvents(description: "APP_STATE|Foreground", isError: false)
+
+    }
+    @objc private func appWillResignActive() {
+        isAppActive = false
+          sendPhoneCallEvents(description: "APP_STATE|Background", isError: false)
+
+    }
 
     @objc private func appWillTerminate() {
         guard let call = self.call else { return }
@@ -560,7 +590,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                                                                 //self.stopSpin()
                                                               })
                     alertController.addAction(cancel)
-                    guard let currentViewController = UIApplication.shared.keyWindow?.topMostViewController() else {
+                    guard let currentViewController = 
+                    //UIApplication.shared.keyWindow?.topMostViewController() 
+                    UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .first { $0.isKeyWindow }?
+                    .topMostViewController()
+                    else {
                         return
                     }
                     currentViewController.present(alertController, animated: true, completion: nil)
@@ -763,21 +800,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          if let custom = callInvite.customParameters {
             saveCustomParams(custom)
         }
-        // self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
-        
-        // /**
-        //  * The TTL of a registration is 1 year. The TTL for registration for this device/identity
-        //  * pair is reset to 1 year whenever a new registration occurs or a push notification is
-        //  * sent to this device/identity pair.
-        //  */
-        // UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
-        
-        // var from:String = callInvite.from ?? defaultCaller
-        // from = from.replacingOccurrences(of: "client:", with: "")
-        
-        // self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        // reportIncomingCall(from: from, uuid: callInvite.uuid)
-        // self.callInvite = callInvite
+       
         self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
         
@@ -786,9 +809,20 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         var fromx1: String = callInvite.from ?? ""
         fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
         
+         if isAppActive {
+        // App is in foreground → skip CallKit UI
+        pendingInvite = callInvite
+
+        // Play bundled ringtone (you’ll need to add “default_ringtone.mp3” to your bundle)
+         playRingbackTone()
+
+        // Notify Flutter
+        self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
+    } else {
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
         reportIncomingCall(from: from!, fromx: fromx!, fromx1: fromx1, uuid: callInvite.uuid)
         self.callInvite = callInvite
+    }}
     }
     
     func formatCustomParams(params: [String:Any]?)->String{
@@ -957,76 +991,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     userInitiatedDisconnect = false
     self.call               = nil
     self.callInvite         = nil
-    //     clearCustomParams()
-
-    //  // stopRingbackTone()
-    //     if !isRejectingCallInvite {
-    //   let reason: CXCallEndedReason = self.userInitiatedDisconnect
-    //     ? .remoteEnded
-    //     : .failed
-    //   // ← here you tell CallKit “OK, end that call UI”
-    //   callKitProvider.reportCall(
-    //     with: call.uuid!,
-    //     endedAt: Date(),
-    //     reason: reason
-    //   )
-    //   sendPhoneCallEvents(
-    //     description: reason == .remoteEnded
-    //       ? "disconnectedLocal"
-    //       : "disconnectedRemote",
-    //     isError: false
-    //   )
-    // }
-
-    // // reset flags + clear your references
-    // isRejectingCallInvite = false
-    // userInitiatedDisconnect = false
-    // self.call               = nil
-    // self.callInvite         = nil
-  // only fire "Call Ended" when it's a real hang-up, not a reject
-//   if !isRejectingCallInvite {
-//     self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-//     if let error = error {
-//       self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
-//     }
-
-//     let reason: CXCallEndedReason = self.userInitiatedDisconnect
-//       ? .remoteEnded
-//       : .failed
-//     callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
-
-//     let eventName = self.userInitiatedDisconnect
-//       ? "disconnectedLocal"
-//       : "disconnectedRemote"
-//     sendPhoneCallEvents(description: eventName, isError: false)
-//   }
-
-//   // reset your flags and cleanup
-//   isRejectingCallInvite = false
-//   self.userInitiatedDisconnect = false
-//   callDisconnected()
-//          clearCustomParams()
-//         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-//         if let error = error {
-//             self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
-//         }
-        
+    stopRingbackTone()
+     pendingInvite = nil
     
-//         // let reason: CXCallEndedReason = self.userInitiatedDisconnect ? .remoteEnded : .failed
-//          // First, report to CallKit so the iOS in-call UI goes away:
-//   let reason: CXCallEndedReason = self.userInitiatedDisconnect
-//     ? .remoteEnded   // or .failed if you want
-//     : .failed       
-//         self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
-//             let eventName = self.userInitiatedDisconnect
-//     ? "disconnectedLocal"
-//     : "disconnectedRemote"
-//   sendPhoneCallEvents(description: eventName, isError: false)
-
- 
-//         callDisconnected()
-//         self.userInitiatedDisconnect = false
-
   
     }
     
@@ -1127,6 +1094,21 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         self.sendPhoneCallEvents(description: "LOG|provider:performAnswerCallAction:", isError: false)
         
+         if isAppActive, let ci = pendingInvite {
+        // Stop ringtone
+        stopRingbackTone()
+
+        // Accept directly on Twilio
+        let acceptOptions = AcceptOptions(callInvite: ci) { builder in
+            builder.uuid = ci.uuid
+        }
+        let twilioCall = ci.accept(options: acceptOptions, delegate: self)
+        self.call = twilioCall
+        pendingInvite = nil
+
+        action.fulfill()
+        return
+    }
         
         self.performAnswerVoiceCall(uuid: action.callUUID) { (success) in
             if success {
@@ -1141,7 +1123,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         self.sendPhoneCallEvents(description: "LOG|provider:performEndCallAction:", isError: false)
-        
+        if isAppActive, let ci = pendingInvite {
+        // Reject invite
+       stopRingbackTone()
+        ci.reject()
+        pendingInvite = nil
+        action.fulfill()
+        return
+    }
         
         if (self.callInvite != nil) {
             self.isRejectingCallInvite = true
