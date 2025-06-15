@@ -143,11 +143,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
     }
 
-    @objc private func appWillTerminate() {
-        guard let call = self.call else { return }
-        sendPhoneCallEvents(description: "LOG|App terminating – hanging up call", isError: false)
-        performEndCallAction(uuid: call.uuid!)
+    @objc private func appDidBecomeActive() {
+    isAppActive = true
+    sendPhoneCallEvents(description: "APP_STATE|Active", isError: false)
     }
+
 
     @objc private func appWillTerminate() {
         guard let call = self.call else { return }
