@@ -352,8 +352,8 @@ class TVConnectionService : ConnectionService() {
                  
                     // Add new incoming call to the telecom manager
                   //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
-                    pendingInvite = callInvite
-                    startForegroundService()
+                   
+                   
                     if (AppState.isFlutterForeground) {
                         Log.e(TAG, "APP IS RESUMED AND GOES HERE TO RING RING MTF")
 
@@ -369,6 +369,7 @@ class TVConnectionService : ConnectionService() {
                             }
                             play()
                         }
+                         pendingInvite = callInvite
                         // app is open → skip system UI, just notify your plugin
                         LocalBroadcastManager.getInstance(applicationContext)
                             .sendBroadcast(
@@ -378,8 +379,12 @@ class TVConnectionService : ConnectionService() {
                             )
 
                               return@let
+                    }else{
+                        telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+                        
                     }
-                      telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+                     startForegroundService()
+                      
 
                 }
 
