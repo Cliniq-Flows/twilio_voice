@@ -562,22 +562,10 @@ class TVConnectionService : ConnectionService() {
                     ringtone?.takeIf { it.isPlaying }?.stop()
                     ringtone = null
 
+                    // 2) If there was an unanswered `pendingInvite`, reject it
                     pendingInvite?.apply {
                         reject(applicationContext)
                         pendingInvite = null
-                        // Broadcast missed/ignored if you want
-                        LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
-                            Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL_IGNORED).apply {
-                                putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callSid)
-                                putExtra(
-                                    TVBroadcastReceiver.EXTRA_INCOMING_CALL_IGNORED_REASON,
-                                    arrayOf("User hung up before answer")
-                                )
-                            }
-                        )
-                        stopForegroundService()
-                        stopSelfSafe()
-                        return@let
                     }
 
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE)

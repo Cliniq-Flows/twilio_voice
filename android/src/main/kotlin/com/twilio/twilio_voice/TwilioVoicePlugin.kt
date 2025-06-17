@@ -1150,6 +1150,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun hangup() {
+
+
 val ctx = context
   if (ctx == null) {
     Log.e(TAG, "hangup(): Context is null, cannot hang up")
