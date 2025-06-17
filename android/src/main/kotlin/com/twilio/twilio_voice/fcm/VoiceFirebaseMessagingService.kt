@@ -125,10 +125,8 @@ class VoiceFirebaseMessagingService : FirebaseMessagingService(), MessageListene
             if(!shouldRejectOnNoPermissions) {
                 return
             }
-            
+
             Log.e(TAG, "onCallInvite: Rejecting incoming call\nSID: ${callInvite.callSid}")
-
-
 
             // send broadcast to TVBroadcastReceiver, we notify Flutter about incoming call
             Intent(applicationContext, TVBroadcastReceiver::class.java).apply {
@@ -145,59 +143,20 @@ class VoiceFirebaseMessagingService : FirebaseMessagingService(), MessageListene
             return
         }
 
-
-        if (AppState.isFlutterForeground) {
-            LocalBroadcastManager.getInstance(applicationContext)
-                .sendBroadcast(
-                    Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL).apply {
-                        putExtra(TVBroadcastReceiver.EXTRA_CALL_INVITE, callInvite)
-                        putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callInvite.callSid)
-                    }
-                )
-            return
-        }
-
-        // Otherwise hand off to your ConnectionService exactly once:
-        val svcIntent = Intent(applicationContext, TVConnectionService::class.java).apply {
+        // send broadcast to TVConnectionService, we notify the TelecomManager about incoming call
+        Intent(applicationContext, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_INCOMING_CALL
             putExtra(TVConnectionService.EXTRA_INCOMING_CALL_INVITE, callInvite)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            applicationContext.startForegroundService(svcIntent)
-        } else {
-            applicationContext.startService(svcIntent)
+            applicationContext.startService(this)
         }
 
-
-//        // send broadcast to TVConnectionService, we notify the TelecomManager about incoming call
-//        Intent(applicationContext, TVConnectionService::class.java).apply {
-//            action = TVConnectionService.ACTION_INCOMING_CALL
-//            putExtra(TVConnectionService.EXTRA_INCOMING_CALL_INVITE, callInvite)
-//            applicationContext.startService(this)
-//        }
-//
-//
-//
-//        // send broadcast to TVBroadcastReceiver, we notify Flutter about incoming call
-//        Intent(applicationContext, TVBroadcastReceiver::class.java).apply {
-//            action = TVBroadcastReceiver.ACTION_INCOMING_CALL
-//            putExtra(TVBroadcastReceiver.EXTRA_CALL_INVITE, callInvite)
-//            putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callInvite.callSid)
-//            LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(this)
-//        }
-//
-//        if (AppState.isFlutterForeground) {
-//
-//        // 1) Send a LocalBroadcast that TwilioVoicePlugin already knows how to handle:
-//             Log.d(TAG, "App in foreground → skipping native UI, broadcasting to plugin")
-//             LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
-//                 Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL).apply {
-//                     putExtra(TVBroadcastReceiver.EXTRA_CALL_INVITE, callInvite)
-//                     putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callInvite.callSid)
-//                 }
-//             )
-//        return
-//    }
+        // send broadcast to TVBroadcastReceiver, we notify Flutter about incoming call
+        Intent(applicationContext, TVBroadcastReceiver::class.java).apply {
+            action = TVBroadcastReceiver.ACTION_INCOMING_CALL
+            putExtra(TVBroadcastReceiver.EXTRA_CALL_INVITE, callInvite)
+            putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callInvite.callSid)
+            LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(this)
+        }
     }
 
     override fun onCancelledCallInvite(cancelledCallInvite: CancelledCallInvite, callException: CallException?) {
