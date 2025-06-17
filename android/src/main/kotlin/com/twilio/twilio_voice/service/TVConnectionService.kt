@@ -197,6 +197,8 @@ class TVConnectionService : ConnectionService() {
          * Extra used with [ACTION_TOGGLE_MUTE] to send additional parameters to the [TVCallConnection] active call.
          */
         const val EXTRA_MUTE_STATE: String = "EXTRA_MUTE_STATE"
+
+        const val ACTION_STOP_RINGTONE = "ACTION_STOP_RINGTONE"
         //endregion
 
         fun hasActiveCalls(): Boolean {
@@ -242,6 +244,11 @@ class TVConnectionService : ConnectionService() {
         super.onStartCommand(intent, flags, startId)
         intent?.let {
             when (it.action) {
+
+                ACTION_STOP_RINGTONE -> {
+                    stopRingtone()
+                }
+
                 ACTION_SEND_DIGITS -> {
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
                         Log.e(TAG, "onStartCommand: ACTION_SEND_DIGITS is missing String EXTRA_CALL_HANDLE")
