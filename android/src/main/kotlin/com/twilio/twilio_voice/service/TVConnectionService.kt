@@ -389,7 +389,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_ANSWER -> {
-
+                    it.setExtrasClassLoader(CallInvite::class.java.classLoader)
                     val invite =it.getParcelableExtraSafe<CallInvite>(EXTRA_INCOMING_CALL_INVITE)
 
                         ?: pendingInvite
