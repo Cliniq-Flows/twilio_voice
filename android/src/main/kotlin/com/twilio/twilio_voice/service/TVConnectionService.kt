@@ -261,8 +261,7 @@ class TVConnectionService : ConnectionService() {
                     // Load CancelledCallInvite class loader
                     // See: https://github.com/twilio/voice-quickstart-android/issues/561#issuecomment-1678613170
 
-                    ringtone?.takeIf { it.isPlaying }?.stop()
-                    ringtone = null
+                   stopRingtone()
                     storage.clearCustomParams()
 
                     pendingInvite?.apply {
@@ -382,18 +381,7 @@ class TVConnectionService : ConnectionService() {
                     if (AppState.isFlutterForeground) {
                         Log.e(TAG, "APP IS RESUMED AND GOES HERE TO RING RING MTF")
 
-                        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                        ringtone = RingtoneManager.getRingtone(applicationContext, uri)?.apply {
-//                            streamType = AudioManager.STREAM_RING
-                            audioAttributes = AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                                .build()
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                                isLooping = true
-                            }
-                            play()
-                        }
+                        playRingtone(applicationContext)
 
                         // app is open → skip system UI, just notify your plugin
                         LocalBroadcastManager.getInstance(applicationContext)
@@ -426,7 +414,8 @@ class TVConnectionService : ConnectionService() {
                     val conn = TVCallConnection(applicationContext)
                     conn.setInitialized()
                     conn.setDialing()
-                    ringtone?.stop(); ringtone = null
+
+                    stopRingtone()
 
                     val firstName = invite.customParameters["firstname"] ?: ""
                     val lastName = invite.customParameters["lastname"] ?: ""
@@ -559,8 +548,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_HANGUP -> {
-                    ringtone?.takeIf { it.isPlaying }?.stop()
-                    ringtone = null
+                    stopRingtone()
 
                     // 2) If there was an unanswered `pendingInvite`, reject it
                     pendingInvite?.apply {
@@ -852,6 +840,35 @@ class TVConnectionService : ConnectionService() {
         return START_STICKY
     }
     //endregion
+
+    private fun playRingtone(context: Context) {
+        // Try the “actual” default, fall back to notification tone if missing
+        val uri = RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_RINGTONE)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+        ringtone = try {
+            RingtoneManager.getRingtone(context, uri)?.apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    isLooping = true
+                }
+                audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+                play()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not load ringtone, skipping playback", e)
+            null
+        }
+    }
+
+    private  fun stopRingtone() {
+        ringtone?.takeIf { it.isPlaying }?.apply {
+            stop()
+        }
+        ringtone = null
+    }
 
     private fun joinConference(intent: Intent, conferenceName: String) {
         Log.d(TAG, "Joining conference: $conferenceName")
@@ -1318,6 +1335,7 @@ class TVConnectionService : ConnectionService() {
     )
     connection.setCallerDisplayName(name, TelecomManager.PRESENTATION_ALLOWED)
     }
+
 
 
 
