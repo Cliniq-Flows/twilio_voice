@@ -38,6 +38,7 @@ import com.twilio.twilio_voice.types.ContextExtension.appName
 import com.twilio.twilio_voice.types.ContextExtension.hasCallPhonePermission
 import com.twilio.twilio_voice.types.ContextExtension.hasManageOwnCallsPermission
 import com.twilio.twilio_voice.types.IntentExtension.getParcelableExtraSafe
+import com.twilio.twilio_voice.types.TVNativeCallActions
 import com.twilio.twilio_voice.types.TVNativeCallEvents
 import com.twilio.twilio_voice.types.TelecomManagerExtension.getPhoneAccountHandle
 import com.twilio.twilio_voice.types.TelecomManagerExtension.hasCallCapableAccount
@@ -503,7 +504,16 @@ class TVConnectionService : ConnectionService() {
                         attachCallEventListeners(conn, sid)
                     }
 
+                    LocalBroadcastManager.getInstance(applicationContext)
+                        .sendBroadcast(
+                            Intent(TVNativeCallActions.ACTION_ANSWERED).apply {
+                                putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, invite.callSid)
+                                putExtra(TVBroadcastReceiver.EXTRA_CALL_INVITE, invite)
+                            }
+                        )
+
                     pendingInvite = null
+
                     return@let
                 }else{
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: run {
