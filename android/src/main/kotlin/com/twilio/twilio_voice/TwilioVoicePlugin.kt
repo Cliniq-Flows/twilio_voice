@@ -1977,7 +1977,7 @@ private fun stopOutgoingRingtone() {
 //                callSid = null
                  // ── NEW: clear when call ends ─────────────────────────
             storage?.clearCustomParams()
-                Log.d(TAG, "handleBroadcastIntent: Call ended $callHandle")
+                Log.d(TAG, "handleBroadcastIntent: Call Ended $callHandle")
                 logEvent("", "Call Ended")
                 
                 

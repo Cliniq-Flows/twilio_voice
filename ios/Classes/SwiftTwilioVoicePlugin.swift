@@ -52,7 +52,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // MARK: — Ringback Tone Properties
     private var ringtonePlayer: AVAudioPlayer?
     private var isAppActive = false
-    var pendingInvite: CallInvite?
+   // var pendingInvite: CallInvite?
 
      // ——————————————————————————————————————
     // MARK: Shared-Prefs Helpers 🔥 NEW
@@ -174,24 +174,46 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let arguments:Dictionary<String, AnyObject> = flutterCall.arguments as! Dictionary<String, AnyObject>;
         
         if flutterCall.method == "tokens" {
-             guard let tokenString = arguments["accessToken"] as? String else {
-                self.sendPhoneCallEvents(description: "LOG|accessToken is missing or not a String", isError: true)
+             guard let token = arguments["accessToken"] as? String else {
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing accessToken", details: nil))
                 return
             }
-             self.accessToken = tokenString
-              if let existingToken = self.deviceToken {
-                self.sendPhoneCallEvents(description: "LOG|registering with Twilio (cached deviceToken)", isError: false)
-                TwilioVoiceSDK.register(accessToken: tokenString, deviceToken: existingToken) { error in
+            self.accessToken = token;
+            guard let deviceToken = deviceToken else {
+                self.sendPhoneCallEvents(description: "LOG|Device token is nil. Cannot register for VoIP push notifications.", isError: true)
+                return
+            }
+            if let token = accessToken {
+                self.sendPhoneCallEvents(description: "LOG|pushRegistry:attempting to register with twilio", isError: false)
+                TwilioVoiceSDK.register(accessToken: token, deviceToken: deviceToken) { (error) in
                     if let error = error {
-                        self.sendPhoneCallEvents(description: "LOG|Failed to register Twilio (cached): \(error.localizedDescription)", isError: false)
-                    } else {
-                        self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP pushes (cached).", isError: false)
+                        self.sendPhoneCallEvents(description: "LOG|An error occurred while registering: \(error.localizedDescription)", isError: false)
+                    }
+                    else {
+                        self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP push notifications.", isError: false)
                     }
                 }
-                return
             }
-            self.sendPhoneCallEvents(description: "LOG|deviceToken is nil – asking APNs for new VoIP push token…", isError: false)
-            voipRegistry.desiredPushTypes = [.voIP]
+             voipRegistry.desiredPushTypes = [.voIP]
+            //  guard let tokenString = arguments["accessToken"] as? String else {
+            //     self.sendPhoneCallEvents(description: "LOG|accessToken is missing or not a String", isError: true)
+            //     return
+            // }
+            //  self.accessToken = tokenString
+            //   if let existingToken = self.deviceToken {
+            //     self.sendPhoneCallEvents(description: "LOG|registering with Twilio (cached deviceToken)", isError: false)
+            //     TwilioVoiceSDK.register(accessToken: tokenString, deviceToken: existingToken) { error in
+            //         if let error = error {
+            //             self.sendPhoneCallEvents(description: "LOG|Failed to register Twilio (cached): \(error.localizedDescription)", isError: false)
+            //         } else {
+            //             self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP pushes (cached).", isError: false)
+            //         }
+            //     }
+            //     return
+            // }
+            // self.sendPhoneCallEvents(description: "LOG|deviceToken is nil – asking APNs for new VoIP push token…", isError: false)
+            // voipRegistry.desiredPushTypes = [.voIP]
+
             // guard let token = arguments["accessToken"] as? String else {return}
             // self.accessToken = token
             // if let deviceToken = deviceToken, let token = accessToken {
@@ -717,8 +739,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         
         // Wipe out cached token + binding date
-        UserDefaults.standard.removeObject(forKey: kCachedDeviceToken)
-        UserDefaults.standard.removeObject(forKey: kCachedBindingDate)
+        // UserDefaults.standard.removeObject(forKey: kCachedDeviceToken)
+        // UserDefaults.standard.removeObject(forKey: kCachedBindingDate)
         self.deviceToken = nil
         
         // Force PushKit to drop & fetch a fresh token
@@ -867,7 +889,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // Mark that we’re rejecting, so callDidDisconnect won’t fire “Call Ended”
     isRejectingCallInvite = true
     performEndCallAction(uuid: ci.uuid)
-    stopRingbackTone()
+  //  stopRingbackTone()
     }
     
     func showMissedCallNotification(from:String?, to:String?){
@@ -991,8 +1013,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
 
     // 4) Reset your flags + references:
-     pendingInvite = nil
-     stopRingbackTone()
+    // pendingInvite = nil
+   //  stopRingbackTone()
     isRejectingCallInvite = false
     userInitiatedDisconnect = false
     self.call               = nil
@@ -1166,21 +1188,21 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         self.sendPhoneCallEvents(description: "LOG|provider:performAnswerCallAction:", isError: false)
         
-        if isAppActive, let ci = pendingInvite {
-        // Stop ringtone
-       stopRingbackTone()
+    //     if isAppActive, let ci = pendingInvite {
+    //     // Stop ringtone
+    //   // stopRingbackTone()
 
-        // Accept directly on Twilio
-        let acceptOptions = AcceptOptions(callInvite: ci) { builder in
-            builder.uuid = ci.uuid
-        }
-        let twilioCall = ci.accept(options: acceptOptions, delegate: self)
-        self.call = twilioCall
-        pendingInvite = nil
+    //     // Accept directly on Twilio
+    //     let acceptOptions = AcceptOptions(callInvite: ci) { builder in
+    //         builder.uuid = ci.uuid
+    //     }
+    //     let twilioCall = ci.accept(options: acceptOptions, delegate: self)
+    //     self.call = twilioCall
+    //     pendingInvite = nil
 
-        action.fulfill()
-        return
-    }
+    //     action.fulfill()
+    //     return
+    // }
         
         self.performAnswerVoiceCall(uuid: action.callUUID) { (success) in
             if success {
@@ -1196,14 +1218,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         self.sendPhoneCallEvents(description: "LOG|provider:performEndCallAction:", isError: false)
         
-        if isAppActive, let ci = pendingInvite {
-        // Reject invite
-        stopRingbackTone()
-        ci.reject()
-        pendingInvite = nil
-        action.fulfill()
-        return
-    }    
+    //     if isAppActive, let ci = pendingInvite {
+    //     // Reject invite
+    //     stopRingbackTone()
+    //     ci.reject()
+    //     pendingInvite = nil
+    //     action.fulfill()
+    //     return
+    // }    
 
 
         if (self.callInvite != nil) {
