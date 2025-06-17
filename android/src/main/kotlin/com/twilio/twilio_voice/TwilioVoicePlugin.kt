@@ -1181,11 +1181,12 @@ val ctx = context
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_HANGUP
             putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ctx.startForegroundService(this)
-            } else {
-                ctx.startService(this)
-            }
+            ctx.startService(this)
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//                ctx.startForegroundService(this)
+//            } else {
+//                ctx.startService(this)
+//            }
         }
 //  Intent(ctx, TVConnectionService::class.java).apply {
 //    action = TVConnectionService.ACTION_HANGUP
