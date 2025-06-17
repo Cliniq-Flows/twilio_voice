@@ -385,7 +385,7 @@ class TVConnectionService : ConnectionService() {
 
                 ACTION_ANSWER -> {
 
-                if (pendingInvite != null) {
+                if (AppState.isFlutterForeground) {
                     val conn = TVCallConnection(applicationContext)
                     conn.setInitialized()
                     conn.setDialing()
