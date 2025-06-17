@@ -177,11 +177,11 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         override fun onActivityCreated(a: Activity, b: Bundle?) {}
         override fun onActivityStarted(a: Activity) {}
         override fun onActivityResumed(a: Activity) {
-            if (a == activity)  AppState.isFlutterForeground = true
+          
         }
 
         override fun onActivityPaused(a: Activity) {
-            if (a == activity) AppState.isFlutterForeground = false
+          
         }
         override fun onActivityStopped(a: Activity) {}
         override fun onActivitySaveInstanceState(a: Activity, b: Bundle) {}
@@ -1529,6 +1529,8 @@ private fun stopOutgoingRingtone() {
         activity = activityPluginBinding.activity
         activityPluginBinding.addOnNewIntentListener(this)
         activityPluginBinding.addRequestPermissionsResultListener(this)
+        activityPluginBinding.addOnResumeListener { AppState.isFlutterForeground = true }
+        activityPluginBinding.addOnPauseListener  { AppState.isFlutterForeground = false }
         registerReceiver()
     }
 
