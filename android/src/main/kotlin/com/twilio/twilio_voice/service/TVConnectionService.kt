@@ -277,7 +277,7 @@ class TVConnectionService : ConnectionService() {
                         Log.e(TAG, "onStartCommand: 'ACTION_INCOMING_CALL' is missing parcelable 'EXTRA_INCOMING_CALL_INVITE'")
                         return@let
                     }
-                    pendingInvite = callInvite
+
 
                     // Extract firstname and lastname from the custom parameters (if available)
                     val firstName = callInvite.customParameters["firstname"] ?: ""
@@ -352,6 +352,8 @@ class TVConnectionService : ConnectionService() {
                  
                     // Add new incoming call to the telecom manager
                   //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+                    pendingInvite = callInvite
+                    startForegroundService()
                     if (AppState.isFlutterForeground) {
                         Log.e(TAG, "APP IS RESUMED AND GOES HERE TO RING RING MTF")
 
@@ -488,13 +490,7 @@ class TVConnectionService : ConnectionService() {
                         attachCallEventListeners(conn, sid)
                     }
 
-//                    val connect = TVCallConnection(applicationContext).apply {
-//                        this.twilioCall = twilioCall
-//                    }
-//                    activeConnections[twilioCall.sid!!] = connect
-//                    attachCallEventListeners(connect, twilioCall.sid!!)
                     pendingInvite = null
-//                    startForegroundService()
                     return@let
                 }else{
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: run {
