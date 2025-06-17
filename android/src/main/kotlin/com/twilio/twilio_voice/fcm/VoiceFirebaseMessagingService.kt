@@ -161,10 +161,20 @@ class VoiceFirebaseMessagingService : FirebaseMessagingService(), MessageListene
        
 
         // send broadcast to TVConnectionService, we notify the TelecomManager about incoming call
-        Intent(applicationContext, TVConnectionService::class.java).apply {
-            action = TVConnectionService.ACTION_INCOMING_CALL
-            putExtra(TVConnectionService.EXTRA_INCOMING_CALL_INVITE, callInvite)
-            applicationContext.startService(this)
+        // Intent(applicationContext, TVConnectionService::class.java).apply {
+        //     action = TVConnectionService.ACTION_INCOMING_CALL
+        //     putExtra(TVConnectionService.EXTRA_INCOMING_CALL_INVITE, callInvite)
+        //     applicationContext.startService(this)
+        // }
+
+        val svcIntent = Intent(applicationContext, TVConnectionService::class.java).apply {
+        action = TVConnectionService.ACTION_INCOMING_CALL
+        putExtra(TVConnectionService.EXTRA_INCOMING_CALL_INVITE, callInvite)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            applicationContext.startForegroundService(svcIntent)
+        } else {
+            applicationContext.startService(svcIntent)
         }
 
        
