@@ -400,10 +400,11 @@ class TVConnectionService : ConnectionService() {
 
                               return@let
                     }else{
+
                         telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
                         
                     }
-                     startForegroundService()
+
                       
 
                 }
