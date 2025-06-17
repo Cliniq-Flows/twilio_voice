@@ -354,6 +354,7 @@ class TVConnectionService : ConnectionService() {
                   //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
 
                     pendingInvite = callInvite
+                    Log.e(TAG, "APP IS RESUMED AND GOES HERE TO RING RING MTF ${AppState.isFlutterForeground}")
                     if (AppState.isFlutterForeground) {
                         Log.e(TAG, "APP IS RESUMED AND GOES HERE TO RING RING MTF")
 
