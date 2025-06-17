@@ -353,7 +353,7 @@ class TVConnectionService : ConnectionService() {
                     // Add new incoming call to the telecom manager
                   //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
                     if (AppState.isFlutterForeground) {
-                        Log.e(TAG, "APP IS RESUMED AND GOES HERE TO RING RING")
+                        Log.e(TAG, "APP IS RESUMED AND GOES HERE TO RING RING MTF")
 
                         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
                         ringtone = RingtoneManager.getRingtone(applicationContext, uri)?.apply {
