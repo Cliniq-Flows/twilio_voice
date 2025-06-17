@@ -177,10 +177,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         override fun onActivityCreated(a: Activity, b: Bundle?) {}
         override fun onActivityStarted(a: Activity) {}
         override fun onActivityResumed(a: Activity) {
-            if (a == activity) {
-                AppState.isFlutterForeground = true
-               Log.d(TAG, "FlutterForeground? $AppState.isFlutterForeground")
-            }
+            if (a == activity)  AppState.isFlutterForeground = true
         }
 
         override fun onActivityPaused(a: Activity) {

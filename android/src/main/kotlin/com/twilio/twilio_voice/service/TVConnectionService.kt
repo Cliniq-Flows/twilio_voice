@@ -348,11 +348,11 @@ class TVConnectionService : ConnectionService() {
                     }
 
 
-
+                   pendingInvites[callInvite.callSid] = callInvite
                     // Add new incoming call to the telecom manager
                   //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
                     if (AppState.isFlutterForeground) {
-                         pendingInvite = callInvite
+                       
                           val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
                         ringtone = RingtoneManager.getRingtone(applicationContext, uri)?.apply {
 //                            streamType = AudioManager.STREAM_RING
