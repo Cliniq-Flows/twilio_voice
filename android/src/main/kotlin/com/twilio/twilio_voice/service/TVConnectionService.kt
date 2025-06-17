@@ -260,22 +260,59 @@ class TVConnectionService : ConnectionService() {
                 ACTION_CANCEL_CALL_INVITE -> {
                     // Load CancelledCallInvite class loader
                     // See: https://github.com/twilio/voice-quickstart-android/issues/561#issuecomment-1678613170
+//                    it.setExtrasClassLoader(CallInvite::class.java.classLoader)
+//                    val cancelledCallInvite = it.getParcelableExtraSafe<CancelledCallInvite>(EXTRA_CANCEL_CALL_INVITE) ?: run {
+//                        Log.e(TAG, "onStartCommand: ACTION_CANCEL_CALL_INVITE is missing parcelable EXTRA_CANCEL_CALL_INVITE")
+//                        return@let
+//                    }
+//                    ringtone?.let {
+//                    if (it.isPlaying) it.stop()
+//                    ringtone = null
+//                    }
+//                    // 2) clear out the pending invite so ACTION_ANSWER won't pick it up
+//                    pendingInvite = null
+//                     storage.clearCustomParams()
+//                    val callHandle = cancelledCallInvite.callSid
+//                    getConnection(callHandle)?.onAbort() ?: run {
+//                        Log.e(TAG, "onStartCommand: [ACTION_CANCEL_CALL_INVITE] could not find connection for callHandle: $callHandle")
+//                    }
                     it.setExtrasClassLoader(CallInvite::class.java.classLoader)
-                    val cancelledCallInvite = it.getParcelableExtraSafe<CancelledCallInvite>(EXTRA_CANCEL_CALL_INVITE) ?: run {
-                        Log.e(TAG, "onStartCommand: ACTION_CANCEL_CALL_INVITE is missing parcelable EXTRA_CANCEL_CALL_INVITE")
-                        return@let
-                    }
-                    ringtone?.let {
-                    if (it.isPlaying) it.stop()
+                    val cancelled = it.getParcelableExtraSafe<CancelledCallInvite>(EXTRA_CANCEL_CALL_INVITE)
+                        ?: run {
+                            Log.e(TAG, "onStartCommand: ACTION_CANCEL_CALL_INVITE missing EXTRA_CANCEL_CALL_INVITE")
+                            return@let
+                        }
+
+                    // 2) Stop & clear any ringing
+                    ringtone?.takeIf { it.isPlaying }?.stop()
                     ringtone = null
-                    }
-                    // 2) clear out the pending invite so ACTION_ANSWER won't pick it up
+
+                    // 3) Clear out the pending invite & saved params so ANSWER won’t pick it up
                     pendingInvite = null
-                     storage.clearCustomParams()
-                    val callHandle = cancelledCallInvite.callSid
-                    getConnection(callHandle)?.onAbort() ?: run {
-                        Log.e(TAG, "onStartCommand: [ACTION_CANCEL_CALL_INVITE] could not find connection for callHandle: $callHandle")
+                    storage.clearCustomParams()
+
+                    // 4) Optionally let Flutter/UI know the call was ignored
+                    LocalBroadcastManager.getInstance(applicationContext)
+                        .sendBroadcast(
+                            Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL_IGNORED).apply {
+                                putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, cancelled.callSid)
+                                putExtra(
+                                    TVBroadcastReceiver.EXTRA_INCOMING_CALL_IGNORED_REASON,
+                                    arrayOf("Remote party cancelled")
+                                )
+                            }
+                        )
+
+                    // 5) If you ever created a half-built Connection for this SID, tear it down
+                    getConnection(cancelled.callSid)?.let { conn ->
+                        conn.setDisconnected(DisconnectCause(DisconnectCause.CANCELED))
+                        conn.destroy()
+                        activeConnections.remove(cancelled.callSid)
                     }
+
+                    // 6) If there are no more calls, drop out of foreground
+                    stopForegroundService()
+                    stopSelfSafe()
                 }
 
                 ACTION_INCOMING_CALL -> {
@@ -542,17 +579,40 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_HANGUP -> {
-                    ringtone?.stop(); ringtone = null
-                    storage.clearCustomParams()
-  val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE)
-                 ?: getActiveCallHandle() ?: return@let
+                    ringtone?.takeIf { it.isPlaying }?.stop()
+                    ringtone = null
 
-  val connection = getConnection(callHandle)
-  if (connection != null) {
-    connection.disconnect() // this kicks off your onCallDisconnected callback
-  } else {
-    Log.e(TAG, "hangup(): could not find connection for $callHandle")
-  }
+                    // 2) Clear stored pending invite & custom params
+                    pendingInvite = null
+                    storage.clearCustomParams()
+
+                    // 3) Figure out which handle to hang up (incoming or active)
+                    val handle = it.getStringExtra(EXTRA_CALL_HANDLE)
+                        ?: getIncomingCallHandle()
+                        ?: getActiveCallHandle()
+                    if (handle == null) {
+                        Log.w(TAG, "hangup/cancel: no call handle to work with")
+                    } else {
+                        // 4) If there’s a live Connection, tell it to disconnect
+                        getConnection(handle)?.let { conn ->
+                            conn.disconnect()  // this will fire your disconnect callbacks
+                        } ?: Log.e(TAG, "hangup/cancel: no Connection for handle $handle")
+                    }
+
+                    // 5) Tear down your foreground service if nothing is left
+                    stopForegroundService()
+                    stopSelfSafe()
+//                    ringtone?.stop(); ringtone = null
+//                    storage.clearCustomParams()
+//  val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE)
+//                 ?: getActiveCallHandle() ?: return@let
+//
+//  val connection = getConnection(callHandle)
+//  if (connection != null) {
+//    connection.disconnect() // this kicks off your onCallDisconnected callback
+//  } else {
+//    Log.e(TAG, "hangup(): could not find connection for $callHandle")
+//  }
                 //     storage.clearCustomParams()
                 //      val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
                 //         Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
