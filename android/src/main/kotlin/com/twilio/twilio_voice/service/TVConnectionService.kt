@@ -265,6 +265,12 @@ class TVConnectionService : ConnectionService() {
                         Log.e(TAG, "onStartCommand: ACTION_CANCEL_CALL_INVITE is missing parcelable EXTRA_CANCEL_CALL_INVITE")
                         return@let
                     }
+                    ringtone?.let {
+                    if (it.isPlaying) it.stop()
+                    ringtone = null
+                    }
+                    // 2) clear out the pending invite so ACTION_ANSWER won't pick it up
+                    pendingInvite = null
                      storage.clearCustomParams()
                     val callHandle = cancelledCallInvite.callSid
                     getConnection(callHandle)?.onAbort() ?: run {
