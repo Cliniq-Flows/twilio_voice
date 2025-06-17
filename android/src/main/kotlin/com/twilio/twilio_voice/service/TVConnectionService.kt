@@ -260,22 +260,39 @@ class TVConnectionService : ConnectionService() {
                 ACTION_CANCEL_CALL_INVITE -> {
                     // Load CancelledCallInvite class loader
                     // See: https://github.com/twilio/voice-quickstart-android/issues/561#issuecomment-1678613170
+
+                    ringtone?.takeIf { it.isPlaying }?.stop()
+                    ringtone = null
+                    storage.clearCustomParams()
+
+                    pendingInvite?.apply {
+                        reject(applicationContext)
+                        LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
+                            Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL_IGNORED).apply {
+                                putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callSid)
+                                putExtra(
+                                    TVBroadcastReceiver.EXTRA_INCOMING_CALL_IGNORED_REASON,
+                                    arrayOf("User declined before answer")
+                                )
+                            }
+                        )
+                    }
+                    pendingInvite = null
+
                     it.setExtrasClassLoader(CallInvite::class.java.classLoader)
                     val cancelledCallInvite = it.getParcelableExtraSafe<CancelledCallInvite>(EXTRA_CANCEL_CALL_INVITE) ?: run {
                         Log.e(TAG, "onStartCommand: ACTION_CANCEL_CALL_INVITE is missing parcelable EXTRA_CANCEL_CALL_INVITE")
                         return@let
                     }
-                    ringtone?.let {
-                    if (it.isPlaying) it.stop()
-                    ringtone = null
-                    }
+
                     // 2) clear out the pending invite so ACTION_ANSWER won't pick it up
-                    pendingInvite = null
-                     storage.clearCustomParams()
+
+                    storage.clearCustomParams()
                     val callHandle = cancelledCallInvite.callSid
                     getConnection(callHandle)?.onAbort() ?: run {
                         Log.e(TAG, "onStartCommand: [ACTION_CANCEL_CALL_INVITE] could not find connection for callHandle: $callHandle")
                     }
+
                 }
 
                 ACTION_INCOMING_CALL -> {
@@ -545,19 +562,17 @@ class TVConnectionService : ConnectionService() {
                     ringtone?.takeIf { it.isPlaying }?.stop()
                     ringtone = null
 
-
-
-
-                    pendingInvite?.let { invite ->
-                        invite.reject(applicationContext)
+                    pendingInvite?.apply {
+                        reject(applicationContext)
                         pendingInvite = null
-
-                        // Optionally broadcast “call ignored”
+                        // Broadcast missed/ignored if you want
                         LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(
                             Intent(TVBroadcastReceiver.ACTION_INCOMING_CALL_IGNORED).apply {
-                                putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, invite.callSid)
-                                putExtra(TVBroadcastReceiver.EXTRA_INCOMING_CALL_IGNORED_REASON,
-                                    arrayOf("Local user declined before answer"))
+                                putExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE, callSid)
+                                putExtra(
+                                    TVBroadcastReceiver.EXTRA_INCOMING_CALL_IGNORED_REASON,
+                                    arrayOf("User hung up before answer")
+                                )
                             }
                         )
                         stopForegroundService()

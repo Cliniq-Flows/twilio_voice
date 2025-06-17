@@ -1164,11 +1164,20 @@ val ctx = context
   }
 
   Log.d(TAG, "hangup(): sending ACTION_HANGUP for $sid")
-  Intent(ctx, TVConnectionService::class.java).apply {
-    action = TVConnectionService.ACTION_HANGUP
-    putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-    ctx.startService(this)
-  }
+        Intent(ctx, TVConnectionService::class.java).apply {
+            action = TVConnectionService.ACTION_HANGUP
+            putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ctx.startForegroundService(this)
+            } else {
+                ctx.startService(this)
+            }
+        }
+//  Intent(ctx, TVConnectionService::class.java).apply {
+//    action = TVConnectionService.ACTION_HANGUP
+//    putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+//    ctx.startService(this)
+//  }
         
 
 
