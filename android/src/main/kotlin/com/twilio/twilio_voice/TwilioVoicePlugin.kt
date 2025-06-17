@@ -1150,44 +1150,33 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun hangup() {
+        val ctx = context
+        if (ctx == null) {
+            Log.e(TAG, "hangup(): Context is null, cannot hang up")
+            return
+        }
 
-
-
-
-
-
-val ctx = context
-
-        // Always make the service stop the ringtone & clear pendingInvite right away:
+        // 1) Stop any playing ringtone immediately
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_STOP_RINGTONE
-        }.let {
+        }.also { ctx.startService(it) }
 
+        // 2) Clear any pending invite JSON you may have stored
+        storage?.clearCustomParams()
+
+        // 3) Figure out which call SID to hang up
+        val sid = TVConnectionService.getActiveCallHandle()
+        if (sid.isNullOrBlank()) {
+            Log.w(TAG, "hangup(): no active call SID to hang up")
+            return
         }
-  if (ctx == null) {
-    Log.e(TAG, "hangup(): Context is null, cannot hang up")
-    return
-  }
 
-
-  // first prefer the plugin’s stored SID, then fallback to the service’s
-  val sid =  TVConnectionService.getActiveCallHandle()
-  if (sid == null) {
-    Log.w(TAG, "hangup(): no active call SID to hang up")
-    return
-  }
-
-  Log.d(TAG, "hangup(): sending ACTION_HANGUP for $sid")
+        // 4) Tell your ConnectionService to tear down that call
+        Log.d(TAG, "hangup(): sending ACTION_HANGUP for $sid")
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_HANGUP
             putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-            ctx.startService(this)
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//                ctx.startForegroundService(this)
-//            } else {
-//                ctx.startService(this)
-//            }
-        }
+        }.also { ctx.startService(it) }
 //  Intent(ctx, TVConnectionService::class.java).apply {
 //    action = TVConnectionService.ACTION_HANGUP
 //    putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
