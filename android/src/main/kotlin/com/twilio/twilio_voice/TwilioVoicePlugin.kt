@@ -1150,65 +1150,43 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     }
 
     private fun hangup() {
-        val ctx = context ?: run {
-            Log.e(TAG, "hangup(): Context is null, cannot hang up")
-            return
-        }
+
+
+
+
+
+
+val ctx = context
 
         // Always make the service stop the ringtone & clear pendingInvite right away:
         Intent(ctx, TVConnectionService::class.java).apply {
             action = TVConnectionService.ACTION_STOP_RINGTONE
         }.let {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(it)
-            else                                   ctx.startService(it)
-        }
 
-        // Then figure out if there's an _active_ call or not:
-        val sid = TVConnectionService.getActiveCallHandle()
-        if (sid != null) {
-            Log.d(TAG, "hangup(): sending ACTION_HANGUP for $sid")
-            Intent(ctx, TVConnectionService::class.java).apply {
-                action = TVConnectionService.ACTION_HANGUP
-                putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-            }.let {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(it)
-                else                                   ctx.startService(it)
-            }
-        } else {
-            // no live call to hang up → just tear down any native UI
-            Log.d(TAG, "hangup(): no active call, tearing down native UI")
-            Intent(ctx, TVConnectionService::class.java).apply {
-                action = TVConnectionService.ACTION_TEAR_DOWN_NATIVE_UI
-            }.let {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(it)
-                else                                   ctx.startService(it)
+        }
+  if (ctx == null) {
+    Log.e(TAG, "hangup(): Context is null, cannot hang up")
+    return
+  }
+
+
+  // first prefer the plugin’s stored SID, then fallback to the service’s
+  val sid =  TVConnectionService.getActiveCallHandle()
+  if (sid == null) {
+    Log.w(TAG, "hangup(): no active call SID to hang up")
+    return
+  }
+
+  Log.d(TAG, "hangup(): sending ACTION_HANGUP for $sid")
+        Intent(ctx, TVConnectionService::class.java).apply {
+            action = TVConnectionService.ACTION_HANGUP
+            putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ctx.startForegroundService(this)
+            } else {
+                ctx.startService(this)
             }
         }
-
-//
-//val ctx = context
-//  if (ctx == null) {
-//    Log.e(TAG, "hangup(): Context is null, cannot hang up")
-//    return
-//  }
-//
-//  // first prefer the plugin’s stored SID, then fallback to the service’s
-//  val sid =  TVConnectionService.getActiveCallHandle()
-//  if (sid == null) {
-//    Log.w(TAG, "hangup(): no active call SID to hang up")
-//    return
-//  }
-//
-//  Log.d(TAG, "hangup(): sending ACTION_HANGUP for $sid")
-//        Intent(ctx, TVConnectionService::class.java).apply {
-//            action = TVConnectionService.ACTION_HANGUP
-//            putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//                ctx.startForegroundService(this)
-//            } else {
-//                ctx.startService(this)
-//            }
-//        }
 //  Intent(ctx, TVConnectionService::class.java).apply {
 //    action = TVConnectionService.ACTION_HANGUP
 //    putExtra(TVConnectionService.EXTRA_CALL_HANDLE, sid)

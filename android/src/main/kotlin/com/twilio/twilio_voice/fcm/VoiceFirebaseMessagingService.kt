@@ -166,12 +166,12 @@ class VoiceFirebaseMessagingService : FirebaseMessagingService(), MessageListene
             putExtra(TVConnectionService.EXTRA_CANCEL_CALL_INVITE, cancelledCallInvite)
 //            applicationContext.startService(this)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                applicationContext.startForegroundService(this) // Ensure it's started as a foreground service
-//                if (AppState.isFlutterForeground) {
-//                    applicationContext.startForegroundService(this)
-//                } else {
-//                    applicationContext.startService(this)
-//                }
+              //  applicationContext.startForegroundService(this) // Ensure it's started as a foreground service
+                if (AppState.isFlutterForeground) {
+                    applicationContext.startForegroundService(this)
+                } else {
+                    applicationContext.startService(this)
+                }
             } else {
                 applicationContext.startService(this)
             }
