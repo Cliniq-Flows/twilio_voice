@@ -22,6 +22,8 @@ import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.twilio.twilio_voice.constants.Constants
 import com.twilio.twilio_voice.constants.FlutterErrorCodes
@@ -1529,8 +1531,18 @@ private fun stopOutgoingRingtone() {
         activity = activityPluginBinding.activity
         activityPluginBinding.addOnNewIntentListener(this)
         activityPluginBinding.addRequestPermissionsResultListener(this)
-        activityPluginBinding.addOnResumeListener { AppState.isFlutterForeground = true }
-        activityPluginBinding.addOnPauseListener  { AppState.isFlutterForeground = false }
+        if (activity is LifecycleOwner) {
+            (activity as LifecycleOwner).lifecycle.addObserver(object : DefaultLifecycleObserver {
+                override fun onResume(owner: LifecycleOwner) {
+                    AppState.isFlutterForeground = true
+                    Log.e(TAG, "App is RESUMED FLUTTER ACTIVITY NATIVE")
+                }
+                override fun onPause(owner: LifecycleOwner) {
+                    AppState.isFlutterForeground = false
+                    Log.e(TAG, "App is PAUSE FLUTTER ACTIVITY NATIVE")
+                }
+            })
+        }
         registerReceiver()
     }
 

@@ -277,6 +277,7 @@ class TVConnectionService : ConnectionService() {
                         Log.e(TAG, "onStartCommand: 'ACTION_INCOMING_CALL' is missing parcelable 'EXTRA_INCOMING_CALL_INVITE'")
                         return@let
                     }
+                      pendingInvites = callInvite
 
                     // Extract firstname and lastname from the custom parameters (if available)
                     val firstName = callInvite.customParameters["firstname"] ?: ""
@@ -348,7 +349,7 @@ class TVConnectionService : ConnectionService() {
                     }
 
 
-                   pendingInvites[callInvite.callSid] = callInvite
+                 
                     // Add new incoming call to the telecom manager
                   //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
                     if (AppState.isFlutterForeground) {
