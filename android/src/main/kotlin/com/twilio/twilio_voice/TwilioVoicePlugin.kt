@@ -179,11 +179,11 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         override fun onActivityCreated(a: Activity, b: Bundle?) {}
         override fun onActivityStarted(a: Activity) {}
         override fun onActivityResumed(a: Activity) {
-          
+            AppState.isFlutterForeground = true
         }
 
         override fun onActivityPaused(a: Activity) {
-          
+            AppState.isFlutterForeground = false
         }
         override fun onActivityStopped(a: Activity) {}
         override fun onActivitySaveInstanceState(a: Activity, b: Bundle) {}
@@ -1531,18 +1531,18 @@ private fun stopOutgoingRingtone() {
         activity = activityPluginBinding.activity
         activityPluginBinding.addOnNewIntentListener(this)
         activityPluginBinding.addRequestPermissionsResultListener(this)
-        if (activity is LifecycleOwner) {
-            (activity as LifecycleOwner).lifecycle.addObserver(object : DefaultLifecycleObserver {
-                override fun onResume(owner: LifecycleOwner) {
-                    AppState.isFlutterForeground = true
-                    Log.e(TAG, "App is RESUMED FLUTTER ACTIVITY NATIVE")
-                }
-                override fun onPause(owner: LifecycleOwner) {
-                    AppState.isFlutterForeground = false
-                    Log.e(TAG, "App is PAUSE FLUTTER ACTIVITY NATIVE")
-                }
-            })
-        }
+//        if (activity is LifecycleOwner) {
+//            (activity as LifecycleOwner).lifecycle.addObserver(object : DefaultLifecycleObserver {
+//                override fun onResume(owner: LifecycleOwner) {
+//                    AppState.isFlutterForeground = true
+//                    Log.e(TAG, "App is RESUMED FLUTTER ACTIVITY NATIVE")
+//                }
+//                override fun onPause(owner: LifecycleOwner) {
+//                    AppState.isFlutterForeground = false
+//                    Log.e(TAG, "App is PAUSE FLUTTER ACTIVITY NATIVE")
+//                }
+//            })
+//        }
         registerReceiver()
     }
 

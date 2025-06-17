@@ -352,8 +352,8 @@ class TVConnectionService : ConnectionService() {
                  
                     // Add new incoming call to the telecom manager
                   //  telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
-                   
-                   
+
+                    pendingInvite = callInvite
                     if (AppState.isFlutterForeground) {
                         Log.e(TAG, "APP IS RESUMED AND GOES HERE TO RING RING MTF")
 
@@ -369,7 +369,7 @@ class TVConnectionService : ConnectionService() {
                             }
                             play()
                         }
-                         pendingInvite = callInvite
+
                         // app is open → skip system UI, just notify your plugin
                         LocalBroadcastManager.getInstance(applicationContext)
                             .sendBroadcast(
@@ -390,12 +390,19 @@ class TVConnectionService : ConnectionService() {
 
                 ACTION_ANSWER -> {
 
+                    val invite =it.getParcelableExtraSafe<CallInvite>(EXTRA_INCOMING_CALL_INVITE)
+
+                        ?: pendingInvite
+                        ?: run {
+                            Log.e(TAG, "ACTION_ANSWER but no CallInvite available")
+                            return@let
+                        }
                 if (AppState.isFlutterForeground) {
                     val conn = TVCallConnection(applicationContext)
                     conn.setInitialized()
                     conn.setDialing()
                     ringtone?.stop(); ringtone = null
-                    val invite = pendingInvite!!
+
                     val firstName = invite.customParameters["firstname"] ?: ""
                     val lastName = invite.customParameters["lastname"] ?: ""
                     var from = "$firstName $lastName".trim()
