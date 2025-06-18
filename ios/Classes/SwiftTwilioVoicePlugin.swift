@@ -319,23 +319,24 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             eventSink(!isOnHold ? "Hold" : "Unhold")
         }
         else if flutterCall.method == "answer" {
-            // nuthin
+           if(self.callInvite != nil) {
+                let ci = self.callInvite!
+                self.sendPhoneCallEvents(description: "LOG|answer method invoked", isError: false)
+                self.answerCall(callInvite: ci)
+            } else {
+                let ferror: FlutterError = FlutterError(code: "ANSWER_ERROR", message: "No call invite to answer", details: nil)
+                _result!(ferror)
+            }
         }
         else if flutterCall.method == "unregister" {
-            // guard let deviceToken = deviceToken else {
-            //     return
-            // }
-            // if let token = arguments["accessToken"] as? String{
-            //     self.unregisterTokens(token: token, deviceToken: deviceToken)
-            // }else if let token = accessToken{
-            //     self.unregisterTokens(token: token, deviceToken: deviceToken)
-            // }
-            if let cachedToken = self.deviceToken {
-                if let token = arguments["accessToken"] as? String {
-                    self.unregisterTokens(token: token, deviceToken: cachedToken)
-                } else if let token = self.accessToken {
-                    self.unregisterTokens(token: token, deviceToken: cachedToken)
-                }
+            
+             guard let deviceToken = deviceToken else {
+                return
+            }
+            if let token = arguments["accessToken"] as? String{
+                self.unregisterTokens(token: token, deviceToken: deviceToken)
+            }else if let token = accessToken{
+                self.unregisterTokens(token: token, deviceToken: deviceToken)
             }
             
         }else if flutterCall.method == "hangUp"{
@@ -346,14 +347,22 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         //         performEndCallAction(uuid: self.call!.uuid!)
         //         //self.toggleUIState(isEnabled: false, showCallControl: false)
         //    }
-        if let currentCall = self.call {
-        // 1) Tell Twilio’s Call object to disconnect (this will trigger callDidDisconnect(_:))
-        self.sendPhoneCallEvents(description: "LOG|hangUp method invoked", isError: false)
-        self.userInitiatedDisconnect = true
-        currentCall.disconnect()
+        // if let currentCall = self.call {
+        // // 1) Tell Twilio’s Call object to disconnect (this will trigger callDidDisconnect(_:))
+        // self.sendPhoneCallEvents(description: "LOG|hangUp method invoked", isError: false)
+        // self.userInitiatedDisconnect = true
+        // currentCall.disconnect()
 
-        // 2) Immediately end the CallKit call so the native in-call UI goes away at once
-        performEndCallAction(uuid: currentCall.uuid!)
+        // // 2) Immediately end the CallKit call so the native in-call UI goes away at once
+        // performEndCallAction(uuid: currentCall.uuid!)
+        if (self.call != nil) {
+                self.sendPhoneCallEvents(description: "LOG|hangUp method invoked", isError: false)
+                self.userInitiatedDisconnect = true
+                performEndCallAction(uuid: self.call!.uuid!)
+                //self.toggleUIState(isEnabled: false, showCallControl: false)
+            } else if(self.callInvite != nil) {
+                performEndCallAction(uuid: self.callInvite!.uuid)
+            }
     }
         }else if flutterCall.method == "registerClient"{
             guard let clientId = arguments["id"] as? String, let clientName =  arguments["name"] as? String else {return}
@@ -541,6 +550,19 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         return false;
     }
+
+    func answerCall(callInvite: CallInvite) {
+        let answerCallAction = CXAnswerCallAction(call: callInvite.uuid)
+        let transaction = CXTransaction(action: answerCallAction)
+        
+        callKitCallController.request(transaction)  { error in
+            if let error = error {
+                self.sendPhoneCallEvents(description: "LOG|AnswerCallAction transaction request failed: \(error.localizedDescription)", isError: false)
+                return
+            }
+        }
+    }
+    
     
     func makeCall(to: String)
     {
@@ -1214,16 +1236,13 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     func performEndCallAction(uuid: UUID) {
         
-        self.sendPhoneCallEvents(description: "LOG|performEndCallAction method invoked", isError: false)
+       self.sendPhoneCallEvents(description: "LOG|performEndCallAction method invoked", isError: false)
         
         // check if call is still active, preventing a race condition ending the call throwing an End Call Failed transaction error 4 error
-        // guard isCallActive(uuid: uuid) else {
-        //     print("Call not found or already ended. Skipping end request.")
-        //  self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-        //     return
-        // }
-         guard isCallActive(uuid: uuid) else {
-        return
+        guard isCallActive(uuid: uuid) else {
+            print("Call not found or already ended. Skipping end request.")
+            self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+            return
         }
         
         let endCallAction = CXEndCallAction(call: uuid)
@@ -1232,11 +1251,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         callKitCallController.request(transaction) { error in
             if let error = error {
                 self.sendPhoneCallEvents(description: "End Call Failed: \(error.localizedDescription).", isError: true)
-            } 
-            // else {
-            //     self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-            // }
+            } else {
+                self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+            }
         }
+
     }
     
     func performVoiceCall(uuid: UUID, client: String?, completionHandler: @escaping (Bool) -> Swift.Void) {
