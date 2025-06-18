@@ -951,13 +951,18 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     }
     
-   @objc public func callDidDisconnect(_ call: Call, error: Error?) {
+    // @objc(callDidDisconnect:error:)
+    public func callDidDisconnect(call: Call, error: Error?) {
        
      clearCustomParams()
 
-    let reason: CXCallEndedReason = self.userInitiatedDisconnect
-      ? .remoteEnded
-      : .failed
+   
+     let reason: CXCallEndedReason = (error == nil)
+      ? .remoteEnded    
+      : .failed    
+    // self.userInitiatedDisconnect
+    //   ? .remoteEnded
+    //   : .failed
     callKitProvider.reportCall(
       with: call.uuid!,
       endedAt: Date(),
