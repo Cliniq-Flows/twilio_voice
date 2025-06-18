@@ -955,7 +955,6 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
        
      clearCustomParams()
 
-    // 1) Tell CallKit to dismiss the native UI:
     let reason: CXCallEndedReason = self.userInitiatedDisconnect
       ? .remoteEnded
       : .failed
@@ -964,16 +963,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
       endedAt: Date(),
       reason: reason
     )
-
-    // 2) Emit exactly the one event Flutter already understands:
     sendPhoneCallEvents(description: "Call Ended", isError: false)
 
-    // 3) If there was an error, emit it as an error event (optional)
+    
     if let err = error {
       sendPhoneCallEvents(description: "Call Ended: \(err.localizedDescription)", isError: true)
     }
-
-    // 4) Reset your flags + references:
     isRejectingCallInvite = false
     userInitiatedDisconnect = false
     self.call               = nil
