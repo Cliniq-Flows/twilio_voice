@@ -15,7 +15,7 @@ Pod::Spec.new do |s|
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'TwilioVoice','~> 6.13.0'
+  s.dependency 'TwilioVoice','~> 6.13.1'
   s.platform = :ios, '12.0'
   s.resources = ['Classes/Resources/phone-outgoing-call-72202.mp3']
 

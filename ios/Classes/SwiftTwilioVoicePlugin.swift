@@ -145,23 +145,43 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let arguments:Dictionary<String, AnyObject> = flutterCall.arguments as! Dictionary<String, AnyObject>;
         
         if flutterCall.method == "tokens" {
-             guard let tokenString = arguments["accessToken"] as? String else {
-                self.sendPhoneCallEvents(description: "LOG|accessToken is missing or not a String", isError: true)
+            guard let token = arguments["accessToken"] as? String else {
+                result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing accessToken", details: nil))
                 return
             }
-             self.accessToken = tokenString
-              if let existingToken = self.deviceToken {
-                self.sendPhoneCallEvents(description: "LOG|registering with Twilio (cached deviceToken)", isError: false)
-                TwilioVoiceSDK.register(accessToken: tokenString, deviceToken: existingToken) { error in
+            self.accessToken = token;
+            guard let deviceToken = deviceToken else {
+                self.sendPhoneCallEvents(description: "LOG|Device token is nil. Cannot register for VoIP push notifications.", isError: true)
+                return
+            }
+            if let token = accessToken {
+                self.sendPhoneCallEvents(description: "LOG|pushRegistry:attempting to register with twilio", isError: false)
+                TwilioVoiceSDK.register(accessToken: token, deviceToken: deviceToken) { (error) in
                     if let error = error {
-                        self.sendPhoneCallEvents(description: "LOG|Failed to register Twilio (cached): \(error.localizedDescription)", isError: false)
-                    } else {
-                        self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP pushes (cached).", isError: false)
+                        self.sendPhoneCallEvents(description: "LOG|An error occurred while registering: \(error.localizedDescription)", isError: false)
+                    }
+                    else {
+                        self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP push notifications.", isError: false)
                     }
                 }
-                return
             }
-            self.sendPhoneCallEvents(description: "LOG|deviceToken is nil – asking APNs for new VoIP push token…", isError: false)
+            //  guard let tokenString = arguments["accessToken"] as? String else {
+            //     self.sendPhoneCallEvents(description: "LOG|accessToken is missing or not a String", isError: true)
+            //     return
+            // }
+            //  self.accessToken = tokenString
+            //   if let existingToken = self.deviceToken {
+            //     self.sendPhoneCallEvents(description: "LOG|registering with Twilio (cached deviceToken)", isError: false)
+            //     TwilioVoiceSDK.register(accessToken: tokenString, deviceToken: existingToken) { error in
+            //         if let error = error {
+            //             self.sendPhoneCallEvents(description: "LOG|Failed to register Twilio (cached): \(error.localizedDescription)", isError: false)
+            //         } else {
+            //             self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP pushes (cached).", isError: false)
+            //         }
+            //     }
+            //     return
+            // }
+            // self.sendPhoneCallEvents(description: "LOG|deviceToken is nil – asking APNs for new VoIP push token…", isError: false)
             voipRegistry.desiredPushTypes = [.voIP]
             // guard let token = arguments["accessToken"] as? String else {return}
             // self.accessToken = token
@@ -688,8 +708,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         
         // Wipe out cached token + binding date
-        UserDefaults.standard.removeObject(forKey: kCachedDeviceToken)
-        UserDefaults.standard.removeObject(forKey: kCachedBindingDate)
+        // UserDefaults.standard.removeObject(forKey: kCachedDeviceToken)
+        // UserDefaults.standard.removeObject(forKey: kCachedBindingDate)
         self.deviceToken = nil
         
         // Force PushKit to drop & fetch a fresh token
@@ -931,8 +951,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     }
     
-    public func callDidDisconnect(call: Call, error: Error?) {
-        clearCustomParams()
+   @objc public func callDidDisconnect(_ call: Call, error: Error?) {
+       
+     clearCustomParams()
 
     // 1) Tell CallKit to dismiss the native UI:
     let reason: CXCallEndedReason = self.userInitiatedDisconnect
@@ -957,75 +978,6 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     userInitiatedDisconnect = false
     self.call               = nil
     self.callInvite         = nil
-    //     clearCustomParams()
-
-    //  // stopRingbackTone()
-    //     if !isRejectingCallInvite {
-    //   let reason: CXCallEndedReason = self.userInitiatedDisconnect
-    //     ? .remoteEnded
-    //     : .failed
-    //   // ← here you tell CallKit “OK, end that call UI”
-    //   callKitProvider.reportCall(
-    //     with: call.uuid!,
-    //     endedAt: Date(),
-    //     reason: reason
-    //   )
-    //   sendPhoneCallEvents(
-    //     description: reason == .remoteEnded
-    //       ? "disconnectedLocal"
-    //       : "disconnectedRemote",
-    //     isError: false
-    //   )
-    // }
-
-    // // reset flags + clear your references
-    // isRejectingCallInvite = false
-    // userInitiatedDisconnect = false
-    // self.call               = nil
-    // self.callInvite         = nil
-  // only fire "Call Ended" when it's a real hang-up, not a reject
-//   if !isRejectingCallInvite {
-//     self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-//     if let error = error {
-//       self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
-//     }
-
-//     let reason: CXCallEndedReason = self.userInitiatedDisconnect
-//       ? .remoteEnded
-//       : .failed
-//     callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
-
-//     let eventName = self.userInitiatedDisconnect
-//       ? "disconnectedLocal"
-//       : "disconnectedRemote"
-//     sendPhoneCallEvents(description: eventName, isError: false)
-//   }
-
-//   // reset your flags and cleanup
-//   isRejectingCallInvite = false
-//   self.userInitiatedDisconnect = false
-//   callDisconnected()
-//          clearCustomParams()
-//         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-//         if let error = error {
-//             self.sendPhoneCallEvents(description: "Call Ended: \(error.localizedDescription)", isError: true)
-//         }
-        
-    
-//         // let reason: CXCallEndedReason = self.userInitiatedDisconnect ? .remoteEnded : .failed
-//          // First, report to CallKit so the iOS in-call UI goes away:
-//   let reason: CXCallEndedReason = self.userInitiatedDisconnect
-//     ? .remoteEnded   // or .failed if you want
-//     : .failed       
-//         self.callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
-//             let eventName = self.userInitiatedDisconnect
-//     ? "disconnectedLocal"
-//     : "disconnectedRemote"
-//   sendPhoneCallEvents(description: eventName, isError: false)
-
- 
-//         callDisconnected()
-//         self.userInitiatedDisconnect = false
 
   
     }
