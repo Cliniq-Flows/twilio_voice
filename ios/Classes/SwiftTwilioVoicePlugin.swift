@@ -371,7 +371,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             } else if(self.callInvite != nil) {
                 performEndCallAction(uuid: self.callInvite!.uuid)
             }
-   // }
+   }
         }else if flutterCall.method == "registerClient"{
             guard let clientId = arguments["id"] as? String, let clientName =  arguments["name"] as? String else {return}
             if clients[clientId] == nil || clients[clientId] != clientName{
@@ -1249,7 +1249,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.callKitCompletionCallback = completionHandler
     }
     // Updated connectToConference function without extraOptions:
-    func connectToConference(uuid: UUID, conferenceName: String, completionHandler: @escaping (Bool) -> Swift.Void) {
+    func connectToConference(
+        uuid: UUID, 
+        conferenceName: String, 
+        completionHandler: @escaping (Bool) -> Swift.Void) {
         
        
         guard let token = accessToken else {
