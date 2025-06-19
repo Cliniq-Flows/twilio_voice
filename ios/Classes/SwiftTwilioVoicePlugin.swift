@@ -1206,14 +1206,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                 self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
             }
         }
-       
     }
     
     func performEndCallAction(uuid: UUID) {
         
         self.sendPhoneCallEvents(description: "LOG|performEndCallAction method invoked", isError: false)
-        
-        // check if call is still active, preventing a race condition ending the call throwing an End Call Failed transaction error 4 error
+
         guard isCallActive(uuid: uuid) else {
             print("Call not found or already ended. Skipping end request.")
             self.sendPhoneCallEvents(description: "Call Ended", isError: false)
