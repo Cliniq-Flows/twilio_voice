@@ -1250,21 +1250,51 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     // Updated connectToConference function without extraOptions:
     func connectToConference(uuid: UUID, conferenceName: String, completionHandler: @escaping (Bool) -> Swift.Void) {
-   
-        guard let token = accessToken else {
-        completionHandler(false)
-        return
+        
+         // 1) Tell CallKit we’re starting an outgoing call
+  let handle = CXHandle(type: .generic, value: conferenceName)
+  let startAction = CXStartCallAction(call: uuid, handle: handle)
+  let transaction = CXTransaction(action: startAction)
+  callKitCallController.request(transaction) { error in
+    guard error == nil else {
+      NSLog("CXStartCallAction failed: \(error!.localizedDescription)")
+      completion(false)
+      return
     }
+    // 2) Report connecting state
+    self.callKitProvider.reportOutgoingCall(with: uuid,
+                                            startedConnectingAt: Date())
 
-    let connectOptions = ConnectOptions(accessToken: token) { builder in
-        builder.uuid = uuid
-        builder.params["conference"] = conferenceName
+    // 3) Actually connect via Twilio
+    let options = ConnectOptions(accessToken: self.accessToken!) { builder in
+      builder.uuid = uuid
+      builder.params["conference"] = conferenceName
     }
+    let call = TwilioVoiceSDK.connect(options: options,
+                                       delegate: self)
+    self.call = call
+    self.callKitCompletionCallback = { success in
+      if success {
+        self.callKitProvider.reportOutgoingCall(with: uuid,
+                                                connectedAt: Date())
+      }
+      completion(success)
+    }
+  }
+    //     guard let token = accessToken else {
+    //     completionHandler(false)
+    //     return
+    // }
 
-    // Only connect once. Assign the returned Call to self.call, so delegate callbacks (callDidConnect, etc.) will fire on that object.
-    let conferenceCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
-    self.call = conferenceCall
-    self.callKitCompletionCallback = completionHandler
+    // let connectOptions = ConnectOptions(accessToken: token) { builder in
+    //     builder.uuid = uuid
+    //     builder.params["conference"] = conferenceName
+    // }
+
+    // // Only connect once. Assign the returned Call to self.call, so delegate callbacks (callDidConnect, etc.) will fire on that object.
+    // let conferenceCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
+    // self.call = conferenceCall
+    // self.callKitCompletionCallback = completionHandler
 
     // Enable the audio device immediately (so that the call audio will flow correctly once connected)
     // audioDevice.isEnabled = true
