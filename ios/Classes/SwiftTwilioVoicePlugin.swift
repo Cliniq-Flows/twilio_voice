@@ -438,7 +438,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
              self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
                  result(success)
    
-             }
+             
     
         } else  if flutterCall.method == "updateDisplayName" {
         guard let args = flutterCall.arguments as? [String:Any],
@@ -1250,10 +1250,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.callKitCompletionCallback = completionHandler
     }
     // Updated connectToConference function without extraOptions:
-    func connectToConference(
-        uuid: UUID, conferenceName: 
-        String, 
-        completionHandler: @escaping (Bool) -> Swift.Void) {
+    func connectToConference(uuid: UUID, conferenceName: String, completionHandler: @escaping (Bool) -> Swift.Void) {
         
        
     //     guard let token = accessToken else {
@@ -1266,11 +1263,13 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     //     builder.params["conference"] = conferenceName
     // }
 
+    // // Only connect once. Assign the returned Call to self.call, so delegate callbacks (callDidConnect, etc.) will fire on that object.
     // let conferenceCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
     // self.call = conferenceCall
     // self.callKitCompletionCallback = completionHandler
 
-    // 0) Make sure we have a token
+    // Enable the audio device immediately (so that the call audio will flow correctly once connected)
+      // 0) Make sure we have a token
     guard let token = accessToken else {
         completionHandler(false)
         return
@@ -1326,6 +1325,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
   
+     audioDevice.isEnabled = true
     }
    
     
