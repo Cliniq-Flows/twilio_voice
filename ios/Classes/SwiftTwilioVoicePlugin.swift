@@ -1206,24 +1206,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                 self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
             }
         }
-        // let callHandle = CXHandle(type: .generic, value: from)
-        
-        // let callUpdate = CXCallUpdate()
-        // callUpdate.remoteHandle = callHandle
-        // callUpdate.localizedCallerName = clients[from] ?? self.clients["defaultCaller"] ?? defaultCaller
-        // callUpdate.supportsDTMF = true
-        // callUpdate.supportsHolding = true
-        // callUpdate.supportsGrouping = false
-        // callUpdate.supportsUngrouping = false
-        // callUpdate.hasVideo = false
-        
-        // callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
-        //     if let error = error {
-        //         self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).", isError: false)
-        //     } else {
-        //         self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
-        //     }
-        // }
+       
     }
     
     func performEndCallAction(uuid: UUID) {
