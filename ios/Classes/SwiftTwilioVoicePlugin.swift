@@ -438,7 +438,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
              self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
                  result(success)
    
-             
+             }
     
         } else  if flutterCall.method == "updateDisplayName" {
         guard let args = flutterCall.arguments as? [String:Any],
