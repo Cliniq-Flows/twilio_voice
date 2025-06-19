@@ -460,7 +460,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
              
-    }
+    
         } else  if flutterCall.method == "updateDisplayName" {
         guard let args = flutterCall.arguments as? [String:Any],
               let newName = args["name"] as? String
@@ -1358,7 +1358,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             
             completionHandler(success)
         }
-    
+    }
 }
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
