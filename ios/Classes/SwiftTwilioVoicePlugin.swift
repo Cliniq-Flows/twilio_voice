@@ -430,14 +430,35 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             return
         }else if flutterCall.method == "connectToConference" {
    
-     guard let conferenceName = arguments["conferenceName"] as? String else {
-                 result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing conferenceName", details: nil))
-                 return
-             }
-             let uuid = UUID()
-             self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
-                 result(success)
-   
+    //  guard let conferenceName = arguments["conferenceName"] as? String else {
+    //              result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing conferenceName", details: nil))
+    //              return
+    //          }
+    //          let uuid = UUID()
+    //          self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
+    //              result(success)
+     // 1) Unwrap arguments
+    guard let args = flutterCall.arguments as? [String: Any],
+          let conferenceName = args["conferenceName"] as? String else
+    {
+        result(FlutterError(
+            code: "INVALID_ARGUMENT",
+            message: "Missing conferenceName",
+            details: nil
+        ))
+        return
+    }
+
+    // 2) Generate a new UUID for CallKit
+    let uuid = UUID()
+
+    // 3) Kick off your CallKit + Twilio conference flow
+    self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
+        // Make sure we reply on the main thread
+        DispatchQueue.main.async {
+            result(success)
+        }
+    }
              
     
         } else  if flutterCall.method == "updateDisplayName" {
@@ -1250,7 +1271,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.callKitCompletionCallback = completionHandler
     }
     // Updated connectToConference function without extraOptions:
-    func connectToConference(uuid: UUID, conferenceName: String, completionHandler: @escaping (Bool) -> Swift.Void) {
+    //func connectToConference(uuid: UUID, conferenceName: String, completionHandler: @escaping (Bool) -> Swift.Void) {
         
        
     //     guard let token = accessToken else {
@@ -1269,65 +1290,78 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // self.callKitCompletionCallback = completionHandler
 
     // Enable the audio device immediately (so that the call audio will flow correctly once connected)
-      // 0) Make sure we have a token
-    guard let token = accessToken else {
+    // audioDevice.isEnabled = true
+    // }
+    func connectToConference(
+    uuid: UUID,
+    conferenceName: String,
+    completionHandler: @escaping (Bool) -> Void
+) {
+    // 0) Ensure we have a token
+    guard let token = self.accessToken else {
+        NSLog("[Twilio] Missing access token – cannot connect to conference")
         completionHandler(false)
         return
     }
-
-    // 1) Tell CallKit we’re starting an outgoing “conference” call
-    //    (so that hang-up via performEndCallAction will work)
+    
+    // 1) Tell CallKit we’re starting an outgoing call
     let handle      = CXHandle(type: .generic, value: conferenceName)
     let startAction = CXStartCallAction(call: uuid, handle: handle)
     let transaction = CXTransaction(action: startAction)
-    callKitCallController.request(transaction) { error in
-        if let err = error {
-            NSLog("CXStartCallAction failed: \(err.localizedDescription)")
+    
+    callKitCallController.request(transaction) { [weak self] error in
+        guard let self = self else { return }
+        
+        if let error = error {
+            NSLog("CXStartCallAction transaction failed: \(error.localizedDescription)")
             completionHandler(false)
             return
         }
-        // If you want the native dialer UI to show “connecting…”
+        
+        // 2) Report “connecting” to CallKit
         self.callKitProvider.reportOutgoingCall(
             with: uuid,
             startedConnectingAt: Date()
         )
-
-        // 2) Build your Twilio conference connect
-        let options = ConnectOptions(accessToken: token) { builder in
+        
+        // 3) Build your Twilio connectOptions exactly as you shared
+        let connectOptions = ConnectOptions(accessToken: token) { builder in
             builder.uuid = uuid
             builder.params["conference"] = conferenceName
         }
-
-        // 3) Kick off the conference leg
+        
+        // 4) Actually connect the conference leg
         let conferenceCall = TwilioVoiceSDK.connect(
-            options: options,
+            options: connectOptions,
             delegate: self
         )
         self.call = conferenceCall
 
-        // 4) When Twilio finally connects or fails, forward into CallKit + Flutter
-        self.callKitCompletionCallback = { success in
+        audioDevice.isEnabled = true
+        
+        // 5) Forward SDK’s “didConnect/didFail” into CallKit and your completionHandler
+        self.callKitCompletionCallback = { [weak self] success in
+            guard let self = self else { return }
+            
             if success {
-                // tell CallKit “you’re now connected”
+                // Report “connected” to CallKit
                 self.callKitProvider.reportOutgoingCall(
                     with: uuid,
                     connectedAt: Date()
                 )
             } else {
-                // failed => clean up CallKit UI
+                // Report “failed” so the UI cleans up
                 self.callKitProvider.reportCall(
                     with: uuid,
                     endedAt: Date(),
                     reason: .failed
                 )
             }
+            
             completionHandler(success)
         }
     }
-  
-     audioDevice.isEnabled = true
-    }
-   
+}
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
         if let ci = self.callInvite {
