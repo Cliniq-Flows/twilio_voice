@@ -16,6 +16,7 @@ import android.telecom.CallAudioState
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 import android.util.Log
+import android.media.MediaPlayer
 import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
@@ -72,7 +73,9 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
     private val TAG = "TwilioVoicePlugin"
 
     // Ringtone
-    private var outgoingRingtone: android.media.Ringtone? = null
+//    private var outgoingRingtone: android.media.Ringtone? = null
+    private var outgoingPlayer: MediaPlayer? = null
+
 
 
     // Locals
@@ -1182,30 +1185,48 @@ val ctx = context
         return  TVConnectionService.hasActiveCalls()
     }
 
+
     private fun playOutgoingRingtone() {
     // If it’s already playing, do nothing
-    if (outgoingRingtone?.isPlaying == true) return
-
-    context?.let { ctx ->
-        val ringtoneUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
-        val rt = android.media.RingtoneManager.getRingtone(ctx, ringtoneUri)
-        rt?.let {
-            it.isLooping = true
-            it.play()
-            outgoingRingtone = it
+    if (outgoingPlayer?.isPlaying == true) return
+        context?.let { ctx ->
+            // create from your raw resource
+            outgoingPlayer = MediaPlayer.create(ctx, R.raw.phone_outgoing_call_72202).apply {
+                isLooping = true
+                start()
+            }
             Log.d(TAG, "Outgoing ringtone started.")
         }
-    }
+//    context?.let { ctx ->
+//        val ringtoneUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
+//        val rt = android.media.RingtoneManager.getRingtone(ctx, ringtoneUri)
+//        rt?.let {
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+//                it.isLooping = true
+//            }
+//            it.play()
+//            outgoingPlayer = it
+//            Log.d(TAG, "Outgoing ringtone started.")
+//        }
+//    }
 }
 
 private fun stopOutgoingRingtone() {
-    outgoingRingtone?.let {
-        if (it.isPlaying) {
-            it.stop()
+    outgoingPlayer?.let { player ->
+        if (player.isPlaying) {
+            player.stop()
             Log.d(TAG, "Outgoing ringtone stopped.")
         }
+        player.release()
     }
-    outgoingRingtone = null
+    outgoingPlayer = null
+//    outgoingRingtone?.let {
+//        if (it.isPlaying) {
+//            it.stop()
+//            Log.d(TAG, "Outgoing ringtone stopped.")
+//        }
+//    }
+//    outgoingRingtone = null
 }
 
     private fun toggleSpeaker(ctx: Context, speakerIsOn: Boolean) {

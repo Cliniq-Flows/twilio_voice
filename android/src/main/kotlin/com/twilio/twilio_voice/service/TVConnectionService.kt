@@ -845,6 +845,7 @@ class TVConnectionService : ConnectionService() {
         // 4) Prime your telecom‐side event hooks
         activeConnections["conference_$conferenceName"] = conferenceConnection
         attachCallEventListeners(conferenceConnection, "conference_$conferenceName")
+        attachCallEventListeners(conferenceConnection, "conference_$conferenceName")
 
         Log.d(TAG, "Conference call initiated with temporary ID: conference_$conferenceName")
     }
