@@ -501,7 +501,7 @@ class TVConnectionService : ConnectionService() {
 
                     val conn = TVCallConnection(applicationContext)
                    conn.setInitialized()
-                    conn.setDialing()
+                    // conn.setDialing()
 
 
 
