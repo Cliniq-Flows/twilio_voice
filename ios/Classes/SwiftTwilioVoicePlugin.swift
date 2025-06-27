@@ -646,31 +646,60 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     // MARK: PKPushRegistryDelegate
     public func pushRegistry(_ registry: PKPushRegistry, didUpdate credentials: PKPushCredentials, for type: PKPushType) {
-        self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials:forType:", isError: false)
+       self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials:forType:", isError: false)
         
-         guard type == .voIP else { return }
-
-        let newToken = credentials.token
-        let previouslySaved = self.deviceToken    
-
-        if registrationRequired() || previouslySaved != newToken {
-            self.sendPhoneCallEvents(description: "LOG|PushKit gave us a new token; registering with Twilio…", isError: false)
-            if let tokenStr = self.accessToken {
-                TwilioVoiceSDK.register(accessToken: tokenStr, deviceToken: newToken) { error in
-                    if let error = error {
-                        self.sendPhoneCallEvents(description: "LOG|TwilioVoiceSDK.register error: \(error.localizedDescription)", isError: false)
-                    } else {
-                        self.sendPhoneCallEvents(description: "LOG|Registered for VoIP pushes (new token).", isError: false)
-                    }
-                }
-            } else {
-                self.sendPhoneCallEvents(description: "LOG|Have deviceToken but no accessToken yet.", isError: false)
-            }
+        if (type != .voIP) {
+            return
         }
         
-        // Cache new token and timestamp
-        self.deviceToken = newToken
+        guard registrationRequired() || deviceToken != credentials.token else {
+            self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials device token unchanged, no update needed.", isError: true)
+            return
+        }
+
+        self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials:forType: device token updated", isError: false)
+        let deviceToken = credentials.token
+        
+        self.sendPhoneCallEvents(description: "LOG|pushRegistry:attempting to register with twilio", isError: false)
+        if let token = accessToken {
+            TwilioVoiceSDK.register(accessToken: token, deviceToken: deviceToken) { (error) in
+                if let error = error {
+                    self.sendPhoneCallEvents(description: "LOG|An error occurred while registering: \(error.localizedDescription)", isError: false)
+                    self.sendPhoneCallEvents(description: "DEVICETOKEN|\(String(decoding: deviceToken, as: UTF8.self))", isError: false)
+                }
+                else {
+                    self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP push notifications.", isError: false)
+                }
+            }
+        }
+        self.deviceToken = deviceToken
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
+      
+        // self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials:forType:", isError: false)
+        
+        //  guard type == .voIP else { return }
+
+        // let newToken = credentials.token
+        // let previouslySaved = self.deviceToken    
+
+        // if registrationRequired() || previouslySaved != newToken {
+        //     self.sendPhoneCallEvents(description: "LOG|PushKit gave us a new token; registering with Twilio…", isError: false)
+        //     if let tokenStr = self.accessToken {
+        //         TwilioVoiceSDK.register(accessToken: tokenStr, deviceToken: newToken) { error in
+        //             if let error = error {
+        //                 self.sendPhoneCallEvents(description: "LOG|TwilioVoiceSDK.register error: \(error.localizedDescription)", isError: false)
+        //             } else {
+        //                 self.sendPhoneCallEvents(description: "LOG|Registered for VoIP pushes (new token).", isError: false)
+        //             }
+        //         }
+        //     } else {
+        //         self.sendPhoneCallEvents(description: "LOG|Have deviceToken but no accessToken yet.", isError: false)
+        //     }
+        // }
+        
+        // // Cache new token and timestamp
+        // self.deviceToken = newToken
+        // UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
 
     }
     
@@ -681,9 +710,23 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
       * will return true, else false.
       */
      func registrationRequired() -> Bool {
-         guard
-             let lastBindingCreated = UserDefaults.standard.object(forKey: kCachedBindingDate)
-         else { return true }
+        //  guard
+        //      let lastBindingCreated = UserDefaults.standard.object(forKey: kCachedBindingDate)
+        //  else { return true }
+
+        //  let date = Date()
+        //  var components = DateComponents()
+        //  components.setValue(kRegistrationTTLInDays/2, for: .day)
+        //  let expirationDate = Calendar.current.date(byAdding: components, to: lastBindingCreated as! Date)!
+
+        //  if expirationDate.compare(date) == ComparisonResult.orderedDescending {
+        //      return false
+        //  }
+        //  return true;
+          guard let lastBindingCreated = UserDefaults.standard.object(forKey: kCachedBindingDate) else {
+             self.sendPhoneCallEvents(description: "LOG|Registration required: true, last binding date not found", isError: false)
+             return true
+         }
 
          let date = Date()
          var components = DateComponents()
@@ -691,6 +734,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          let expirationDate = Calendar.current.date(byAdding: components, to: lastBindingCreated as! Date)!
 
          if expirationDate.compare(date) == ComparisonResult.orderedDescending {
+             self.sendPhoneCallEvents(description: "LOG|Registration required: false, half of TTL not passed", isError: false)
              return false
          }
          return true;
@@ -709,6 +753,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     func unregister() {
         
         guard let deviceToken = deviceToken, let token = accessToken else {
+            self.sendPhoneCallEvents(description: "LOG|Missing required parameters to unregister", isError: true)
             return
         }
         
