@@ -465,40 +465,81 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // MARK: — Ringback Tone Playback
 
     private func playRingbackTone() {
-         // don’t start twice
+    //  // don’t start twice
+    // guard ringtonePlayer == nil else { return }
+
+    // // 1) Get the bundle for *this* plugin pod
+    // let bundle = Bundle(for: SwiftTwilioVoicePlugin.self)
+
+    // // 2) Look for the exact resource name you declared in your Podspec
+    // guard let url = bundle.url(
+    //     forResource: "phone-outgoing-call-72202",
+    //     withExtension: "mp3"
+    // ) else {
+    //     NSLog("⚠️ ringback file not found in plugin bundle")
+    //     return
+    // }
+
+    // do {
+    //     // 3) Configure & activate the session so playback actually happens
+    //     let session = AVAudioSession.sharedInstance()
+    //     try session.setCategory(.playAndRecord,
+    //                             mode: .default,
+    //                             options: [.duckOthers,.mixWithOthers,.allowBluetooth,.defaultToSpeaker])
+    //     // try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers])
+    //     // try session.overrideOutputAudioPort(.speaker)                      
+    //     try session.setActive(true)
+
+    //     // 4) Create & start the player
+    //     ringtonePlayer = try AVAudioPlayer(contentsOf: url)
+    //      ringtonePlayer?.volume = 1.0
+    //     ringtonePlayer?.numberOfLoops = -1
+    //     ringtonePlayer?.prepareToPlay()
+    //     ringtonePlayer?.play()
+    // } catch {
+    //     NSLog("⚠️ failed to start ringback: \(error)")
+    //     ringtonePlayer = nil
+    // }
     guard ringtonePlayer == nil else { return }
+    let ringURL: URL? = {
+      if let main = Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
+        return main
+      }
+     
+      guard
+        let bundleRoot = Bundle(for: SwiftTwilioVoicePlugin.self)
+                              .url(forResource: "TwilioVoicePluginResources", withExtension: "bundle"),
+        let resBundle = Bundle(url: bundleRoot)
+      else { return nil }
+      return resBundle.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3")
+    }()
 
-    // 1) Get the bundle for *this* plugin pod
-    let bundle = Bundle(for: SwiftTwilioVoicePlugin.self)
-
-    // 2) Look for the exact resource name you declared in your Podspec
-    guard let url = bundle.url(
-        forResource: "phone-outgoing-call-72202",
-        withExtension: "mp3"
-    ) else {
-        NSLog("⚠️ ringback file not found in plugin bundle")
-        return
+    guard let url = ringURL else {
+      NSLog("⚠️ ringback file not found")
+      return
     }
 
     do {
-        // 3) Configure & activate the session so playback actually happens
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord,
-                                mode: .default,
-                                options: [.duckOthers,.mixWithOthers,.allowBluetooth,.defaultToSpeaker])
-        // try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers])
-        // try session.overrideOutputAudioPort(.speaker)                      
-        try session.setActive(true)
+   
+      let session = AVAudioSession.sharedInstance()
+      try session.setCategory(
+        .playAndRecord,
+        mode: .default,
+        options: [.duckOthers, .mixWithOthers, .allowBluetooth]
+      )
+   
+      try session.overrideOutputAudioPort(.speaker)
+      try session.setActive(true)
 
-        // 4) Create & start the player
-        ringtonePlayer = try AVAudioPlayer(contentsOf: url)
-         ringtonePlayer?.volume = 1.0
-        ringtonePlayer?.numberOfLoops = -1
-        ringtonePlayer?.prepareToPlay()
-        ringtonePlayer?.play()
+    
+      ringtonePlayer = try AVAudioPlayer(contentsOf: url)
+      ringtonePlayer?.volume = 1.0
+      ringtonePlayer?.numberOfLoops = -1
+      ringtonePlayer?.prepareToPlay()
+      ringtonePlayer?.play()
     } catch {
-        NSLog("⚠️ failed to start ringback: \(error)")
-        ringtonePlayer = nil
+      NSLog("⚠️ failed to start ringback: \(error)")
+      ringtonePlayer = nil
     }
     }
 
