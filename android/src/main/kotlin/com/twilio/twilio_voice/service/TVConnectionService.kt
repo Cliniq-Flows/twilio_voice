@@ -248,6 +248,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_CANCEL_CALL_INVITE -> {
+                    startForegroundService()  
                     // Load CancelledCallInvite class loader
                     // See: https://github.com/twilio/voice-quickstart-android/issues/561#issuecomment-1678613170
                     it.setExtrasClassLoader(CallInvite::class.java.classLoader)
@@ -260,6 +261,9 @@ class TVConnectionService : ConnectionService() {
                     getConnection(callHandle)?.onAbort() ?: run {
                         Log.e(TAG, "onStartCommand: [ACTION_CANCEL_CALL_INVITE] could not find connection for callHandle: $callHandle")
                     }
+                     stopForegroundService()
+                    stopSelf()
+                    return START_NOT_STICKY
                 }
 
                 ACTION_INCOMING_CALL -> {
