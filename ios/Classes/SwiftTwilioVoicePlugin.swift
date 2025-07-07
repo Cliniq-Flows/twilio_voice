@@ -86,8 +86,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         _ = updateCallKitIcon(icon: defaultIcon)
         
         voipRegistry.delegate = self
-        // voipRegistry.desiredPushTypes = Set([PKPushType.voIP])
-        voipRegistry.desiredPushTypes = [.voIP]
+        voipRegistry.desiredPushTypes = Set([PKPushType.voIP])
 
         let appDelegate = UIApplication.shared.delegate
         guard let controller = appDelegate?.window??.rootViewController as? FlutterViewController else {
@@ -182,7 +181,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             //     return
             // }
             // self.sendPhoneCallEvents(description: "LOG|deviceToken is nil – asking APNs for new VoIP push token…", isError: false)
-            voipRegistry.desiredPushTypes = [.voIP]
+         
             // guard let token = arguments["accessToken"] as? String else {return}
             // self.accessToken = token
             // if let deviceToken = deviceToken, let token = accessToken {
@@ -802,19 +801,16 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     func unregisterTokens(token: String, deviceToken: Data) {
-       
-         TwilioVoiceSDK.unregister(accessToken: token, deviceToken: deviceToken) { (error) in
+       TwilioVoiceSDK.unregister(accessToken: token, deviceToken: deviceToken) { (error) in
             if let error = error {
                 self.sendPhoneCallEvents(description: "LOG|An error occurred while unregistering: \(error.localizedDescription)", isError: false)
             } else {
                 self.sendPhoneCallEvents(description: "LOG|Successfully unregistered from VoIP push notifications.", isError: false)
             }
         }
-        self.deviceToken = nil
         
         // Force PushKit to drop & fetch a fresh token
-        voipRegistry.desiredPushTypes = []       // ← CHANGED
-        voipRegistry.desiredPushTypes = [.voIP]  // ← CHANGED
+      
     }
     
     /**
