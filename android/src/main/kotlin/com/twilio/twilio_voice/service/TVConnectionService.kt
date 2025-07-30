@@ -10,11 +10,17 @@ import android.content.Context
 import android.content.Intent
 import com.twilio.voice.CallException
 import android.content.pm.ServiceInfo
+// UPDATE ADDED jul 30 2025
+import android.media.AudioFocusRequest
+// UPDATE ADDED jul 30 2025
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.telecom.*
 import android.util.Log
+// UPDATE ADDED jul 30 2025
+import android.media.AudioAttributes
 import com.twilio.twilio_voice.types.CallExceptionExtension
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import org.json.JSONObject
@@ -214,6 +220,8 @@ class TVConnectionService : ConnectionService() {
             return activeConnections[callSid]
         }
     }
+    // UPDATE ADDED jul 30 2025
+    private var focusRequest: AudioFocusRequest? = null
 
     private val storage: Storage by lazy { StorageImpl(applicationContext) }
     private fun stopSelfSafe(): Boolean {
@@ -368,6 +376,21 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_HANGUP -> {
+                    // UPDATE ADDED jul 30 2025
+                    val audioManager = applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    // reset back to normal
+                    audioManager.mode = AudioManager.MODE_NORMAL
+                    // abandon focus if you held one
+                    focusRequest?.let { req ->
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            audioManager.abandonAudioFocusRequest(req)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            audioManager.abandonAudioFocus(null)
+                        }
+                        focusRequest = null
+                    }
+
                     storage.clearCustomParams()
   val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE)
                  ?: getActiveCallHandle() ?: return@let
@@ -378,6 +401,8 @@ class TVConnectionService : ConnectionService() {
   } else {
     Log.e(TAG, "hangup(): could not find connection for $callHandle")
   }
+
+
                 //     storage.clearCustomParams()
                 //      val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
                 //         Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
@@ -480,6 +505,8 @@ class TVConnectionService : ConnectionService() {
 //                    val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
 //                    telecomManager.placeCall(address, extras)
                     // 1) Extract & build your params
+
+
                     val token = it.getStringExtra(EXTRA_TOKEN) ?: return@let
                     val to    = it.getStringExtra(EXTRA_TO)    ?: return@let
                     val from  = it.getStringExtra(EXTRA_FROM)  ?: return@let
@@ -606,6 +633,33 @@ class TVConnectionService : ConnectionService() {
                                 }
                             )
                         }
+                    }
+                    // UPDATE ADDED jul 30 2025
+                    val audioManager = applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        // build the request
+                        val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                            .setAudioAttributes(
+                                AudioAttributes.Builder()
+                                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                    .build()
+                            )
+                            .build()
+                        // actually ask for it
+                        audioManager.requestAudioFocus(req)
+                        // save it so we can abandon later
+                        focusRequest = req
+                    } else {
+                        @Suppress("DEPRECATION")
+                        audioManager.requestAudioFocus(
+                            null,
+                            AudioManager.STREAM_VOICE_CALL,
+                            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                        )
+                        focusRequest = null
                     }
 
 

@@ -87,6 +87,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         voipRegistry.delegate = self
         voipRegistry.desiredPushTypes = Set([PKPushType.voIP])
+        // UPDATE ADDED jul 30 2025
+        self.audioDevice = DefaultAudioDevice()
+        TwilioVoiceSDK.audioDevice = self.audioDevice
 
         let appDelegate = UIApplication.shared.delegate
         guard let controller = appDelegate?.window??.rootViewController as? FlutterViewController else {
@@ -523,11 +526,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
       let session = AVAudioSession.sharedInstance()
       try session.setCategory(
         .playAndRecord,
-        mode: .default,
+        // UPDATE ADDED jul 30 2025
+        mode: .voiceChat,
         options: [.duckOthers, .mixWithOthers, .allowBluetooth]
       )
    
-      try session.overrideOutputAudioPort(.speaker)
+     // try session.overrideOutputAudioPort(.speaker)
       try session.setActive(true)
 
     
@@ -1005,9 +1009,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "Connected|\(from)|\(to)|\(direction)", isError: false)
 
       
-        audioDevice.isEnabled = true
+        // UPDATE ADDED jul 30 2025
+        // audioDevice.isEnabled = true
         callKitCompletionCallback?(true)
-     stopRingbackTone()
+         stopRingbackTone()
         if let callKitCompletionCallback = callKitCompletionCallback {
             callKitCompletionCallback(true)
         }
@@ -1146,11 +1151,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
         self.sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
        // audioDevice.isEnabled = true
+       // UPDATE ADDED jul 30 2025
+       TwilioVoiceSDK.audioDevice.isEnabled = true
     }
     
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
         self.sendPhoneCallEvents(description: "LOG|provider:didDeactivateAudioSession:", isError: false)
-        audioDevice.isEnabled = false
+        //audioDevice.isEnabled = false
+        TwilioVoiceSDK.audioDevice.isEnabled = false
     }
     
     public func provider(_ provider: CXProvider, timedOutPerforming action: CXAction) {

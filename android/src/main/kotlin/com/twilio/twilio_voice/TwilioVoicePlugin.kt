@@ -6,10 +6,14 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+// UPDATE ADDED jul 30 2025
+import android.content.Context.AUDIO_SERVICE
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+// UPDATE ADDED jul 30 2025
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.telecom.CallAudioState
@@ -1281,6 +1285,10 @@ private fun stopOutgoingRingtone() {
         to: String,
         params: Map<String, String>
     ): Boolean {
+        // UPDATE ADDED jul 30 2025
+        val audioManager = ctx.getSystemService(AUDIO_SERVICE) as AudioManager
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+
         assert(accessToken.isNotEmpty()) { "Twilio Access Token cannot be empty" }
         assert(to.isNotEmpty()) { "To cannot be empty" }
         assert(from.isNotEmpty()) { "From cannot be empty" }
