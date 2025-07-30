@@ -1150,15 +1150,18 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
         self.sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
-       // audioDevice.isEnabled = true
+       
        // UPDATE ADDED jul 30 2025
-       TwilioVoiceSDK.audioDevice.isEnabled = true
+       self.audioDevice.isEnabled = true
+       //TwilioVoiceSDK.audioDevice.isEnabled = true
     }
     
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
         self.sendPhoneCallEvents(description: "LOG|provider:didDeactivateAudioSession:", isError: false)
-        //audioDevice.isEnabled = false
-        TwilioVoiceSDK.audioDevice.isEnabled = false
+        // UPDATE ADDED jul 30 2025
+        self.audioDevice.isEnabled = false
+       //audioDevice.isEnabled = false
+       // TwilioVoiceSDK.audioDevice.isEnabled = false
     }
     
     public func provider(_ provider: CXProvider, timedOutPerforming action: CXAction) {
