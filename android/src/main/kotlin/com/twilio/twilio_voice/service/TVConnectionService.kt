@@ -358,6 +358,34 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_ANSWER -> {
+
+
+                    val audioManager = applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+// 1) switch into “in-call” mode
+audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+
+// 2) request focus
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+  focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+    .setAudioAttributes(
+      AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
+    )
+    .build()
+  audioManager.requestAudioFocus(focusRequest!!)
+} else {
+  @Suppress("DEPRECATION")
+  audioManager.requestAudioFocus(
+    null,
+    AudioManager.STREAM_VOICE_CALL,
+    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+  )
+  focusRequest = null
+}
+
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: run {
                         Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
                         return@let
