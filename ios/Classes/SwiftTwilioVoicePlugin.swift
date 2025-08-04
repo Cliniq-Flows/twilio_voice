@@ -71,6 +71,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     return v
   }()
+  // ——————————————————————————————————————
+    // MARK: Shared-Prefs Helpers 🔥 END
+    // ——————————————————————————————————————
     
     static var appName: String {
         get {
