@@ -10,6 +10,7 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.telecom.CallAudioState
@@ -1033,6 +1034,24 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                         "Storage is null, cannot set reject on no permissions. Has Storage been initialized?"
                     )
                     result.success(false)
+                }
+            }
+
+            TVMethodChannels.SET_CALL_VOLUME -> {
+                // grab level from Dart (0.0–1.0)
+                val level = (call.argument<Double>("level") ?: 0.0).toFloat()
+                context?.let { ctx ->
+                    val audioManager = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                    val idx   = (level * maxVol).toInt().coerceIn(0, maxVol)
+                    audioManager.setStreamVolume(
+                        AudioManager.STREAM_VOICE_CALL,
+                        idx,
+                        /* flags= */ 0
+                    )
+                    result.success(null)
+                } ?: run {
+                    result.error("NO_CONTEXT", "Plugin context was null", null)
                 }
             }
 

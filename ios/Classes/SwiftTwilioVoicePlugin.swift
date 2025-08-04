@@ -5,6 +5,7 @@ import PushKit
 import TwilioVoice
 import CallKit
 import UserNotifications
+import MediaPlayer
 
 public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate, CXCallObserverDelegate {
     let callObserver = CXCallObserver()
@@ -58,6 +59,18 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private let kCustomParamsKey = "TwilioCustomParams"
 
     private var activeCalls: [UUID: CXCall] = [:]
+
+    private static let volumeView: MPVolumeView = {
+    let v = MPVolumeView(frame: .zero)
+    v.showsRouteButton = false
+    v.isHidden = true
+    DispatchQueue.main.async {
+      if let window = UIApplication.shared.windows.first {
+        window.addSubview(v)
+      }
+    }
+    return v
+  }()
     
     static var appName: String {
         get {
@@ -458,9 +471,32 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             result(true)
             return
         }
+      else  if flutterCall.method == "setCallVolume" {
+        guard
+    let args = flutterCall.arguments as? [String:Any],
+    let level = args["level"] as? Float
+  else {
+    result(FlutterError(code: "INVALID_ARGS", message: "Missing level", details: nil))
+    return
+  }
+  Self.setSystemVolume(level)
+  result(nil)
+  return
+      }
         result(true)
     }
     
+
+    static func setSystemVolume(_ level: Float) {
+    DispatchQueue.main.async {
+      for sub in volumeView.subviews {
+        if let slider = sub as? UISlider {
+          slider.value = level
+          break
+        }
+      }
+    }
+  }
 
     // MARK: — Ringback Tone Playback
 

@@ -51,7 +51,8 @@ enum class TVMethodChannels(val method: String) {
     CONNECTTOCONFERENCE("connectToConference"),
     UPDATE_DISPLAY_NAME("updateDisplayName"),
     GET_CUSTOM_PARAMS("getCustomParams"),
-    CLEAR_CUSTOM_PARAMS("clearCustomParams");
+    CLEAR_CUSTOM_PARAMS("clearCustomParams"),
+    SET_CALL_VOLUME("setCallVolume");
 
 
     companion object {

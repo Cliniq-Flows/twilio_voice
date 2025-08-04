@@ -169,4 +169,12 @@ class MethodChannelTwilioCall extends TwilioCallPlatform {
       <String, dynamic>{},
     );
   }
+
+  @override
+  Future<void> setCallVolume({required double? volume}) {
+    final Map<String, dynamic> args = {
+      'level': volume,
+    };
+    return _channel.invokeMethod('setCallVolume', args);
+  }
 }

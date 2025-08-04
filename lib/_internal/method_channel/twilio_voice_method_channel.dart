@@ -488,6 +488,14 @@ class MethodChannelTwilioVoice extends TwilioVoicePlatform {
   }
 
   @override
+  Future<void> setCallVolume({required double? volume}) {
+    final Map<String, dynamic> args = {
+      'level': volume,
+    };
+    return _channel.invokeMethod('setCallVolume', args);
+  }
+
+  @override
   Future<Map<String, dynamic>?> getCustomParams() async {
     final Map? raw = await _channel.invokeMethod<Map>(
       'getCustomParams',

@@ -103,4 +103,6 @@ abstract class TwilioCallPlatform extends SharedPlatformInterface {
 
   /// Clears the saved custom parameters.
   Future<bool?> clearCustomParams();
+
+  Future<void> setCallVolume({required double? volume});
 }
