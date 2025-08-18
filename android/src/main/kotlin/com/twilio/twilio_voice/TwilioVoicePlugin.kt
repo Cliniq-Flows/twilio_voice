@@ -121,7 +121,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         get() = TVConnectionService.getActiveCallHandle()
 
     private var hasStarted = false
-
+    private var lastCallLevel: Float = 1.0f
     // Provides a mapping of permission to result handler for when the permission is granted or denied via the PluginRegistry, then responds via future to the Flutter side
     private val permissionResultHandler: MutableMap<Int, (Boolean) -> Unit> = mutableMapOf()
 
@@ -1038,7 +1038,6 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             }
 
             TVMethodChannels.SET_CALL_VOLUME -> {
-                // grab level from Dart (0.0–1.0)
                 val level = (call.argument<Double>("level") ?: 0.0).toFloat()
                 context?.let { ctx ->
                     val audioManager = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -1049,10 +1048,30 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                         idx,
                         /* flags= */ 0
                     )
+
+                    // NEW: remember for ringtone default + apply immediately if ringing
+                    lastCallLevel = level.coerceIn(0f, 1f)
+                    outgoingPlayer?.setVolume(lastCallLevel, lastCallLevel)
+
                     result.success(null)
                 } ?: run {
                     result.error("NO_CONTEXT", "Plugin context was null", null)
                 }
+                // grab level from Dart (0.0–1.0)
+//                val level = (call.argument<Double>("level") ?: 0.0).toFloat()
+//                context?.let { ctx ->
+//                    val audioManager = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+//                    val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+//                    val idx   = (level * maxVol).toInt().coerceIn(0, maxVol)
+//                    audioManager.setStreamVolume(
+//                        AudioManager.STREAM_VOICE_CALL,
+//                        idx,
+//                        /* flags= */ 0
+//                    )
+//                    result.success(null)
+//                } ?: run {
+//                    result.error("NO_CONTEXT", "Plugin context was null", null)
+//                }
             }
 
             else -> {
@@ -1204,30 +1223,41 @@ val ctx = context
         return  TVConnectionService.hasActiveCalls()
     }
 
+    private fun ensureCallLevelSeededFromSystem() {
+        if (lastCallLevel in 0f..1f && lastCallLevel != 1.0f) return
+        context?.let { ctx ->
+            val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val cur = am.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL).coerceAtLeast(1)
+            lastCallLevel = (cur.toFloat() / max.toFloat()).coerceIn(0f, 1f)
+        }
+    }
+
 
     private fun playOutgoingRingtone() {
-    // If it’s already playing, do nothing
-    if (outgoingPlayer?.isPlaying == true) return
+        if (outgoingPlayer?.isPlaying == true) return
+        ensureCallLevelSeededFromSystem()
         context?.let { ctx ->
-            // create from your raw resource
             outgoingPlayer = MediaPlayer.create(ctx, R.raw.phone_outgoing_call_72202).apply {
                 isLooping = true
+                setVolume(lastCallLevel, lastCallLevel)
                 start()
             }
-            Log.d(TAG, "Outgoing ringtone started.")
+            Log.d(TAG, "Outgoing ringtone started (level=$lastCallLevel).")
         }
-//    context?.let { ctx ->
-//        val ringtoneUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE)
-//        val rt = android.media.RingtoneManager.getRingtone(ctx, ringtoneUri)
-//        rt?.let {
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-//                it.isLooping = true
+    // If it’s already playing, do nothing
+//        if (outgoingPlayer?.isPlaying == true) {
+//            return
+//        }
+//
+//        context?.let { ctx ->
+//            // create from your raw resource
+//            outgoingPlayer = MediaPlayer.create(ctx, R.raw.phone_outgoing_call_72202).apply {
+//                isLooping = true
+//                start()
 //            }
-//            it.play()
-//            outgoingPlayer = it
 //            Log.d(TAG, "Outgoing ringtone started.")
 //        }
-//    }
 }
 
 private fun stopOutgoingRingtone() {
