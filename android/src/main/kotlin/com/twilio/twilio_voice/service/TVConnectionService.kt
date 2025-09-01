@@ -944,7 +944,8 @@ class TVConnectionService : ConnectionService() {
         connection.setInitializing()
 
         // Apply extras
-        connection.extras = request.extras
+        connection.extras = request?.extras ?: Bundle()
+//        connection.extras = request.extras
 
         startForegroundService()
 
