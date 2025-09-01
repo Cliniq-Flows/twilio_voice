@@ -972,6 +972,11 @@ class TVConnectionService : ConnectionService() {
             throw Exception("onCreateOutgoingConnection: missing EXTRA_OUTGOING_PARAMS")
         }
 
+        val customDisplayName: String? =
+         root?.getString(EXTRA_DISPLAY_NAME)
+        ?: outgoing?.getString(EXTRA_DISPLAY_NAME)
+        ?: root?.getString(TelecomManager.EXTRA_CALL_SUBJECT)
+
         // Detect conference mode
         val isConference = myBundle.containsKey("conference")
         val conferenceName = if (isConference) myBundle.getString("conference") else null
@@ -1018,6 +1023,7 @@ class TVConnectionService : ConnectionService() {
 
         // Nice UI: label the Telecom call clearly
         if (isConference) {
+            
             // val label = "Conference: ${conferenceName ?: ""}".trim()
             // connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, label)
             // connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, label, null),
