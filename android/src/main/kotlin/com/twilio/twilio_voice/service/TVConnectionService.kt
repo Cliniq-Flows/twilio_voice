@@ -609,7 +609,7 @@ class TVConnectionService : ConnectionService() {
                      }
 
                      // The address is for Telecom UI only; Twilio connection happens in ConnectionService
-                     val address = Uri.fromParts(PhoneAccount.SCHEME_TEL, "conf:$conferenceName", null)
+                     val address = Uri.fromParts(PhoneAccount.SCHEME_TEL, "-", null)
                          Log.d(TAG, "Placing Telecom conference call → $conferenceName (label='$displayName')")
 
                      tm.placeCall(address, extras)
@@ -1044,11 +1044,11 @@ class TVConnectionService : ConnectionService() {
                 val callSid = call.sid!!
 
                 // Provide a reasonable 'to' for conference (for logs/UI only)
-                val toForParams = to ?: "conf:${conferenceName ?: "unknown"}"
+                val toForParams = to ?: "- ?: "unknown"}"
 
                 val callParams = TVCallParametersImpl(mStorage, call, toForParams, from, params)
                 connection.setCallParameters(callParams)
-
+`
                 // Display name
                 val firstName = params["to_firstname"] ?: ""
                 val lastName  = params["to_lastname"] ?: ""
