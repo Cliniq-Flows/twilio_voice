@@ -58,6 +58,7 @@ class TVConnectionService : ConnectionService() {
          // ─── NEW: Conference Call ACTION and EXTRA ───────────────────────────────
         const val ACTION_CONNECT_TO_CONFERENCE: String = "ACTION_CONNECT_TO_CONFERENCE"
         const val EXTRA_CONFERENCE_NAME: String = "EXTRA_CONFERENCE_NAME"
+        const val EXTRA_DISPLAY_NAME = "EXTRA_DISPLAY_NAME"
         // ─────────────────────────────────────────────────────────────────────────────
 
         const val ACTION_UPDATE_DISPLAY_NAME: String = "updateDisplayName"
@@ -189,6 +190,9 @@ class TVConnectionService : ConnectionService() {
          * Extra used with [ACTION_TOGGLE_MUTE] to send additional parameters to the [TVCallConnection] active call.
          */
         const val EXTRA_MUTE_STATE: String = "EXTRA_MUTE_STATE"
+
+            
+
         //endregion
 
         fun hasActiveCalls(): Boolean {
@@ -578,8 +582,13 @@ class TVConnectionService : ConnectionService() {
                          ?: run { Log.e(TAG, "ACTION_CONNECT_TO_CONFERENCE: missing token"); return@let }
 
                      val tm = getSystemService(TELECOM_SERVICE) as TelecomManager
+                      val displayName = intent.getStringExtra(EXTRA_DISPLAY_NAME)
+                            ?: "Conference: $conferenceName"
                      val handle = tm.getPhoneAccountHandle(applicationContext)
-                     val fromIdentity = storage.defaultCaller ?: "client:android"
+                     val fromIdentity = displayName ?: "client:android"
+
+
+
 
                      // IMPORTANT: only conference here; do NOT include EXTRA_TO
                      val params = Bundle().apply {
@@ -595,12 +604,14 @@ class TVConnectionService : ConnectionService() {
                      val extras = Bundle().apply {
                          putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
                          putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, outgoing)
-                         putString(TelecomManager.EXTRA_CALL_SUBJECT, "Conference: $conferenceName")
+                         putString(TelecomManager.EXTRA_CALL_SUBJECT, displayName)
+                         putString(EXTRA_DISPLAY_NAME, displayName)
                      }
 
                      // The address is for Telecom UI only; Twilio connection happens in ConnectionService
                      val address = Uri.fromParts(PhoneAccount.SCHEME_TEL, "conf:$conferenceName", null)
-                     Log.d(TAG, "Placing Telecom conference call → $conferenceName")
+                         Log.d(TAG, "Placing Telecom conference call → $conferenceName (label='$displayName')")
+
                      tm.placeCall(address, extras)
                      // Pass the intent along with the conference name
                     // joinConference(intent, conferenceName)
@@ -1007,7 +1018,12 @@ class TVConnectionService : ConnectionService() {
 
         // Nice UI: label the Telecom call clearly
         if (isConference) {
-            val label = "Conference: ${conferenceName ?: ""}".trim()
+            // val label = "Conference: ${conferenceName ?: ""}".trim()
+            // connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, label)
+            // connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, label, null),
+            //     TelecomManager.PRESENTATION_ALLOWED)
+            // connection.setCallerDisplayName(label, TelecomManager.PRESENTATION_ALLOWED)
+             val label = (customDisplayName ?: "Conference: ${conferenceName ?: ""}").trim()
             connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, label)
             connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, label, null),
                 TelecomManager.PRESENTATION_ALLOWED)
@@ -1030,8 +1046,12 @@ class TVConnectionService : ConnectionService() {
                 // Display name
                 val firstName = params["to_firstname"] ?: ""
                 val lastName  = params["to_lastname"] ?: ""
+                val customDisplayName: String? =
+                root?.getString(EXTRA_DISPLAY_NAME)
+                    ?: outgoing?.getString(EXTRA_DISPLAY_NAME)
+                    ?: root?.getString(TelecomManager.EXTRA_CALL_SUBJECT)
                 val display   = if (isConference) {
-                    "Conference: ${conferenceName ?: ""}".trim()
+                   (customDisplayName ?: "Conference: ${conferenceName ?: ""}").trim()
                 } else if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
                     "$firstName $lastName".trim()
                 } else toForParams

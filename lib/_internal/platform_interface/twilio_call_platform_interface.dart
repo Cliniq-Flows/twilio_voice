@@ -92,6 +92,7 @@ abstract class TwilioCallPlatform extends SharedPlatformInterface {
   /// [extraOptions] will be added to the call payload sent to your server.
   Future<bool?> connectToConference({
     required String conferenceName,
+    required String displayName,
   });
 
   Future<bool?> updateDisplayName({

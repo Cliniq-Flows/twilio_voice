@@ -120,8 +120,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         selector: #selector(appWillTerminate),
         name: UIApplication.willTerminateNotification,
         object: nil
+       
     )
-    
+         TwilioVoiceSDK.audioDevice = self.audioDevice
 
     }
     
@@ -588,7 +589,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     ringtonePlayer = nil
 
     // deactivate if you want
-    try? AVAudioSession.sharedInstance().setActive(false, options: [])
+    // try? AVAudioSession.sharedInstance().setActive(false, options: [])
     }
 
     func updateCurrentCallDisplayName(to newName: String) {
@@ -940,14 +941,19 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
         
-        let from: String? = callInvite.customParameters!["firstname"] ?? ""
-        let fromx: String? = callInvite.customParameters!["lastname"] ?? ""
+        // let from: String? = callInvite.customParameters!["firstname"] ?? ""
+        // let fromx: String? = callInvite.customParameters!["lastname"] ?? ""
+        // var fromx1: String = callInvite.from ?? ""
+        let first: String = (callInvite.customParameters?["firstname"] as? String ?? "")
+        let last:  String = (callInvite.customParameters?["lastname"]  as? String ?? "")
         var fromx1: String = callInvite.from ?? ""
         fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
-        
-        self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        reportIncomingCall(from: from!, fromx: fromx!, fromx1: fromx1, uuid: callInvite.uuid)
+         self.sendPhoneCallEvents(description: "Ringing|\(first)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
+        // self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
+        // reportIncomingCall(from: from!, fromx: fromx!, fromx1: fromx1, uuid: callInvite.uuid)
+        reportIncomingCall(from: first, fromx: last, fromx1: fromx1, uuid: callInvite.uuid)
         self.callInvite = callInvite
+
     }
     
     func formatCustomParams(params: [String:Any]?)->String{
@@ -1054,11 +1060,13 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         if let callKitCompletionCallback = callKitCompletionCallback {
             callKitCompletionCallback(true)
         }
-        
+         audioDevice.isEnabled = true
+         stopRingbackTone()
+          callKitCompletionCallback?(true)
 
          saveCustomParams(callArgs as [String:Any])
         
-        toggleAudioRoute(toSpeaker: false)
+        //toggleAudioRoute(toSpeaker: false)
     }
     
     public func call(call: Call, isReconnectingWithError error: Error) {
@@ -1188,7 +1196,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
         self.sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
-       // audioDevice.isEnabled = true
+       audioDevice.isEnabled = true
     }
     
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
@@ -1289,16 +1297,24 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
             // Determine the custom display name using your extra parameters.
             // Here we check for "from_firstname" and "from_lastname" in callArgs.
-            var displayName = handle  // fallback to the handle if custom values are not provided
-            if let fromFirstName = self.callArgs["to_firstname"] as? String,
-            let fromLastName = self.callArgs["to_lastname"] as? String,
-            (!fromFirstName.isEmpty || !fromLastName.isEmpty) {
-                displayName = "\(fromFirstName) \(fromLastName)".trimmingCharacters(in: .whitespaces)
-            }
+            // var displayName = handle  // fallback to the handle if custom values are not provided
+            // if let fromFirstName = self.callArgs["to_firstname"] as? String,
+            // let fromLastName = self.callArgs["to_lastname"] as? String,
+            // (!fromFirstName.isEmpty || !fromLastName.isEmpty) {
+            //     displayName = "\(fromFirstName) \(fromLastName)".trimmingCharacters(in: .whitespaces)
+            // }
+
+            var displayName: String = handle
+            let fn = (self.callArgs["to_firstname"] as? String ?? "")
+            let ln = (self.callArgs["to_lastname"]  as? String ?? "")
+            let combined = "\(fn) \(ln)".trimmingCharacters(in: .whitespaces)
+            if !combined.isEmpty { displayName = combined }
 
             let callUpdate = CXCallUpdate()
             callUpdate.remoteHandle = callHandle
-            callUpdate.localizedCallerName = displayName ?? self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller
+            callUpdate.localizedCallerName = displayName.isEmpty ? (self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller) : displayName
+
+            // callUpdate.localizedCallerName = displayName ?? self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller
             callUpdate.supportsDTMF = false
             callUpdate.supportsHolding = true
             callUpdate.supportsGrouping = false

@@ -983,6 +983,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             null
         )
         return@onMethodCall
+
+        val displayName = call.argument<String>("displayName")
     }
     if (accessToken.isNullOrEmpty()) {
         result.error(
@@ -993,7 +995,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         return@onMethodCall
     }
     // Pass the token along to the helper
-    val success = connectToConference(conferenceName, accessToken!!)
+    val success = connectToConference(conferenceName, displayName,accessToken!!)
     result.success(success)
             }
 
@@ -1095,7 +1097,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
 
 
-    private fun connectToConference(conferenceName: String, token: String): Boolean {
+    private fun connectToConference(conferenceName: String,  displayName: String?, token: String): Boolean {
     return context?.let { ctx ->
         // Check if there is an active call and hang it up
         TVConnectionService.getActiveCallHandle()?.let { activeCallHandle ->
@@ -1119,6 +1121,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             action = TVConnectionService.ACTION_CONNECT_TO_CONFERENCE
             putExtra(TVConnectionService.EXTRA_CONFERENCE_NAME, conferenceName)
             putExtra(TVConnectionService.EXTRA_TOKEN, token)
+            displayName?.let { putExtra(TVConnectionService.EXTRA_DISPLAY_NAME, it) }
             ctx.startService(this)
         }
         true
