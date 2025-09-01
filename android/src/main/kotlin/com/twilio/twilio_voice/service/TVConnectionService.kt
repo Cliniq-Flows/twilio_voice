@@ -572,28 +572,20 @@ class TVConnectionService : ConnectionService() {
                 // ─── New branch for conference connection ───────────────────────────────
                  ACTION_CONNECT_TO_CONFERENCE -> {
                      val conferenceName = intent.getStringExtra(EXTRA_CONFERENCE_NAME)
-                     if (conferenceName.isNullOrEmpty()){
-                         Log.e(TAG, "onStartCommand: ACTION_CONNECT_TO_CONFERENCE missing conference name")
-                         return@let
-                     }
-
+                         ?: run { Log.e(TAG, "ACTION_CONNECT_TO_CONFERENCE: missing conference name"); return@let }
 
                      val token = intent.getStringExtra(EXTRA_TOKEN)
-                     if (token.isNullOrEmpty()){
-                         Log.e(TAG, "ACTION_CONNECT_TO_CONFERENCE: missing token")
-                         return@let
-                     }
+                         ?: run { Log.e(TAG, "ACTION_CONNECT_TO_CONFERENCE: missing token"); return@let }
 
                      val tm = getSystemService(TELECOM_SERVICE) as TelecomManager
                      val handle = tm.getPhoneAccountHandle(applicationContext)
                      val fromIdentity = storage.defaultCaller ?: "client:android"
 
-                     // Bundle passed to onCreateOutgoingConnection (via EXTRA_OUTGOING_PARAMS)
+                     // IMPORTANT: only conference here; do NOT include EXTRA_TO
                      val params = Bundle().apply {
                          putString(EXTRA_TOKEN, token)
-                         putString(EXTRA_TO, conferenceName)         // placeholder “To”
-                         putString(EXTRA_FROM, fromIdentity)         // your caller identity
-                         putString("conference", conferenceName)     // <-- IMPORTANT: TwiML/server will key off this
+                         putString(EXTRA_FROM, fromIdentity)      // optional; safe to include
+                         putString("conference", conferenceName)   // this drives Twilio join
                      }
 
                      val outgoing = Bundle().apply {
@@ -603,13 +595,11 @@ class TVConnectionService : ConnectionService() {
                      val extras = Bundle().apply {
                          putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
                          putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, outgoing)
-                         // Optional: show a subject on the telecom UI
                          putString(TelecomManager.EXTRA_CALL_SUBJECT, "Conference: $conferenceName")
                      }
 
-                     // The tel: address is just for UI; Twilio connect happens in onCreateOutgoingConnection
-                     val address = Uri.fromParts(PhoneAccount.SCHEME_TEL, conferenceName, null)
-
+                     // The address is for Telecom UI only; Twilio connection happens in ConnectionService
+                     val address = Uri.fromParts(PhoneAccount.SCHEME_TEL, "conf:$conferenceName", null)
                      Log.d(TAG, "Placing Telecom conference call → $conferenceName")
                      tm.placeCall(address, extras)
                      // Pass the intent along with the conference name
@@ -950,106 +940,119 @@ class TVConnectionService : ConnectionService() {
 //
 //        return connection
 //    }
-override fun onCreateOutgoingConnection(
-    connectionManagerPhoneAccount: PhoneAccountHandle?,
-    request: ConnectionRequest?
-): Connection {
-    assert(request != null) { "ConnectionRequest cannot be null" }
-    assert(connectionManagerPhoneAccount != null) { "ConnectionManagerPhoneAccount cannot be null" }
 
-    super.onCreateOutgoingConnection(connectionManagerPhoneAccount, request)
-    Log.d(TAG, "onCreateOutgoingConnection")
+    override fun onCreateOutgoingConnection(
+        connectionManagerPhoneAccount: PhoneAccountHandle?,
+        request: ConnectionRequest?
+    ): Connection {
+        assert(request != null) { "ConnectionRequest cannot be null" }
+        assert(connectionManagerPhoneAccount != null) { "ConnectionManagerPhoneAccount cannot be null" }
 
-    // 0) Unpack the nested bundles:
-    // request.extras -> TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS -> EXTRA_OUTGOING_PARAMS
-    val root = request?.extras
-    val outgoing = root?.getBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS)
-    val myBundle: Bundle = (outgoing?.getBundle(EXTRA_OUTGOING_PARAMS)
-        ?: root?.getBundle(EXTRA_OUTGOING_PARAMS) // fallback if caller sent it flat
-            ) ?: run {
-        Log.e(TAG, "onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS")
-        throw Exception("onCreateOutgoingConnection: missing EXTRA_OUTGOING_PARAMS")
-    }
+        super.onCreateOutgoingConnection(connectionManagerPhoneAccount, request)
+        Log.d(TAG, "onCreateOutgoingConnection")
 
-    // 1) Required fields
-    val token: String = myBundle.getString(EXTRA_TOKEN) ?: run {
-        Log.e(TAG, "onCreateOutgoingConnection: missing EXTRA_TOKEN")
-        throw Exception("onCreateOutgoingConnection: missing EXTRA_TOKEN")
-    }
-    val to: String = myBundle.getString(EXTRA_TO) ?: run {
-        Log.e(TAG, "onCreateOutgoingConnection: missing EXTRA_TO")
-        throw Exception("onCreateOutgoingConnection: missing EXTRA_TO")
-    }
-    val from: String = myBundle.getString(EXTRA_FROM) ?: run {
-        Log.e(TAG, "onCreateOutgoingConnection: missing EXTRA_FROM")
-        throw Exception("onCreateOutgoingConnection: missing EXTRA_FROM")
-    }
-
-    // 2) Collect custom params
-    val params = HashMap<String, String>()
-    myBundle.keySet().forEach { key ->
-        if (key != EXTRA_TO && key != EXTRA_FROM && key != EXTRA_TOKEN) {
-            myBundle.getString(key)?.let { params[key] = it }
+        // Unpack nested bundles: root → OUTGOING_CALL_EXTRAS → EXTRA_OUTGOING_PARAMS
+        val root = request?.extras
+        val outgoing = root?.getBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS)
+        val myBundle: Bundle = (outgoing?.getBundle(EXTRA_OUTGOING_PARAMS)
+            ?: root?.getBundle(EXTRA_OUTGOING_PARAMS)
+                ) ?: run {
+            Log.e(TAG, "onCreateOutgoingConnection: missing EXTRA_OUTGOING_PARAMS")
+            throw Exception("onCreateOutgoingConnection: missing EXTRA_OUTGOING_PARAMS")
         }
-    }
-    params["From"] = from
-    params["To"] = to
 
-    // 3) Build the Connection FIRST and init extras to avoid NPEs
-    val connection = TVCallConnection(applicationContext).apply {
-        extras = request?.extras ?: Bundle()   // <-- initialize before any extras.put*
-        setInitializing()
-    }
+        // Detect conference mode
+        val isConference = myBundle.containsKey("conference")
+        val conferenceName = if (isConference) myBundle.getString("conference") else null
 
-    // 4) Start the Voice SDK call
-    val connectOptions = ConnectOptions.Builder(token).params(params).build()
-    connection.twilioCall = Voice.connect(applicationContext, connectOptions, connection)
+        // Required pieces
+        val token: String = myBundle.getString(EXTRA_TOKEN) ?: run {
+            Log.e(TAG, "onCreateOutgoingConnection: missing EXTRA_TOKEN")
+            throw Exception("onCreateOutgoingConnection: missing EXTRA_TOKEN")
+        }
+        val from: String = myBundle.getString(EXTRA_FROM)
+            ?: (storage.defaultCaller ?: "client:android")
 
-    // 5) Optional nicer UI for conference calls (safe now that extras is non-null)
-    params["conference"]?.let { conf ->
-        connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, "Conference: $conf")
-        connection.setAddress(
-            Uri.fromParts(PhoneAccount.SCHEME_TEL, "Conference: $conf", null),
-            TelecomManager.PRESENTATION_ALLOWED
-        )
-        connection.setCallerDisplayName("Conference: $conf", TelecomManager.PRESENTATION_ALLOWED)
-    }
+        // 'to' is only required for NON conference calls
+        val to: String? = if (!isConference) {
+            myBundle.getString(EXTRA_TO) ?: run {
+                Log.e(TAG, "onCreateOutgoingConnection: missing EXTRA_TO (non-conference)")
+                throw Exception("onCreateOutgoingConnection: missing EXTRA_TO (non-conference)")
+            }
+        } else null
 
-    // 6) Late-binding tweaks once Twilio assigns a real SID
-    val mStorage: Storage = StorageImpl(applicationContext)
-    val onCallStateListener: CompletionHandler<Call.State> = CompletionHandler { state ->
-        if (state == Call.State.RINGING || state == Call.State.CONNECTED) {
-            val call = connection.twilioCall!!
-            val callSid = call.sid!!
-
-            val callParams = TVCallParametersImpl(mStorage, call, to, from, params)
-            connection.setCallParameters(callParams)
-
-            val firstName = params["to_firstname"] ?: ""
-            val lastName  = params["to_lastname"] ?: ""
-            val display   = if (firstName.isNotEmpty() || lastName.isNotEmpty())
-                "$firstName $lastName".trim()
-            else to
-
-            connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, display)
-            connection.setAddress(
-                Uri.fromParts(PhoneAccount.SCHEME_TEL, display, null),
-                TelecomManager.PRESENTATION_ALLOWED
-            )
-            connection.setCallerDisplayName(display, TelecomManager.PRESENTATION_ALLOWED)
-
-            if (!activeConnections.containsKey(callSid)) {
-                applyParameters(connection, callParams)
-                attachCallEventListeners(connection, callSid)
-                callParams.callSid = callSid
+        // Collect custom params (excluding our control keys)
+        val params = HashMap<String, String>()
+        myBundle.keySet().forEach { key ->
+            if (key != EXTRA_TOKEN && key != EXTRA_TO && key != EXTRA_FROM) {
+                myBundle.getString(key)?.let { params[key] = it }
             }
         }
-    }
-    connection.setOnCallStateListener(onCallStateListener)
 
-    startForegroundService()
-    return connection
-}
+        // Only add To/From if NOT a conference call (avoid server routing by 'To')
+        if (!isConference) {
+            params["From"] = from
+            params["To"] = to!!
+        }
+
+        // Build the Connection and init extras early to avoid NPEs
+        val connection = TVCallConnection(applicationContext).apply {
+            extras = request?.extras ?: Bundle()
+            setInitializing()
+        }
+
+        // Start the Twilio Voice call
+        val connectOptions = ConnectOptions.Builder(token).params(params).build()
+        connection.twilioCall = Voice.connect(applicationContext, connectOptions, connection)
+
+        // Nice UI: label the Telecom call clearly
+        if (isConference) {
+            val label = "Conference: ${conferenceName ?: ""}".trim()
+            connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, label)
+            connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, label, null),
+                TelecomManager.PRESENTATION_ALLOWED)
+            connection.setCallerDisplayName(label, TelecomManager.PRESENTATION_ALLOWED)
+        }
+
+        // Late-binding once Twilio assigns the real SID
+        val mStorage: Storage = StorageImpl(applicationContext)
+        val onCallStateListener: CompletionHandler<Call.State> = CompletionHandler { state ->
+            if (state == Call.State.RINGING || state == Call.State.CONNECTED) {
+                val call = connection.twilioCall!!
+                val callSid = call.sid!!
+
+                // Provide a reasonable 'to' for conference (for logs/UI only)
+                val toForParams = to ?: "conf:${conferenceName ?: "unknown"}"
+
+                val callParams = TVCallParametersImpl(mStorage, call, toForParams, from, params)
+                connection.setCallParameters(callParams)
+
+                // Display name
+                val firstName = params["to_firstname"] ?: ""
+                val lastName  = params["to_lastname"] ?: ""
+                val display   = if (isConference) {
+                    "Conference: ${conferenceName ?: ""}".trim()
+                } else if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
+                    "$firstName $lastName".trim()
+                } else toForParams
+
+                connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, display)
+                connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, display, null),
+                    TelecomManager.PRESENTATION_ALLOWED)
+                connection.setCallerDisplayName(display, TelecomManager.PRESENTATION_ALLOWED)
+
+                if (!activeConnections.containsKey(callSid)) {
+                    applyParameters(connection, callParams)
+                    attachCallEventListeners(connection, callSid)
+                    callParams.callSid = callSid
+                }
+            }
+        }
+        connection.setOnCallStateListener(onCallStateListener)
+
+        startForegroundService()
+        return connection
+    }
 
     /**
      * Attach call event listeners to the given connection. This includes responding to call events, call actions and when call has ended.
