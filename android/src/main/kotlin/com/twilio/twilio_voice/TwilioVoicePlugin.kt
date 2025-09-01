@@ -984,7 +984,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         )
         return@onMethodCall
 
-        val displayName = call.argument<String>("displayName")
+      
     }
     if (accessToken.isNullOrEmpty()) {
         result.error(
@@ -994,6 +994,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         )
         return@onMethodCall
     }
+        val displayName: String? = call.argument<String>("displayName")
     // Pass the token along to the helper
     val success = connectToConference(conferenceName, displayName,accessToken!!)
     result.success(success)
