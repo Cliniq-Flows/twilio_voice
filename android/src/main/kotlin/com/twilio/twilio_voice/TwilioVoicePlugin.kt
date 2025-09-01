@@ -2167,6 +2167,70 @@ private fun stopOutgoingRingtone() {
 //                callSid = callHandle
      stopOutgoingRingtone()
                 logEvents("", arrayOf("Connected", from, to, callDirection))
+                TVNativeCallEvents.EVENT_CONNECTED -> {
+    // TODO
+    val callHandle =
+        intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE) ?: run {
+            Log.e(
+                TAG,
+                "No 'EXTRA_CALL_INVITE' provided or invalid type, make sure to provide a [CallInvite]"
+            )
+            return
+        }
+    val from = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_FROM) ?: run {
+        Log.e(
+            TAG,
+            "No 'EXTRA_CALL_INVITE' provided or invalid type, make sure to provide a [CallInvite]"
+        )
+        return
+    }
+    val to = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_TO) ?: run {
+        Log.e(
+            TAG,
+            "No 'EXTRA_CALL_INVITE' provided or invalid type, make sure to provide a [CallInvite]"
+        )
+        return
+    }
+    val direction = intent.getIntExtra(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, -1)
+    val callDirection = CallDirection.fromId(direction)!!.label
+    val sid = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE)
+    if (sid == null) {
+        Log.e(TAG, "Ringing without SID")
+        return          // <-- return Unit
+    } else {
+        // no-op
+    }
+
+    // callSid = callHandle
+    stopOutgoingRingtone()
+    logEvents("", arrayOf("Connected", from, to, callDirection))
+
+    // ───── NEW: Bring the app to foreground when an OUTGOING call is connected ─────
+    // (Keeps user on native UI while ringing; only jumps back on connect)
+    try {
+        if (direction == CallDirection.OUTGOING.id) {
+            val appCtx = context
+            if (appCtx != null) {
+                val launchIntent = appCtx.packageManager
+                    ?.getLaunchIntentForPackage(appCtx.packageName)
+                    ?.apply {
+                        addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        )
+                    }
+                if (launchIntent != null) {
+                    appCtx.startActivity(launchIntent)
+                    Log.d(TAG, "Brought app to foreground on call connected")
+                } else {
+                    Log.w(TAG, "No launch intent for package; can't foreground app")
+                }
+            }
+        }
+    } catch (t: Throwable) {
+        Log.w(TAG, "Unable to bring app to foreground: ${t.message}")
+    }
             }
 
             TVNativeCallEvents.EVENT_CONNECT_FAILURE -> {
