@@ -658,53 +658,97 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     func makeCall(to: String)
     {
         // Cancel the previous call before making another one.
-        if (self.call != nil) {
-            self.userInitiatedDisconnect = true
-            performEndCallAction(uuid: self.call!.uuid!)            
-        } else {
-            let uuid = UUID()
+        // if (self.call != nil) {
+        //     self.userInitiatedDisconnect = true
+        //     performEndCallAction(uuid: self.call!.uuid!)            
+        // } else {
+        //     let uuid = UUID()
             
-            self.checkRecordPermission { (permissionGranted) in
-                if (!permissionGranted) {
-                    let alertController: UIAlertController = UIAlertController(title: String(format:  NSLocalizedString("mic_permission_title", comment: "") , SwiftTwilioVoicePlugin.appName),
-                                                                               message: NSLocalizedString( "mic_permission_subtitle", comment: ""),
-                                                                               preferredStyle: .alert)
+        //     self.checkRecordPermission { (permissionGranted) in
+        //         if (!permissionGranted) {
+        //             let alertController: UIAlertController = UIAlertController(title: String(format:  NSLocalizedString("mic_permission_title", comment: "") , SwiftTwilioVoicePlugin.appName),
+        //                                                                        message: NSLocalizedString( "mic_permission_subtitle", comment: ""),
+        //                                                                        preferredStyle: .alert)
                     
-                    let continueWithMic: UIAlertAction = UIAlertAction(title: NSLocalizedString("btn_continue_no_mic", comment: ""),
-                                                                       style: .default,
-                                                                       handler: { (action) in
-                                                                        self.performStartCallAction(uuid: uuid, handle: to)
-                                                                       })
-                    alertController.addAction(continueWithMic)
+        //             let continueWithMic: UIAlertAction = UIAlertAction(title: NSLocalizedString("btn_continue_no_mic", comment: ""),
+        //                                                                style: .default,
+        //                                                                handler: { (action) in
+        //                                                                 self.performStartCallAction(uuid: uuid, handle: to)
+        //                                                                })
+        //             alertController.addAction(continueWithMic)
                     
-                    let goToSettings: UIAlertAction = UIAlertAction(title:NSLocalizedString("btn_settings", comment: ""),
-                                                                    style: .default,
-                                                                    handler: { (action) in
-                                                                        UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!,
-                                                                                                  options: [UIApplication.OpenExternalURLOptionsKey.universalLinksOnly: false],
-                                                                                                  completionHandler: nil)
-                                                                    })
-                    alertController.addAction(goToSettings)
+        //             let goToSettings: UIAlertAction = UIAlertAction(title:NSLocalizedString("btn_settings", comment: ""),
+        //                                                             style: .default,
+        //                                                             handler: { (action) in
+        //                                                                 UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!,
+        //                                                                                           options: [UIApplication.OpenExternalURLOptionsKey.universalLinksOnly: false],
+        //                                                                                           completionHandler: nil)
+        //                                                             })
+        //             alertController.addAction(goToSettings)
                     
-                    let cancel: UIAlertAction = UIAlertAction(title: NSLocalizedString("btn_cancel", comment: ""),
-                                                              style: .cancel,
-                                                              handler: { (action) in
-                                                                //self.toggleUIState(isEnabled: true, showCallControl: false)
-                                                                //self.stopSpin()
-                                                              })
-                    alertController.addAction(cancel)
-                    // guard let currentViewController = UIApplication.shared.keyWindow?.topMostViewController() else {
-                    //     return
-                    // }
-                    // currentViewController.present(alertController, animated: true, completion: nil)
-                    guard let currentVC = UIApplication.shared.windows.first(where: { $0.isKeyWindow })?.topMostViewController() else { return }
-                    currentVC.present(alertController, animated: true, completion: nil)
+        //             let cancel: UIAlertAction = UIAlertAction(title: NSLocalizedString("btn_cancel", comment: ""),
+        //                                                       style: .cancel,
+        //                                                       handler: { (action) in
+        //                                                         //self.toggleUIState(isEnabled: true, showCallControl: false)
+        //                                                         //self.stopSpin()
+        //                                                       })
+        //             alertController.addAction(cancel)
+        //             // guard let currentViewController = UIApplication.shared.keyWindow?.topMostViewController() else {
+        //             //     return
+        //             // }
+        //             // currentViewController.present(alertController, animated: true, completion: nil)
+        //             guard let currentVC = UIApplication.shared.windows.first(where: { $0.isKeyWindow })?.topMostViewController() else { return }
+        //             currentVC.present(alertController, animated: true, completion: nil)
                     
-                } else {
-                    self.performStartCallAction(uuid: uuid, handle: to)
-                }
+        //         } else {
+        //             self.performStartCallAction(uuid: uuid, handle: to)
+        //         }
+        //     }
+        // }
+        if let current = self.call, let oldUUID = current.uuid {
+        self.userInitiatedDisconnect = true
+        current.disconnect()
+        performEndCallAction(uuid: oldUUID)
+        self.call = nil
+    }
+
+    var params = self.callArgs as [String: Any]
+    if params["To"] == nil { params["To"] = to }
+    if params["From"] == nil { params["From"] = self.identity }
+    self.callArgs = params.reduce(into: [String: AnyObject]()) { $0[$1.key] = $1.value as AnyObject }
+
+    // 3) Mark as outbound so ringback/logging behave correctly.
+    self.callOutgoing = true
+
+    // 4) Always start via CallKit; Twilio connect happens in provider(_:perform:).
+    let uuid = UUID()
+    self.checkRecordPermission { granted in
+        guard granted else {
+            let alert = UIAlertController(
+                title: String(format: NSLocalizedString("mic_permission_title", comment: ""), SwiftTwilioVoicePlugin.appName),
+                message: NSLocalizedString("mic_permission_subtitle", comment: ""),
+                preferredStyle: .alert
+            )
+            let continueWithMic = UIAlertAction(title: NSLocalizedString("btn_continue_no_mic", comment: ""), style: .default) { _ in
+                self.performStartCallAction(uuid: uuid, handle: to)
             }
+            let goToSettings = UIAlertAction(title: NSLocalizedString("btn_settings", comment: ""), style: .default) { _ in
+                UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!, options: [.universalLinksOnly: false], completionHandler: nil)
+            }
+            let cancel = UIAlertAction(title: NSLocalizedString("btn_cancel", comment: ""), style: .cancel)
+
+            alert.addAction(continueWithMic)
+            alert.addAction(goToSettings)
+            alert.addAction(cancel)
+
+            if let currentVC = UIApplication.shared.windows.first(where: { $0.isKeyWindow })?.topMostViewController() {
+                currentVC.present(alert, animated: true, completion: nil)
+            }
+            return
         }
+
+        self.performStartCallAction(uuid: uuid, handle: to)
+    }
     }
     
     func checkRecordPermission(completion: @escaping (_ permissionGranted: Bool) -> Void) {
@@ -1397,6 +1441,27 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.call = theCall
         self.callKitCompletionCallback = completionHandler
     }
+
+    private func startViaCallKit(uuid: UUID,
+                             handle: String,
+                             params: [String: Any],
+                             completion: ((Bool) -> Void)? = nil) {
+    // End any existing call
+    if let existing = self.call, let existingUUID = existing.uuid {
+        self.userInitiatedDisconnect = true
+        existing.disconnect()
+        performEndCallAction(uuid: existingUUID)
+        self.call = nil
+    }
+
+    // Stash params; performVoiceCall() will read these and pass to Twilio
+    self.callArgs = params.reduce(into: [String: AnyObject]()) { $0[$1.key] = $1.value as AnyObject }
+    self.callOutgoing = true
+    if let completion = completion { self.callKitCompletionCallback = completion }
+
+    // This triggers provider(_:perform: CXStartCallAction) → performVoiceCall(...)
+    performStartCallAction(uuid: uuid, handle: handle)
+}
     // Updated connectToConference function without extraOptions:
     func connectToConference(
         uuid: UUID, 
@@ -1404,23 +1469,30 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         displayName: String, 
         completionHandler: @escaping (Bool) -> Swift.Void) {
         
-        guard accessToken != nil else {
-        completionHandler(false)
-        return
-    }
+    //     guard accessToken != nil else {
+    //     completionHandler(false)
+    //     return
+    // }
 
-     if let existing = self.call, let existingUUID = existing.uuid {
-        self.userInitiatedDisconnect = true
-        existing.disconnect()
-        performEndCallAction(uuid: existingUUID)
-        self.call = nil
-    }
+    //  if let existing = self.call, let existingUUID = existing.uuid {
+    //     self.userInitiatedDisconnect = true
+    //     existing.disconnect()
+    //     performEndCallAction(uuid: existingUUID)
+    //     self.call = nil
+    // }
 
-     self.callArgs = ["conference": conferenceName as AnyObject]
+    //  self.callArgs = ["conference": conferenceName as AnyObject]
 
-     self.callOutgoing = true
-    self.callKitCompletionCallback = completionHandler
-        self.performStartCallAction(uuid: uuid, handle: displayName)
+    //  self.callOutgoing = true
+    // self.callKitCompletionCallback = completionHandler
+    //     self.performStartCallAction(uuid: uuid, handle: displayName)
+
+    startViaCallKit(
+        uuid: uuid,
+        handle: displayName,
+        params: ["conference": conferenceName],
+        completion: completionHandler
+    )
 
     //     guard let token = accessToken else {
     //     completionHandler(false)
