@@ -2159,55 +2159,17 @@ private fun stopOutgoingRingtone() {
                 val callDirection = CallDirection.fromId(direction)!!.label
                   val sid = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE) 
               if (sid == null) {
-            Log.e(TAG, "Ringing without SID")
-            return          // <-- return Unit
-        }else{
-  
-        }
+                    Log.e(TAG, "Ringing without SID")
+                    return          // <-- return Unit
+                }else{
+        
+                }
 //                callSid = callHandle
-     stopOutgoingRingtone()
-                logEvents("", arrayOf("Connected", from, to, callDirection))
-                TVNativeCallEvents.EVENT_CONNECTED -> {
-    // TODO
-    val callHandle =
-        intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE) ?: run {
-            Log.e(
-                TAG,
-                "No 'EXTRA_CALL_INVITE' provided or invalid type, make sure to provide a [CallInvite]"
-            )
-            return
-        }
-    val from = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_FROM) ?: run {
-        Log.e(
-            TAG,
-            "No 'EXTRA_CALL_INVITE' provided or invalid type, make sure to provide a [CallInvite]"
-        )
-        return
-    }
-    val to = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_TO) ?: run {
-        Log.e(
-            TAG,
-            "No 'EXTRA_CALL_INVITE' provided or invalid type, make sure to provide a [CallInvite]"
-        )
-        return
-    }
-    val direction = intent.getIntExtra(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, -1)
-    val callDirection = CallDirection.fromId(direction)!!.label
-    val sid = intent.getStringExtra(TVBroadcastReceiver.EXTRA_CALL_HANDLE)
-    if (sid == null) {
-        Log.e(TAG, "Ringing without SID")
-        return          // <-- return Unit
-    } else {
-        // no-op
-    }
+                stopOutgoingRingtone()
+                            logEvents("", arrayOf("Connected", from, to, callDirection))
 
-    // callSid = callHandle
-    stopOutgoingRingtone()
-    logEvents("", arrayOf("Connected", from, to, callDirection))
 
-    // ───── NEW: Bring the app to foreground when an OUTGOING call is connected ─────
-    // (Keeps user on native UI while ringing; only jumps back on connect)
-    try {
+                            try {
         if (direction == CallDirection.OUTGOING.id) {
             val appCtx = context
             if (appCtx != null) {
