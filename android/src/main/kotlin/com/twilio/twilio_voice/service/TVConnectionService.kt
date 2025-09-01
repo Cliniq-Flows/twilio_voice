@@ -577,18 +577,23 @@ class TVConnectionService : ConnectionService() {
                          return@let
                      }
 
-                     val token = intent.getStringExtra(EXTRA_TOKEN) ?: return@let
+
+                     val token = intent.getStringExtra(EXTRA_TOKEN)
+                     if (token.isNullOrEmpty()){
+                         Log.e(TAG, "ACTION_CONNECT_TO_CONFERENCE: missing token")
+                         return@let
+                     }
 
                      val tm = getSystemService(TELECOM_SERVICE) as TelecomManager
-                     val handle = tm.getPhoneAccountHandle(applicationContext) ?: return@let
+                     val handle = tm.getPhoneAccountHandle(applicationContext)
+                     val fromIdentity = storage.defaultCaller ?: "client:android"
 
-                     // Build the param bundle exactly like ACTION_PLACE_OUTGOING_CALL does
+                     // Bundle passed to onCreateOutgoingConnection (via EXTRA_OUTGOING_PARAMS)
                      val params = Bundle().apply {
                          putString(EXTRA_TOKEN, token)
-                         // Twilio will key off "conference"; To/From are fine as placeholders
-                         putString(EXTRA_TO, conferenceName)
-                         putString(EXTRA_FROM, storage.defaultCaller ?: "client:android")
-                         putString("conference", conferenceName)
+                         putString(EXTRA_TO, conferenceName)         // placeholder “To”
+                         putString(EXTRA_FROM, fromIdentity)         // your caller identity
+                         putString("conference", conferenceName)     // <-- IMPORTANT: TwiML/server will key off this
                      }
 
                      val outgoing = Bundle().apply {
@@ -598,9 +603,14 @@ class TVConnectionService : ConnectionService() {
                      val extras = Bundle().apply {
                          putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
                          putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, outgoing)
+                         // Optional: show a subject on the telecom UI
+                         putString(TelecomManager.EXTRA_CALL_SUBJECT, "Conference: $conferenceName")
                      }
 
+                     // The tel: address is just for UI; Twilio connect happens in onCreateOutgoingConnection
                      val address = Uri.fromParts(PhoneAccount.SCHEME_TEL, conferenceName, null)
+
+                     Log.d(TAG, "Placing Telecom conference call → $conferenceName")
                      tm.placeCall(address, extras)
                      // Pass the intent along with the conference name
                     // joinConference(intent, conferenceName)
@@ -879,12 +889,20 @@ class TVConnectionService : ConnectionService() {
 
         // create outgoing connection
         val connection = TVCallConnection(applicationContext)
-          val props = connection.connectionProperties or Connection.PROPERTY_SELF_MANAGED
-        connection.setConnectionProperties(props)
+//          val props = connection.connectionProperties or Connection.PROPERTY_SELF_MANAGED
+//        connection.setConnectionProperties(props)
 
         // create Voice SDK call
         connection.twilioCall = Voice.connect(applicationContext, connectOptions, connection)
 
+        // Optionally improve the displayed name for a conference:
+        val conf = params["conference"]
+        if (!conf.isNullOrEmpty()) {
+            connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, "Conference: $conf")
+            connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, "Conference: $conf", null),
+                TelecomManager.PRESENTATION_ALLOWED)
+            connection.setCallerDisplayName("Conference: $conf", TelecomManager.PRESENTATION_ALLOWED)
+        }
         // create storage instance for call parameters
         val mStorage: Storage = StorageImpl(applicationContext)
 
