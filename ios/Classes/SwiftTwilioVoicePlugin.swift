@@ -1270,6 +1270,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                 provider.reportOutgoingCall(with: action.callUUID, connectedAt: Date())
             } else {
                 self.sendPhoneCallEvents(description: "LOG|provider:performVoiceCall() failed", isError: false)
+                self.callKitProvider.reportCall(with: action.callUUID, endedAt: Date(), reason: .failed)
+                self.callDisconnected()
             }
         }
         action.fulfill()
@@ -1403,24 +1405,34 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     func performEndCallAction(uuid: UUID) {
         
-        self.sendPhoneCallEvents(description: "LOG|performEndCallAction method invoked", isError: false)
+        // self.sendPhoneCallEvents(description: "LOG|performEndCallAction method invoked", isError: false)
 
-        guard isCallActive(uuid: uuid) else {
-            print("Call not found or already ended. Skipping end request.")
+        // guard isCallActive(uuid: uuid) else {
+        //     print("Call not found or already ended. Skipping end request.")
+        //     self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+        //     return
+        // }
+        
+        // let endCallAction = CXEndCallAction(call: uuid)
+        // let transaction = CXTransaction(action: endCallAction)
+        
+        // callKitCallController.request(transaction) { error in
+        //     if let error = error {
+        //         self.sendPhoneCallEvents(description: "End Call Failed: \(error.localizedDescription).", isError: true)
+        //     } else {
+        //         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
+        //     }
+        // }
+        sendPhoneCallEvents(description: "LOG|performEndCallAction method invoked", isError: false)
+    let end = CXEndCallAction(call: uuid)
+    let tx = CXTransaction(action: end)
+    callKitCallController.request(tx) { err in
+        if let err = err {
+            self.sendPhoneCallEvents(description: "End Call Failed: \(err.localizedDescription).", isError: true)
+        } else {
             self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-            return
         }
-        
-        let endCallAction = CXEndCallAction(call: uuid)
-        let transaction = CXTransaction(action: endCallAction)
-        
-        callKitCallController.request(transaction) { error in
-            if let error = error {
-                self.sendPhoneCallEvents(description: "End Call Failed: \(error.localizedDescription).", isError: true)
-            } else {
-                self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-            }
-        }
+    }
     }
     
     func performVoiceCall(uuid: UUID, client: String?, completionHandler: @escaping (Bool) -> Swift.Void) {
