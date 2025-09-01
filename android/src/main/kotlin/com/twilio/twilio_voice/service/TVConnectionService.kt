@@ -583,7 +583,7 @@ class TVConnectionService : ConnectionService() {
 
                      val tm = getSystemService(TELECOM_SERVICE) as TelecomManager
                       val displayName = intent.getStringExtra(EXTRA_DISPLAY_NAME)
-                            ?: "Conference: $conferenceName"
+                            ?: ""
                      val handle = tm.getPhoneAccountHandle(applicationContext)
                      val fromIdentity = displayName ?: "client:android"
 
@@ -1029,7 +1029,7 @@ class TVConnectionService : ConnectionService() {
             // connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, label, null),
             //     TelecomManager.PRESENTATION_ALLOWED)
             // connection.setCallerDisplayName(label, TelecomManager.PRESENTATION_ALLOWED)
-             val label = (customDisplayName ?: "Conference: ${conferenceName ?: ""}").trim()
+             val label = (customDisplayName ?: "").trim()
             connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, label)
             connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, label, null),
                 TelecomManager.PRESENTATION_ALLOWED)
@@ -1057,7 +1057,7 @@ class TVConnectionService : ConnectionService() {
                     ?: outgoing?.getString(EXTRA_DISPLAY_NAME)
                     ?: root?.getString(TelecomManager.EXTRA_CALL_SUBJECT)
                 val display   = if (isConference) {
-                   (customDisplayName ?: "Conference: ${conferenceName ?: ""}").trim()
+                   (customDisplayName ?: "").trim()
                 } else if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
                     "$firstName $lastName".trim()
                 } else toForParams

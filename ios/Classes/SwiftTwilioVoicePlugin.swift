@@ -452,8 +452,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                  result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing conferenceName", details: nil))
                  return
              }
+             guard let displayName = arguments["displayName"] as? String else {
+                 result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing displayName", details: nil))
+                 return
+             }
              let uuid = UUID()
-             self.connectToConference(uuid: uuid, conferenceName: conferenceName) { success in
+             self.connectToConference(uuid: uuid, conferenceName: conferenceName,displayName:displayName) { success in
                  result(success)}
    
         } else  if flutterCall.method == "updateDisplayName" {
@@ -689,10 +693,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                                                                 //self.stopSpin()
                                                               })
                     alertController.addAction(cancel)
-                    guard let currentViewController = UIApplication.shared.keyWindow?.topMostViewController() else {
-                        return
-                    }
-                    currentViewController.present(alertController, animated: true, completion: nil)
+                    // guard let currentViewController = UIApplication.shared.keyWindow?.topMostViewController() else {
+                    //     return
+                    // }
+                    // currentViewController.present(alertController, animated: true, completion: nil)
+                    guard let currentVC = UIApplication.shared.windows.first(where: { $0.isKeyWindow })?.topMostViewController() else { return }
+                    currentVC.present(alertController, animated: true, completion: nil)
                     
                 } else {
                     self.performStartCallAction(uuid: uuid, handle: to)
@@ -1395,26 +1401,44 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     func connectToConference(
         uuid: UUID, 
         conferenceName: String, 
+        displayName: String, 
         completionHandler: @escaping (Bool) -> Swift.Void) {
         
-       
-        guard let token = accessToken else {
+        guard accessToken != nil else {
         completionHandler(false)
         return
     }
 
-    let connectOptions = ConnectOptions(accessToken: token) { builder in
-        builder.uuid = uuid
-        builder.params["conference"] = conferenceName
+     if let existing = self.call, let existingUUID = existing.uuid {
+        self.userInitiatedDisconnect = true
+        existing.disconnect()
+        performEndCallAction(uuid: existingUUID)
+        self.call = nil
     }
 
-    // Only connect once. Assign the returned Call to self.call, so delegate callbacks (callDidConnect, etc.) will fire on that object.
-    let conferenceCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
-    self.call = conferenceCall
-    self.callKitCompletionCallback = completionHandler
+     self.callArgs = ["conference": conferenceName as AnyObject]
 
-    // Enable the audio device immediately (so that the call audio will flow correctly once connected)
-    audioDevice.isEnabled = true
+     self.callOutgoing = true
+    self.callKitCompletionCallback = completionHandler
+        self.performStartCallAction(uuid: uuid, handle: displayName)
+
+    //     guard let token = accessToken else {
+    //     completionHandler(false)
+    //     return
+    // }
+
+    // let connectOptions = ConnectOptions(accessToken: token) { builder in
+    //     builder.uuid = uuid
+    //     builder.params["conference"] = conferenceName
+    // }
+
+    // // Only connect once. Assign the returned Call to self.call, so delegate callbacks (callDidConnect, etc.) will fire on that object.
+    // let conferenceCall = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
+    // self.call = conferenceCall
+    // self.callKitCompletionCallback = completionHandler
+
+    // // Enable the audio device immediately (so that the call audio will flow correctly once connected)
+    // audioDevice.isEnabled = true
     }
   
     
