@@ -1,5 +1,7 @@
 package com.twilio.twilio_voice.service
 
+import android.media.AudioManager
+
 import android.telecom.Connection
 import android.annotation.SuppressLint
 import android.app.Notification
@@ -225,6 +227,9 @@ class TVConnectionService : ConnectionService() {
         }
     }
 
+    private var hasVoipAudioFocus = false
+
+
     //region Service onStartCommand
     @SuppressLint("MissingPermission")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -368,6 +373,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_HANGUP -> {
+
                     storage.clearCustomParams()
   val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE)
                  ?: getActiveCallHandle() ?: return@let
@@ -378,6 +384,7 @@ class TVConnectionService : ConnectionService() {
   } else {
     Log.e(TAG, "hangup(): could not find connection for $callHandle")
   }
+                    if (hasVoipAudioFocus) releaseVoipAudioFocus()
                 //     storage.clearCustomParams()
                 //      val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
                 //         Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
@@ -532,6 +539,7 @@ class TVConnectionService : ConnectionService() {
                         }
 
                         override fun onConnected(call: Call) {
+                            acquireVoipAudioFocus()
                             val sid = call.sid ?: return
                             activeConnections[sid] = conn
                             // 1) tell Flutter “here’s the active call”
@@ -550,6 +558,7 @@ class TVConnectionService : ConnectionService() {
                         }
 
                         override fun onConnectFailure(call: Call, error: CallException) {
+                            if (hasVoipAudioFocus) releaseVoipAudioFocus()
                             if (error.errorCode == 31603) {
                                 sendBroadcastEvent(
                                     applicationContext, TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE, call.sid, Bundle().apply {
@@ -591,6 +600,7 @@ class TVConnectionService : ConnectionService() {
                         override fun onReconnected(call: Call)               { /* optional */ }
 
                         override fun onDisconnected(call: Call, error: CallException?) {
+                            if (hasVoipAudioFocus) releaseVoipAudioFocus()
                             conn.disconnect()
                             // Clear the active handle now that it’s gone
                             sendBroadcastCallHandle(applicationContext, null)
@@ -730,6 +740,29 @@ class TVConnectionService : ConnectionService() {
     }
     //endregion
 
+
+    private fun acquireVoipAudioFocus() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        am.mode = AudioManager.MODE_IN_COMMUNICATION
+        @Suppress("DEPRECATION")
+        val result = am.requestAudioFocus(
+            { /* no-op */ },
+            AudioManager.STREAM_VOICE_CALL,
+            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+        )
+        hasVoipAudioFocus = (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        Log.d(TAG, "acquireVoipAudioFocus: granted=$hasVoipAudioFocus")
+    }
+
+    private fun releaseVoipAudioFocus() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        @Suppress("DEPRECATION")
+        am.abandonAudioFocus(null)
+        am.mode = AudioManager.MODE_NORMAL
+        hasVoipAudioFocus = false
+        Log.d(TAG, "releaseVoipAudioFocus: released")
+    }
+
     private fun joinConference(intent: Intent, conferenceName: String) {
         Log.d(TAG, "Joining conference: $conferenceName")
 
@@ -770,6 +803,7 @@ class TVConnectionService : ConnectionService() {
             }
 
             override fun onConnected(call: Call) {
+                acquireVoipAudioFocus()
                 Log.d(TAG, "Conference connected with SID=${call.sid}")
                 // swap your temp ID → real SID
                 conferenceConnection.twilioCall?.sid?.let { realSid ->
@@ -790,6 +824,7 @@ class TVConnectionService : ConnectionService() {
             }
 
             override fun onConnectFailure(call: Call, error: CallException) {
+                if (hasVoipAudioFocus) releaseVoipAudioFocus()
                 Log.e(TAG, "Conference connect failure: ${error.message}")
                 if (error.errorCode == 31603) {
                     sendBroadcastEvent(
@@ -822,6 +857,7 @@ class TVConnectionService : ConnectionService() {
             }
 
             override fun onDisconnected(call: Call, error: CallException?) {
+                if (hasVoipAudioFocus) releaseVoipAudioFocus()
                 Log.d(TAG, "Conference disconnected")
                 // this kicks off your telecom onDisconnect handler, which will remove from activeConnections
                 conferenceConnection.disconnect()
