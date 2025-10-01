@@ -1,3 +1,10 @@
+
+private let swiftTwilioVoicePluginChangeSummary: [String] = [
+    "Bridges Flutter to Twilio Voice with CallKit/PushKit integration",
+    "Manages VoIP token caching and registration lifecycles",
+    "Streams call state and audio routing events back to Dart"
+]
+
 import Flutter
 import UIKit
 import AVFoundation
@@ -49,6 +56,13 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     var userInitiatedDisconnect: Bool = false
     var callOutgoing: Bool = false
     private var isRejectingCallInvite = false
+    private var lastVoipPushReceivedAt: Date?
+    private var lastVoipPushSummary: [String: String] = [:]
+    private var lastCallInviteReceivedAt: Date?
+    private var lastCallInviteFrom: String?
+    private var lastIncomingCallUUID: UUID?
+    private var lastCallKitReportError: String?
+    private var lastCallKitReportTimestamp: Date?
     
     // MARK: — Ringback Tone Properties
     private var ringtonePlayer: AVAudioPlayer?
@@ -96,6 +110,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         //super.init(coder: aDecoder)
         super.init()
+#if DEBUG
+        if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
+            NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
+        }
+#endif
         callObserver.setDelegate(self, queue: DispatchQueue.main)
         
         callKitProvider.setDelegate(self, queue: nil)
@@ -913,6 +932,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
      */
     public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType) {
         self.sendPhoneCallEvents(description: "LOG|pushRegistry:didReceiveIncomingPushWithPayload:forType:", isError: false)
+        lastVoipPushReceivedAt = Date()
+        lastVoipPushSummary = summarizeVoipPayload(payload.dictionaryPayload)
         
         if (type == PKPushType.voIP) {
             TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
@@ -927,6 +948,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "LOG|pushRegistry:didReceiveIncomingPushWithPayload:forType:completion:", isError: false)
         // Save for later when the notification is properly handled.
 //        self.incomingPushCompletionCallback = completion
+        lastVoipPushReceivedAt = Date()
+        lastVoipPushSummary = summarizeVoipPayload(payload.dictionaryPayload)
         
         if (type == PKPushType.voIP) {
             TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
@@ -998,6 +1021,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let last:  String = (callInvite.customParameters?["lastname"]  as? String ?? "")
         var fromx1: String = callInvite.from ?? ""
         fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
+        lastCallInviteReceivedAt = Date()
+        lastCallInviteFrom = fromx1
+        lastIncomingCallUUID = callInvite.uuid
+        logIncomingCallDiagnostics(trigger: "incoming_call_invite_received", callUUID: callInvite.uuid, callInvite: callInvite)
          self.sendPhoneCallEvents(description: "Ringing|\(first)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
         // self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
         // reportIncomingCall(from: from!, fromx: fromx!, fromx1: fromx1, uuid: callInvite.uuid)
@@ -1032,19 +1059,27 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // if let ci = self.callInvite {
         //     performEndCallAction(uuid: ci.uuid)
         // }
-         clearCustomParams()
-    sendPhoneCallEvents(description: "Missed Call", isError: false)
-    sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
-    showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
+        clearCustomParams()
+        var extra: [String: Any] = [:]
+        if let from = cancelledCallInvite.from { extra["cancelFrom"] = from }
+        if let to = cancelledCallInvite.to { extra["cancelTo"] = to }
+        logIncomingCallDiagnostics(trigger: "incoming_call_invite_cancelled",
+                                   reason: error.localizedDescription,
+                                   callUUID: self.callInvite?.uuid,
+                                   callInvite: self.callInvite,
+                                   extra: extra)
+        sendPhoneCallEvents(description: "Missed Call", isError: false)
+        sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
+        showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
 
-    guard let ci = self.callInvite else {
-        sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
-        return
-    }
+        guard let ci = self.callInvite else {
+            sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
+            return
+        }
 
-    // Mark that we’re rejecting, so callDidDisconnect won’t fire “Call Ended”
-    isRejectingCallInvite = true
-    performEndCallAction(uuid: ci.uuid)
+        // Mark that we’re rejecting, so callDidDisconnect won’t fire “Call Ended”
+        isRejectingCallInvite = true
+        performEndCallAction(uuid: ci.uuid)
     }
     
     func showMissedCallNotification(from:String?, to:String?){
@@ -1197,6 +1232,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         self.callOutgoing = false
         self.userInitiatedDisconnect = false
+        self.lastIncomingCallUUID = nil
+        self.lastCallInviteReceivedAt = nil
+        self.lastCallInviteFrom = nil
         
     }
     
@@ -1398,9 +1436,17 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         callUpdate.hasVideo = false
         
         callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+            self.lastCallKitReportTimestamp = Date()
+            self.lastIncomingCallUUID = uuid
             if let error = error {
+                self.lastCallKitReportError = error.localizedDescription
                 self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).", isError: false)
+                self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
+                                                reason: error.localizedDescription,
+                                                callUUID: uuid,
+                                                callInvite: self.callInvite)
             } else {
+                self.lastCallKitReportError = nil
                 self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
             }
         }
@@ -1567,6 +1613,189 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         NotificationCenter.default.removeObserver(self)
         eventSink = nil
         return nil
+    }
+
+    private func logIncomingCallDiagnostics(trigger: String,
+                                            reason: String? = nil,
+                                            callUUID: UUID? = nil,
+                                            callInvite: CallInvite? = nil,
+                                            extra: [String: Any] = [:]) {
+        var diagnostics: [String: Any] = extra
+        diagnostics["trigger"] = trigger
+
+        let isoFormatter = ISO8601DateFormatter()
+        diagnostics["timestamp"] = isoFormatter.string(from: Date())
+
+        if let reason = reason, !reason.isEmpty {
+            diagnostics["reason"] = reason
+        }
+
+        let appState = currentApplicationState()
+        diagnostics["appState"] = applicationStateDescription(appState)
+        diagnostics["hasVoipToken"] = deviceToken != nil
+        diagnostics["registeredForAPNs"] = currentAPNsRegistrationState()
+
+        if let pushReceivedAt = lastVoipPushReceivedAt {
+            diagnostics["msSinceVoipPush"] = millisecondsSince(pushReceivedAt)
+        }
+        if !lastVoipPushSummary.isEmpty {
+            diagnostics["voipPushSummary"] = lastVoipPushSummary
+        }
+
+        if let inviteReceivedAt = lastCallInviteReceivedAt {
+            diagnostics["msSinceCallInvite"] = millisecondsSince(inviteReceivedAt)
+        }
+
+        if let invite = callInvite {
+            if let from = invite.from { diagnostics["inviteFrom"] = from }
+            if let to = invite.to { diagnostics["inviteTo"] = to }
+            let params = stringifyCustomParameters(invite.customParameters)
+            if !params.isEmpty { diagnostics["inviteCustomParams"] = params }
+        } else if let cachedFrom = lastCallInviteFrom {
+            diagnostics["lastInviteFrom"] = cachedFrom
+        }
+
+        let resolvedUUID = callUUID ?? lastIncomingCallUUID
+        if let uuid = resolvedUUID {
+            diagnostics["callUUID"] = uuid.uuidString
+            diagnostics["callKitHasCall"] = isCallActive(uuid: uuid)
+        }
+
+        let calls = callObserver.calls
+        diagnostics["activeCallCount"] = calls.count
+        diagnostics["activeCallStates"] = calls.map { call -> [String: Any] in
+            [
+                "uuid": call.uuid.uuidString,
+                "outgoing": call.isOutgoing,
+                "connected": call.hasConnected,
+                "ended": call.hasEnded,
+                "onHold": call.isOnHold
+            ]
+        }
+
+        let audioSession = AVAudioSession.sharedInstance()
+        diagnostics["audioCategory"] = audioSession.category.rawValue
+        diagnostics["audioMode"] = audioSession.mode.rawValue
+        diagnostics["audioRoute"] = audioSession.currentRoute.outputs.map { $0.portType.rawValue }
+        diagnostics["inputAvailable"] = audioSession.isInputAvailable
+        diagnostics["otherAudioPlaying"] = audioSession.isOtherAudioPlaying
+
+        if let lastError = lastCallKitReportError {
+            diagnostics["lastCallKitError"] = lastError
+        }
+        if let timestamp = lastCallKitReportTimestamp {
+            diagnostics["msSinceCallKitReport"] = millisecondsSince(timestamp)
+        }
+
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            guard let self = self else { return }
+            var enriched = diagnostics
+            enriched["notificationAuthorization"] = self.authorizationStatusDescription(settings.authorizationStatus)
+            enriched["notificationAlertSetting"] = self.notificationSettingDescription(settings.alertSetting)
+            self.emitDiagnostics(enriched, scope: "incoming-call")
+        }
+    }
+
+    private func emitDiagnostics(_ payload: [String: Any], scope: String) {
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+           let json = String(data: data, encoding: .utf8) {
+            sendPhoneCallEvents(description: "DIAG|\(scope)|\(json)", isError: false)
+        } else {
+            sendPhoneCallEvents(description: "DIAG|\(scope)|\(String(describing: payload))", isError: false)
+        }
+    }
+
+    private func currentApplicationState() -> UIApplication.State {
+        if Thread.isMainThread {
+            return UIApplication.shared.applicationState
+        }
+        var state = UIApplication.State.inactive
+        DispatchQueue.main.sync {
+            state = UIApplication.shared.applicationState
+        }
+        return state
+    }
+
+    private func applicationStateDescription(_ state: UIApplication.State) -> String {
+        switch state {
+        case .active: return "active"
+        case .inactive: return "inactive"
+        case .background: return "background"
+        @unknown default: return "unknown"
+        }
+    }
+
+    private func currentAPNsRegistrationState() -> Bool {
+        if Thread.isMainThread {
+            return UIApplication.shared.isRegisteredForRemoteNotifications
+        }
+        var registered = false
+        DispatchQueue.main.sync {
+            registered = UIApplication.shared.isRegisteredForRemoteNotifications
+        }
+        return registered
+    }
+
+    private func authorizationStatusDescription(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: return "notDetermined"
+        case .denied: return "denied"
+        case .authorized: return "authorized"
+        case .provisional: return "provisional"
+        case .ephemeral: return "ephemeral"
+        @unknown default: return "unknown"
+        }
+    }
+
+    private func notificationSettingDescription(_ setting: UNNotificationSetting) -> String {
+        switch setting {
+        case .notSupported: return "notSupported"
+        case .disabled: return "disabled"
+        case .enabled: return "enabled"
+        @unknown default: return "unknown"
+        }
+    }
+
+    private func millisecondsSince(_ date: Date) -> Int {
+        Int(Date().timeIntervalSince(date) * 1000)
+    }
+
+    private func stringifyCustomParameters(_ params: [String: Any]?) -> [String: String] {
+        guard let params = params else { return [:] }
+        var sanitized: [String: String] = [:]
+        for (key, value) in params {
+            sanitized[key] = String(describing: value)
+        }
+        return sanitized
+    }
+
+    private func summarizeVoipPayload(_ payload: [AnyHashable: Any]) -> [String: String] {
+        var summary: [String: String] = [:]
+        let interestingKeys: Set<String> = [
+            "twi_call_sid",
+            "twi_call_id",
+            "twi_message_type",
+            "twi_to",
+            "twi_from",
+            "twi_bridge_token",
+            "From",
+            "To"
+        ]
+
+        for (rawKey, value) in payload {
+            guard let key = rawKey as? String else { continue }
+            if interestingKeys.contains(key) {
+                summary[key] = String(describing: value)
+            }
+        }
+
+        if summary.isEmpty {
+            let keys = payload.keys.compactMap { $0 as? String }
+            if !keys.isEmpty {
+                summary["keys"] = keys.sorted().joined(separator: ",")
+            }
+        }
+        return summary
     }
     
     private func sendPhoneCallEvents(description: String, isError: Bool) {
