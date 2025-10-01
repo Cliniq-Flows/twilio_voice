@@ -1063,7 +1063,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         if let cancelFrom = cancelledCallInvite.from, !cancelFrom.isEmpty {
             extra["cancelFrom"] = cancelFrom
         }
-        if let to = cancelledCallInvite.to { extra["cancelTo"] = to }
+        let cancelTo = cancelledCallInvite.to
+        if !cancelTo.isEmpty { extra["cancelTo"] = cancelTo }
         logIncomingCallDiagnostics(trigger: "incoming_call_invite_cancelled",
                                    reason: error.localizedDescription,
                                    callUUID: self.callInvite?.uuid,
