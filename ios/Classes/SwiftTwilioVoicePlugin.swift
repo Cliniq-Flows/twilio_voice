@@ -1061,7 +1061,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // }
         clearCustomParams()
         var extra: [String: Any] = [:]
-        if let from = cancelledCallInvite.from { extra["cancelFrom"] = from }
+        let cancelFrom = cancelledCallInvite.from
+        if !cancelFrom.isEmpty { extra["cancelFrom"] = cancelFrom }
         if let to = cancelledCallInvite.to { extra["cancelTo"] = to }
         logIncomingCallDiagnostics(trigger: "incoming_call_invite_cancelled",
                                    reason: error.localizedDescription,
@@ -1647,7 +1648,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
 
         if let invite = callInvite {
-            if let from = invite.from { diagnostics["inviteFrom"] = from }
+            let inviteFrom = invite.from
+            if !inviteFrom.isEmpty { diagnostics["inviteFrom"] = inviteFrom }
             if let to = invite.to { diagnostics["inviteTo"] = to }
             let params = stringifyCustomParameters(invite.customParameters)
             if !params.isEmpty { diagnostics["inviteCustomParams"] = params }
