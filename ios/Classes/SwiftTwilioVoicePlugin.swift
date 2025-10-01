@@ -1,4 +1,3 @@
-
 private let swiftTwilioVoicePluginChangeSummary: [String] = [
     "Bridges Flutter to Twilio Voice with CallKit/PushKit integration",
     "Manages VoIP token caching and registration lifecycles",
@@ -1061,8 +1060,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // }
         clearCustomParams()
         var extra: [String: Any] = [:]
-        let cancelFrom = cancelledCallInvite.from
-        if !cancelFrom.isEmpty { extra["cancelFrom"] = cancelFrom }
+        if let cancelFrom = cancelledCallInvite.from, !cancelFrom.isEmpty {
+            extra["cancelFrom"] = cancelFrom
+        }
         if let to = cancelledCallInvite.to { extra["cancelTo"] = to }
         logIncomingCallDiagnostics(trigger: "incoming_call_invite_cancelled",
                                    reason: error.localizedDescription,
@@ -1648,9 +1648,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
 
         if let invite = callInvite {
-            let inviteFrom = invite.from
-            if !inviteFrom.isEmpty { diagnostics["inviteFrom"] = inviteFrom }
-            if let to = invite.to { diagnostics["inviteTo"] = to }
+            if let inviteFrom = invite.from, !inviteFrom.isEmpty {
+                diagnostics["inviteFrom"] = inviteFrom
+            }
+            let inviteTo = invite.to
+            if !inviteTo.isEmpty { diagnostics["inviteTo"] = inviteTo }
             let params = stringifyCustomParameters(invite.customParameters)
             if !params.isEmpty { diagnostics["inviteCustomParams"] = params }
         } else if let cachedFrom = lastCallInviteFrom {
