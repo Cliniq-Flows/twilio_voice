@@ -63,8 +63,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private var lastCallKitReportError: String?
     private var lastCallKitReportTimestamp: Date?
     
+    
     // MARK: — Ringback Tone Properties
     private var ringtonePlayer: AVAudioPlayer?
+    private var wantsRingback = false
+    private var callkitAudioActive = false
 
      // ——————————————————————————————————————
     // MARK: Shared-Prefs Helpers 🔥 NEW
@@ -530,6 +533,26 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // MARK: — Ringback Tone Playback
 
     private func playRingbackTone() {
+
+         guard ringtonePlayer == nil else { return }
+    // Make sure Twilio’s default config is in place
+    audioDevice.block()
+
+    guard let url = Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") else {
+        NSLog("⚠️ ringback file not found")
+        return
+    }
+    do {
+        let p = try AVAudioPlayer(contentsOf: url)
+        p.numberOfLoops = -1
+        p.volume = 1.0
+        p.prepareToPlay()
+        _ = p.play()
+        ringtonePlayer = p
+    } catch {
+        NSLog("⚠️ failed to start ringback: \(error)")
+        ringtonePlayer = nil
+    }
     
     // guard ringtonePlayer == nil else { return }
     // audioDevice.block()
@@ -573,36 +596,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     //   NSLog("⚠️ failed to start ringback: \(error)")
     //   ringtonePlayer = nil
     // }
-     guard ringtonePlayer == nil else { return }
-
-    // Ensure Twilio's audio session config has run (idempotent)
-   audioDevice.block()
-
-    // Find the asset (plugin bundle → main bundle)
-    let url: URL? = {
-        if let url = Bundle(for: SwiftTwilioVoicePlugin.self)
-            .url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
-            return url
-        }
-        return Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3")
-    }()
-
-    guard let ringURL = url else {
-        NSLog("⚠️ ringback file not found")
-        return
-    }
-
-    do {
-        let player = try AVAudioPlayer(contentsOf: ringURL)
-        player.numberOfLoops = -1
-        player.volume = 1.0
-        player.prepareToPlay()
-        player.play()
-        ringtonePlayer = player
-    } catch {
-        NSLog("⚠️ failed to start ringback: \(error)")
-        ringtonePlayer = nil
-    }
+    
     }
 
     private func stopRingbackTone() {
@@ -1130,7 +1124,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
        saveCustomParams(callArgs as [String:Any])
        if self.callOutgoing {
-    playRingbackTone()
+    wantsRingback = true
+        // If CallKit already activated audio, start now; else we'll start in didActivate
+        if callkitAudioActive && ringtonePlayer == nil { playRingbackTone() }
    }
         //self.placeCallButton.setTitle("Ringing", for: .normal)
     }
@@ -1145,6 +1141,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         audioDevice.isEnabled = true
         callKitCompletionCallback?(true)
      stopRingbackTone()
+      wantsRingback = false
         if let callKitCompletionCallback = callKitCompletionCallback {
             callKitCompletionCallback(true)
         }
@@ -1171,6 +1168,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
         
       stopRingbackTone()
+       wantsRingback = false
         
         if(error.localizedDescription.contains("Access Token expired")){
             self.sendPhoneCallEvents(description: "DEVICETOKEN", isError: false)
@@ -1191,6 +1189,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
        
      clearCustomParams()
         stopRingbackTone()
+            wantsRingback = false
+
 
    
      let reason: CXCallEndedReason = (error == nil)
@@ -1288,11 +1288,15 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
         self.sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
        audioDevice.isEnabled = true
+        callkitAudioActive = true
+            if wantsRingback && ringtonePlayer == nil { playRingbackTone() }
+
     }
     
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
         self.sendPhoneCallEvents(description: "LOG|provider:didDeactivateAudioSession:", isError: false)
         audioDevice.isEnabled = false
+        callkitAudioActive = false
     }
     
     public func provider(_ provider: CXProvider, timedOutPerforming action: CXAction) {
