@@ -995,21 +995,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          if let custom = callInvite.customParameters {
             saveCustomParams(custom)
         }
-        // self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
-        
-        // /**
-        //  * The TTL of a registration is 1 year. The TTL for registration for this device/identity
-        //  * pair is reset to 1 year whenever a new registration occurs or a push notification is
-        //  * sent to this device/identity pair.
-        //  */
-        // UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
-        
-        // var from:String = callInvite.from ?? defaultCaller
-        // from = from.replacingOccurrences(of: "client:", with: "")
-        
-        // self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        // reportIncomingCall(from: from, uuid: callInvite.uuid)
-        // self.callInvite = callInvite
+       
         self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
         
@@ -1028,7 +1014,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
         // reportIncomingCall(from: from!, fromx: fromx!, fromx1: fromx1, uuid: callInvite.uuid)
         reportIncomingCall(from: first, fromx: last, fromx1: fromx1, uuid: callInvite.uuid)
-       
+       self.sendPhoneCallEvents(description: "LOG|callInviteReceived:", isError: false)
+    logIncomingCallDiagnostics(trigger: "incoming_call_invite_received",
+                               callUUID: callInvite.uuid,
+                               callInvite: callInvite)
+    self.sendPhoneCallEvents(description: "Ringing|\(first)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
 
     }
     
@@ -1074,14 +1064,25 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
         showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
 
-        guard let ci = self.callInvite else {
-            sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
-            return
-        }
+        // guard let ci = self.callInvite else {
+        //     sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
+        //     return
+        // }
 
-        // Mark that we’re rejecting, so callDidDisconnect won’t fire “Call Ended”
+        // // Mark that we’re rejecting, so callDidDisconnect won’t fire “Call Ended”
+        // isRejectingCallInvite = true
+        // performEndCallAction(uuid: ci.uuid)
+        if let ci = self.callInvite {
         isRejectingCallInvite = true
         performEndCallAction(uuid: ci.uuid)
+        } else if let uuid = self.lastIncomingCallUUID {
+            isRejectingCallInvite = true
+            performEndCallAction(uuid: uuid)
+        } else {
+            sendPhoneCallEvents(description: "LOG|No pending call invite or UUID to end", isError: false)
+        }
+
+        self.callInvite = nil
     }
     
     func showMissedCallNotification(from:String?, to:String?){
@@ -1440,7 +1441,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
               let tCompleted = Date()
-            self.lastCallKitReportTimestamp = Date()
+            self.lastCallKitReportTimestamp = tCompleted
             self.lastIncomingCallUUID = uuid
 
             var diag: [String: Any] = [
@@ -1455,7 +1456,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
         // Emit one compact JSON diagnostic line (uses your existing helper)
         self.emitDiagnostics(diag, scope: "incoming-call")
-        
+
             if let error = error {
                 self.lastCallKitReportError = error.localizedDescription
                 self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).", isError: false)
