@@ -139,8 +139,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         name: UIApplication.willTerminateNotification,
         object: nil
        
-    )
+    )   
+        audioDevice = DefaultAudioDevice()
          TwilioVoiceSDK.audioDevice = self.audioDevice
+         audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
+
 
     }
     
@@ -527,81 +530,78 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // MARK: — Ringback Tone Playback
 
     private func playRingbackTone() {
-    //  // don’t start twice
+    
     // guard ringtonePlayer == nil else { return }
+    //  audioDevice.block?()
+    // let ringURL: URL? = {
+    //   if let main = Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
+    //     return main
+    //   }
+     
+    //   guard
+    //     let bundleRoot = Bundle(for: SwiftTwilioVoicePlugin.self)
+    //                           .url(forResource: "TwilioVoicePluginResources", withExtension: "bundle"),
+    //     let resBundle = Bundle(url: bundleRoot)
+    //   else { return nil }
+    //   return resBundle.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3")
+    // }()
 
-    // // 1) Get the bundle for *this* plugin pod
-    // let bundle = Bundle(for: SwiftTwilioVoicePlugin.self)
-
-    // // 2) Look for the exact resource name you declared in your Podspec
-    // guard let url = bundle.url(
-    //     forResource: "phone-outgoing-call-72202",
-    //     withExtension: "mp3"
-    // ) else {
-    //     NSLog("⚠️ ringback file not found in plugin bundle")
-    //     return
+    // guard let url = ringURL else {
+    //   NSLog("⚠️ ringback file not found")
+    //   return
     // }
 
     // do {
-    //     // 3) Configure & activate the session so playback actually happens
-    //     let session = AVAudioSession.sharedInstance()
-    //     try session.setCategory(.playAndRecord,
-    //                             mode: .default,
-    //                             options: [.duckOthers,.mixWithOthers,.allowBluetooth,.defaultToSpeaker])
-    //     // try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers])
-    //     // try session.overrideOutputAudioPort(.speaker)                      
-    //     try session.setActive(true)
+   
+    //   let session = AVAudioSession.sharedInstance()
+    //   try session.setCategory(
+    //     .playAndRecord,
+    //     mode: .default,
+    //     options: [.duckOthers, .mixWithOthers, .allowBluetooth]
+    //   )
+   
+    //   try session.overrideOutputAudioPort(.speaker)
+    //   try session.setActive(true)
 
-    //     // 4) Create & start the player
-    //     ringtonePlayer = try AVAudioPlayer(contentsOf: url)
-    //      ringtonePlayer?.volume = 1.0
-    //     ringtonePlayer?.numberOfLoops = -1
-    //     ringtonePlayer?.prepareToPlay()
-    //     ringtonePlayer?.play()
+    
+    //   ringtonePlayer = try AVAudioPlayer(contentsOf: url)
+    //   ringtonePlayer?.volume = 1.0
+    //   ringtonePlayer?.numberOfLoops = -1
+    //   ringtonePlayer?.prepareToPlay()
+    //   ringtonePlayer?.play()
     // } catch {
-    //     NSLog("⚠️ failed to start ringback: \(error)")
-    //     ringtonePlayer = nil
+    //   NSLog("⚠️ failed to start ringback: \(error)")
+    //   ringtonePlayer = nil
     // }
-    guard ringtonePlayer == nil else { return }
-    let ringURL: URL? = {
-      if let main = Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
-        return main
-      }
-     
-      guard
-        let bundleRoot = Bundle(for: SwiftTwilioVoicePlugin.self)
-                              .url(forResource: "TwilioVoicePluginResources", withExtension: "bundle"),
-        let resBundle = Bundle(url: bundleRoot)
-      else { return nil }
-      return resBundle.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3")
+     guard ringtonePlayer == nil else { return }
+
+    // Ensure Twilio's audio session config has run (idempotent)
+    audioDevice.block?()
+
+    // Find the asset (plugin bundle → main bundle)
+    let url: URL? = {
+        if let url = Bundle(for: SwiftTwilioVoicePlugin.self)
+            .url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
+            return url
+        }
+        return Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3")
     }()
 
-    guard let url = ringURL else {
-      NSLog("⚠️ ringback file not found")
-      return
+    guard let ringURL = url else {
+        NSLog("⚠️ ringback file not found")
+        return
     }
 
     do {
-   
-      let session = AVAudioSession.sharedInstance()
-      try session.setCategory(
-        .playAndRecord,
-        mode: .default,
-        options: [.duckOthers, .mixWithOthers, .allowBluetooth]
-      )
-   
-      try session.overrideOutputAudioPort(.speaker)
-      try session.setActive(true)
-
-    
-      ringtonePlayer = try AVAudioPlayer(contentsOf: url)
-      ringtonePlayer?.volume = 1.0
-      ringtonePlayer?.numberOfLoops = -1
-      ringtonePlayer?.prepareToPlay()
-      ringtonePlayer?.play()
+        let player = try AVAudioPlayer(contentsOf: ringURL)
+        player.numberOfLoops = -1
+        player.volume = 1.0
+        player.prepareToPlay()
+        player.play()
+        ringtonePlayer = player
     } catch {
-      NSLog("⚠️ failed to start ringback: \(error)")
-      ringtonePlayer = nil
+        NSLog("⚠️ failed to start ringback: \(error)")
+        ringtonePlayer = nil
     }
     }
 
@@ -609,9 +609,6 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         guard let player = ringtonePlayer else { return }
     if player.isPlaying { player.stop() }
     ringtonePlayer = nil
-
-    // deactivate if you want
-    // try? AVAudioSession.sharedInstance().setActive(false, options: [])
     }
 
     func updateCurrentCallDisplayName(to newName: String) {
@@ -1504,6 +1501,9 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     func performVoiceCall(uuid: UUID, client: String?, completionHandler: @escaping (Bool) -> Swift.Void) {
+        
+         audioDevice.block?()
+
         guard let token = accessToken else {
             completionHandler(false)
             return
@@ -1596,9 +1596,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
         if let ci = self.callInvite {
+            audioDevice.block?()
             let acceptOptions: AcceptOptions = AcceptOptions(callInvite: ci) { (builder) in
                 builder.uuid = ci.uuid
             }
+            
             self.sendPhoneCallEvents(description: "LOG|performAnswerVoiceCall: answering call", isError: false)
             let theCall = ci.accept(options: acceptOptions, delegate: self)
             self.sendPhoneCallEvents(description: "Answer|\(theCall.from!)|\(theCall.to!)|Incoming\(formatCustomParams(params: ci.customParameters))", isError:false)
