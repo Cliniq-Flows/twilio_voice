@@ -534,23 +534,62 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
     private func playRingbackTone() {
 
-         guard ringtonePlayer == nil else { return }
-    // Make sure Twilio’s default config is in place
-    audioDevice.block()
-
-    guard let url = Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") else {
-        NSLog("⚠️ ringback file not found")
+     guard ringtonePlayer == nil else {
+        sendPhoneCallEvents(description: "LOG|ringback: already playing", isError: false)
         return
     }
+
+    // Make sure Twilio’s default audio session config is applied
+    audioDevice.block()
+
+    // Show current session + route for debugging
+    let s = AVAudioSession.sharedInstance()
+    sendPhoneCallEvents(
+        description: "DIAG|ringback pre|cat=\(s.category.rawValue) mode=\(s.mode.rawValue) " +
+                     "opt=\(s.categoryOptions) route=\(s.currentRoute.outputs.map{$0.portType.rawValue})",
+        isError: false
+    )
+
+    // Locate asset
+    let ringURL: URL? = {
+        if let b = Bundle(for: SwiftTwilioVoicePlugin.self)
+            .url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
+            return b
+        }
+        return Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3")
+    }()
+
+    guard let url = ringURL else {
+        sendPhoneCallEvents(description: "LOG|ringback: file not found", isError: true)
+        return
+    }
+
     do {
         let p = try AVAudioPlayer(contentsOf: url)
         p.numberOfLoops = -1
         p.volume = 1.0
         p.prepareToPlay()
-        _ = p.play()
+
+        // First attempt: under Twilio's session as-is
+        let ok = p.play()
         ringtonePlayer = p
+        sendPhoneCallEvents(description: "LOG|ringback: first play()=\(ok)", isError: !ok)
+
+        // If it didn’t start (or you still can't hear it), try a very light fallback:
+        // keep Twilio-compatible settings, avoid forcing speaker here
+        if !ok {
+            do {
+                try s.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .mixWithOthers])
+                try s.setActive(true, options: [])
+                let ok2 = p.play()
+                sendPhoneCallEvents(description: "LOG|ringback: fallback play()=\(ok2)", isError: !ok2)
+            } catch {
+                sendPhoneCallEvents(description: "LOG|ringback: fallback session error \(error.localizedDescription)", isError: true)
+            }
+        }
+
     } catch {
-        NSLog("⚠️ failed to start ringback: \(error)")
+        sendPhoneCallEvents(description: "LOG|ringback: AVAudioPlayer error \(error.localizedDescription)", isError: true)
         ringtonePlayer = nil
     }
     
