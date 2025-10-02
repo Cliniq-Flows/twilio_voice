@@ -532,7 +532,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private func playRingbackTone() {
     
     // guard ringtonePlayer == nil else { return }
-    //  audioDevice.block?()
+    // audioDevice.block()
     // let ringURL: URL? = {
     //   if let main = Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
     //     return main
@@ -576,7 +576,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
      guard ringtonePlayer == nil else { return }
 
     // Ensure Twilio's audio session config has run (idempotent)
-    audioDevice.block?()
+   audioDevice.block()
 
     // Find the asset (plugin bundle → main bundle)
     let url: URL? = {
@@ -1502,7 +1502,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     func performVoiceCall(uuid: UUID, client: String?, completionHandler: @escaping (Bool) -> Swift.Void) {
         
-         audioDevice.block?()
+        audioDevice.block()
 
         guard let token = accessToken else {
             completionHandler(false)
@@ -1596,7 +1596,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
         if let ci = self.callInvite {
-            audioDevice.block?()
+           audioDevice.block()
             let acceptOptions: AcceptOptions = AcceptOptions(callInvite: ci) { (builder) in
                 builder.uuid = ci.uuid
             }
