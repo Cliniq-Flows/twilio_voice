@@ -991,7 +991,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     // MARK: TVONotificaitonDelegate
     public func callInviteReceived(callInvite: CallInvite) {
-
+         self.callInvite = callInvite
          if let custom = callInvite.customParameters {
             saveCustomParams(custom)
         }
@@ -1028,7 +1028,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
         // reportIncomingCall(from: from!, fromx: fromx!, fromx1: fromx1, uuid: callInvite.uuid)
         reportIncomingCall(from: first, fromx: last, fromx1: fromx1, uuid: callInvite.uuid)
-        self.callInvite = callInvite
+       
 
     }
     
@@ -1421,6 +1421,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
    func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
+       let tStarted = Date()
         let firstname = from.capitalized
         let lastname = fromx.capitalized
         let number = fromx1
@@ -1438,8 +1439,23 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         callUpdate.hasVideo = false
         
         callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+              let tCompleted = Date()
             self.lastCallKitReportTimestamp = Date()
             self.lastIncomingCallUUID = uuid
+
+            var diag: [String: Any] = [
+            "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)  // time inside report call
+        ]
+        if let pushAt = self.lastVoipPushReceivedAt {
+            diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
+        }
+        if let inviteAt = self.lastCallInviteReceivedAt {
+            diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
+        }
+
+        // Emit one compact JSON diagnostic line (uses your existing helper)
+        self.emitDiagnostics(diag, scope: "incoming-call")
+        
             if let error = error {
                 self.lastCallKitReportError = error.localizedDescription
                 self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).", isError: false)
