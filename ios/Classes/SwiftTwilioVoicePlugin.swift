@@ -1187,7 +1187,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let to = (call.to ?? self.callTo)
         self.sendPhoneCallEvents(description: "Connected|\(from)|\(to)|\(direction)", isError: false)
 
-      
+         audioDevice.block() 
         audioDevice.isEnabled = true
          wantsRingback = false
         callKitCompletionCallback?(true)
@@ -1332,6 +1332,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
         self.sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
+       audioDevice.block()       
        audioDevice.isEnabled = true
         callkitAudioActive = true
             if wantsRingback && ringtonePlayer == nil { playRingbackTone() }
