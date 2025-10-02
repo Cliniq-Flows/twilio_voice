@@ -11,4 +11,4 @@
 "btn_continue_no_mic" = "Continuar sin micrófono";
 "btn_settings" = "Ajustes";
 "btn_cancel" = "Cancelar";
-"notification_missed_call" = "Llamada perdida de %@";
+"notification_missed_call_body" = "Llamada perdida de %@";
