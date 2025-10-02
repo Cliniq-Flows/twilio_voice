@@ -532,6 +532,25 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
     // MARK: — Ringback Tone Playback
 
+    private func ringURL() -> URL? {
+    // 1. Main app bundle
+    if let url = Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
+        return url
+    }
+
+    // 2. Plugin resource bundle
+    if let rb = Bundle(for: SwiftTwilioVoicePlugin.self)
+        .url(forResource: "TwilioVoicePluginResources", withExtension: "bundle"),
+       let res = Bundle(url: rb),
+       let url = res.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
+        return url
+    }
+
+    // 3. Class bundle
+    return Bundle(for: SwiftTwilioVoicePlugin.self)
+        .url(forResource: "phone-outgoing-call-72202", withExtension: "mp3")
+}
+
     private func playRingbackTone() {
 
      guard ringtonePlayer == nil else {
@@ -551,15 +570,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     )
 
     // Locate asset
-    let ringURL: URL? = {
-        if let b = Bundle(for: SwiftTwilioVoicePlugin.self)
-            .url(forResource: "phone-outgoing-call-72202", withExtension: "mp3") {
-            return b
-        }
-        return Bundle.main.url(forResource: "phone-outgoing-call-72202", withExtension: "mp3")
-    }()
-
-    guard let url = ringURL else {
+    guard let url = ringURL() else {
         sendPhoneCallEvents(description: "LOG|ringback: file not found", isError: true)
         return
     }
@@ -1178,17 +1189,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
       
         audioDevice.isEnabled = true
+         wantsRingback = false
         callKitCompletionCallback?(true)
-     stopRingbackTone()
-      wantsRingback = false
-        if let callKitCompletionCallback = callKitCompletionCallback {
-            callKitCompletionCallback(true)
-        }
-         audioDevice.isEnabled = true
-         stopRingbackTone()
-          callKitCompletionCallback?(true)
-
-         saveCustomParams(callArgs as [String:Any])
+        stopRingbackTone()
+        saveCustomParams(callArgs as [String:Any])
+        
+      
         
         //toggleAudioRoute(toSpeaker: false)
     }
@@ -1345,8 +1351,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
         self.sendPhoneCallEvents(description: "LOG|provider:performStartCallAction:", isError: false)
         
+         wantsRingback = true
+        if callkitAudioActive && ringtonePlayer == nil { playRingbackTone() }
         
         provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: Date())
+        
         
         self.performVoiceCall(uuid: action.callUUID, client: "") { (success) in
             if (success) {
