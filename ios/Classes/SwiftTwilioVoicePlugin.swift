@@ -1038,7 +1038,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.callInvite = nil
     }
     
-    func showMissedCallNotification(from:String?, to:String?){
+func showMissedCallNotification(from: String?, to: String?, customParams: [String:Any]? = nil) {
         guard UserDefaults.standard.optionalBool(forKey: "show-notifications") ?? true else{return}
         let notificationCenter = UNUserNotificationCenter.current()
 
