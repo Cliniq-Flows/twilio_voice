@@ -929,7 +929,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     // MARK: TVONotificaitonDelegate
-    public func callInviteReceived(_ callInvite: CallInvite) {
+    public func callInviteReceived(callInvite: CallInvite) {
         guard isSignedIn else { callInvite.reject(); return }
 
   self.callInvite = callInvite
@@ -1001,19 +1001,18 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         return ""
     }
     
-    public func cancelledCallInviteReceived(_ cancelledCallInvite: CancelledCallInvite, error: Error) {
-        //  clearCustomParams()
-        // self.sendPhoneCallEvents(description: "Missed Call", isError: false)
-        // self.sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
-        // self.showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
-        // if (self.callInvite == nil) {
-        //     self.sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
-        //     return
-        // }
-        
-        // if let ci = self.callInvite {
-        //     performEndCallAction(uuid: ci.uuid)
-        // }
+    public func cancelledCallInviteReceived(cancelledCallInvite: CancelledCallInvite, error: Error) {
+        let savedParams = getCustomParams()                 // may contain firstname/lastname
+        let fallbackFrom = (cancelledCallInvite.from?.isEmpty == false)
+        ? cancelledCallInvite.from
+        : self.lastCallInviteFrom    
+
+        sendPhoneCallEvents(description: "Missed Call", isError: false)
+        sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
+
+
+         showMissedCallNotification(from: fallbackFrom, to: cancelledCallInvite.to, customParams: savedParams)
+
         clearCustomParams()
         var extra: [String: Any] = [:]
         if let cancelFrom = cancelledCallInvite.from, !cancelFrom.isEmpty {
@@ -1026,18 +1025,6 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                                    callUUID: self.callInvite?.uuid,
                                    callInvite: self.callInvite,
                                    extra: extra)
-        sendPhoneCallEvents(description: "Missed Call", isError: false)
-        sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
-        showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
-
-        // guard let ci = self.callInvite else {
-        //     sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
-        //     return
-        // }
-
-        // // Mark that we’re rejecting, so callDidDisconnect won’t fire “Call Ended”
-        // isRejectingCallInvite = true
-        // performEndCallAction(uuid: ci.uuid)
         if let ci = self.callInvite {
         isRejectingCallInvite = true
         performEndCallAction(uuid: ci.uuid)
@@ -1059,19 +1046,40 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         notificationCenter.getNotificationSettings { (settings) in
           if settings.authorizationStatus == .authorized {
             let content = UNMutableNotificationContent()
-            var userName:String?
-            if var from = from{
-                from = from.replacingOccurrences(of: "client:", with: "")
-                content.userInfo = ["type":"twilio-missed-call", "From":from]
-                if let to = to{
-                    content.userInfo["To"] = to
-                }
-                userName = self.clients[from]
+
+             var callerId = rawFrom?.replacingOccurrences(of: "client:", with: "")
+            if callerId == nil || callerId!.isEmpty {
+                callerId = self.lastCallInviteFrom
             }
+
+            // 2) Try to resolve a nice display name
+            let first = (customParams?["firstname"] as? String ?? "")
+            let last  = (customParams?["lastname"]  as? String ?? "")
+            let full  = "\(first) \(last)".trimmingCharacters(in: .whitespaces)
+
+            let resolvedName: String = {
+                if !full.isEmpty { return full }
+                if let id = callerId, let known = self.clients[id] { return known }
+                return self.clients["defaultCaller"] ?? self.defaultCaller
+            }()
+
+            // 3) Title + Body
+            content.title = "Missed call"
+            content.body  = "Missed call from \(resolvedName)"
+
+            // var userName:String?
+            // if var from = from{
+            //     from = from.replacingOccurrences(of: "client:", with: "")
+            //     content.userInfo = ["type":"twilio-missed-call", "From":from]
+            //     if let to = to{
+            //         content.userInfo["To"] = to
+            //     }
+            //     userName = self.clients[from]
+            // }
             
-            let title = userName ?? self.clients["defaultCaller"] ?? self.defaultCaller
-            content.title = title
-            content.body = NSLocalizedString("notification_missed_call_body", comment: "")
+            // let title = userName ?? self.clients["defaultCaller"] ?? self.defaultCaller
+            // content.title = title
+            // content.body = NSLocalizedString("notification_missed_call_body", comment: "")
 
             // content.title = String(format:  NSLocalizedString("notification_missed_call", comment: ""),title)
 
@@ -1091,7 +1099,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     // MARK: TVOCallDelegate
-    public func callDidStartRinging(_ call: Call) {
+    public func callDidStartRinging(call: Call) {
         let direction = (self.callOutgoing ? "Outgoing" : "Incoming")
         let from = (call.from ?? self.identity)
         let to = (call.to ?? self.callTo)
@@ -1106,7 +1114,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         //self.placeCallButton.setTitle("Ringing", for: .normal)
     }
     
-    public func callDidConnect(_ call: Call) {
+    public func callDidConnect(call: Call) {
         let direction = (self.callOutgoing ? "Outgoing" : "Incoming")
         let from = (call.from ?? self.identity)
         let to = (call.to ?? self.callTo)
@@ -1124,16 +1132,16 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         //toggleAudioRoute(toSpeaker: false)
     }
     
-    public func call(_ call: Call, isReconnectingWithError error: Error) {
+    public func call(call: Call, isReconnectingWithError error: Error) {
         self.sendPhoneCallEvents(description: "Reconnecting", isError: false)
         
     }
     
-    public func callDidReconnect(_ call: Call) {
+    public func callDidReconnect(call: Call) {
         self.sendPhoneCallEvents(description: "Reconnected", isError: false)
     }
     
-    public func callDidFailToConnect(_ call: Call, error: Error) {
+    public func callDidFailToConnect(call: Call, error: Error) {
         self.sendPhoneCallEvents(description: "LOG|Call failed to connect: \(error.localizedDescription)", isError: false)
         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
         
@@ -1155,7 +1163,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     // @objc(callDidDisconnect:error:)
-    public func callDidDisconnect(_ call: Call, error: Error?) {
+    public func callDidDisconnect(call: Call, error: Error?) {
        
      clearCustomParams()
         stopRingbackTone()
@@ -1873,6 +1881,19 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     /// Remove it when the call ends
     private func clearCustomParams() {
         UserDefaults.standard.removeObject(forKey: kCustomParamsKey)
+    }
+
+    func signOutAndDisableVoip() {
+    
+    if let token = self.accessToken, let dev = self.deviceToken {
+        TwilioVoiceSDK.unregister(accessToken: token, deviceToken: dev) { _ in }
+    }
+    // Disable PushKit & clear local state
+    voipRegistry.desiredPushTypes = []
+    self.accessToken = nil
+    self.deviceToken = nil
+    UserDefaults.standard.removeObject(forKey: kCachedBindingDate)
+    sendPhoneCallEvents(description: "LOG|Signed out: VoIP disabled, tokens cleared", isError: false)
     }
 
 }
