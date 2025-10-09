@@ -13,7 +13,7 @@ import CallKit
 import UserNotifications
 import MediaPlayer
 
-public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate, CXCallObserverDelegate ,UNUserNotificationCenterDelegate {
+public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate, CXCallObserverDelegate {
     let callObserver = CXCallObserver()
     
     final let defaultCallKitIcon = "callkit_icon"
