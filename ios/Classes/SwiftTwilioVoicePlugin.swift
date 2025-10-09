@@ -13,11 +13,11 @@ import CallKit
 import UserNotifications
 import MediaPlayer
 
-public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate, CXCallObserverDelegate {
+public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate, CXCallObserverDelegate, UNUserNotificationCenterDelegate  {
     let callObserver = CXCallObserver()
     
     final let defaultCallKitIcon = "callkit_icon"
-    
+
     var callKitIcon: String?
 
     var _result: FlutterResult?
@@ -1065,7 +1065,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     // MARK: TVONotificaitonDelegate
-    public func callInviteReceived(callInvite: CallInvite) {
+    public func callInviteReceived(_ callInvite: CallInvite) {
         guard isSignedIn else { callInvite.reject(); return }
 
   self.callInvite = callInvite
@@ -1137,7 +1137,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         return ""
     }
     
-    public func cancelledCallInviteReceived(cancelledCallInvite: CancelledCallInvite, error: Error) {
+    public func cancelledCallInviteReceived(_ cancelledCallInvite: CancelledCallInvite, error: Error) {
         //  clearCustomParams()
         // self.sendPhoneCallEvents(description: "Missed Call", isError: false)
         // self.sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
@@ -1227,7 +1227,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     // MARK: TVOCallDelegate
-    public func callDidStartRinging(call: Call) {
+    public func callDidStartRinging(_ call: Call) {
         let direction = (self.callOutgoing ? "Outgoing" : "Incoming")
         let from = (call.from ?? self.identity)
         let to = (call.to ?? self.callTo)
@@ -1242,7 +1242,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         //self.placeCallButton.setTitle("Ringing", for: .normal)
     }
     
-    public func callDidConnect(call: Call) {
+    public func callDidConnect(_ call: Call) {
         let direction = (self.callOutgoing ? "Outgoing" : "Incoming")
         let from = (call.from ?? self.identity)
         let to = (call.to ?? self.callTo)
@@ -1260,16 +1260,16 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         //toggleAudioRoute(toSpeaker: false)
     }
     
-    public func call(call: Call, isReconnectingWithError error: Error) {
+    public func call(_ call: Call, isReconnectingWithError error: Error) {
         self.sendPhoneCallEvents(description: "Reconnecting", isError: false)
         
     }
     
-    public func callDidReconnect(call: Call) {
+    public func callDidReconnect(_ call: Call) {
         self.sendPhoneCallEvents(description: "Reconnected", isError: false)
     }
     
-    public func callDidFailToConnect(call: Call, error: Error) {
+    public func callDidFailToConnect(_ call: Call, error: Error) {
         self.sendPhoneCallEvents(description: "LOG|Call failed to connect: \(error.localizedDescription)", isError: false)
         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
         
@@ -1291,7 +1291,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
     
     // @objc(callDidDisconnect:error:)
-    public func callDidDisconnect(call: Call, error: Error?) {
+    public func callDidDisconnect(_ call: Call, error: Error?) {
        
      clearCustomParams()
         stopRingbackTone()
