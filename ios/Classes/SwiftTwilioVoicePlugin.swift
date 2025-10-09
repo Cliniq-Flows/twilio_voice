@@ -17,6 +17,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     let callObserver = CXCallObserver()
     
     final let defaultCallKitIcon = "callkit_icon"
+    
     var callKitIcon: String?
 
     var _result: FlutterResult?
