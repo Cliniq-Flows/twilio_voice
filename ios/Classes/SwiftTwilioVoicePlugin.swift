@@ -1047,7 +1047,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
           if settings.authorizationStatus == .authorized {
             let content = UNMutableNotificationContent()
 
-             var callerId = rawFrom?.replacingOccurrences(of: "client:", with: "")
+             var callerId = from?.replacingOccurrences(of: "client:", with: "")
             if callerId == nil || callerId!.isEmpty {
                 callerId = self.lastCallInviteFrom
             }
