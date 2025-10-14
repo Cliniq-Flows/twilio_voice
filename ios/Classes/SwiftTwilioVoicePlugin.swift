@@ -4,9 +4,6 @@ private let swiftTwilioVoicePluginChangeSummary: [String] = [
     "Streams call state and audio routing events back to Dart"
 ]
 
-
-
-
 import Flutter
 import UIKit
 import AVFoundation
@@ -115,133 +112,65 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         return "Cliniq Flows" // final fallback
         }
 
-        private func buildProvider() {
-        // Build a fresh provider configuration
-       let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName().isEmpty ? "Better Cliniq" : SwiftTwilioVoicePlugin.appDisplayName())
-  cfg.supportedHandleTypes = [.generic, .phoneNumber]              // ← add this here too
-  cfg.maximumCallGroups = 1
-  cfg.maximumCallsPerCallGroup = 1
-  cfg.supportsVideo = false
-  if let iconName = UserDefaults.standard.string(forKey: defaultCallKitIcon),
-     let img = UIImage(named: iconName)?.pngData() {
-    cfg.iconTemplateImageData = img
-  }
-  callKitProvider = CXProvider(configuration: cfg)
-  callKitProvider.setDelegate(self, queue: nil)
-}   
-
-    public override init() {
-  // Create members BEFORE super.init
-  voipRegistry = PKPushRegistry(queue: .main)
-
-  let display = SwiftTwilioVoicePlugin.appDisplayName()
-  let providerConfig = CXProviderConfiguration(localizedName: display.isEmpty ? "Cliniq Flows" : display)
-  providerConfig.supportedHandleTypes = [.phoneNumber, .generic]  
-  providerConfig.maximumCallGroups = 1
-  providerConfig.maximumCallsPerCallGroup = 1
-  providerConfig.supportsVideo = false
-  providerConfig.includesCallsInRecents = true
-
-  callKitProvider = CXProvider(configuration: providerConfig)
-  callKitCallController = CXCallController()
-  audioDevice = DefaultAudioDevice()
-
-  // Now it's safe to use self
-  super.init()
-
-  // Wire up delegates / state
-  callKitProvider.setDelegate(self, queue: nil)
-
-  TwilioVoiceSDK.audioDevice = audioDevice
-  audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
-
-  voipRegistry.delegate = self
-  voipRegistry.desiredPushTypes = isSignedIn ? [.voIP] : []
-
-  callObserver.setDelegate(self, queue: .main)
-  UNUserNotificationCenter.current().delegate = self
-
-  clients = UserDefaults.standard.object(forKey: kClientList) as? [String:String] ?? [:]
-  let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
-  _ = updateCallKitIcon(icon: defaultIcon)
-
-  #if DEBUG
-  if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
-    NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
-  }
-  #endif
-
-  NotificationCenter.default.addObserver(
-    self,
-    selector: #selector(appWillTerminate),
-    name: UIApplication.willTerminateNotification,
-    object: nil
-  )
-}
-
+       private func buildProvider() {
+            let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
+            cfg.supportedHandleTypes = [.phoneNumber, .generic]           // ← REQUIRED
+            cfg.maximumCallGroups = 1
+            cfg.maximumCallsPerCallGroup = 1
+            cfg.supportsVideo = false
+            if let iconName = UserDefaults.standard.string(forKey: defaultCallKitIcon),
+            let img = UIImage(named: iconName)?.pngData() {
+                cfg.iconTemplateImageData = img
+            }
+            callKitProvider = CXProvider(configuration: cfg)
+            callKitProvider.setDelegate(self, queue: nil)
+        }
         
-     //  public override init() {
-        //      super.init()
-        //     //isSpinning = false
-        //     voipRegistry = PKPushRegistry.init(queue: DispatchQueue.main)
-        //     let configuration = CXProviderConfiguration(localizedName:SwiftTwilioVoicePlugin.appDisplayName())
-        //     configuration.maximumCallGroups = 1
-        //     configuration.maximumCallsPerCallGroup = 1
-        //     let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
-            
-        //     clients = UserDefaults.standard.object(forKey: kClientList)  as? [String:String] ?? [:]
-        //     callKitProvider = CXProvider(configuration: configuration)
-        //     callKitCallController = CXCallController()
-        //     callKitProvider.setDelegate(self, queue: nil)
-            
-        //     //super.init(coder: aDecoder)
-           
+        public override init() {
+       
+            voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
 
-        //     #if DEBUG
-        //             if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
-        //                 NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
-        //             }
-        //     #endif
-        //     buildProvider()  
-        //     callObserver.setDelegate(self, queue: DispatchQueue.main)
-            
-        //     callKitProvider.setDelegate(self, queue: nil)
-        //     _ = updateCallKitIcon(icon: defaultIcon)
-            
-        //     // voipRegistry.delegate = self
-            
-        //     // voipRegistry.desiredPushTypes = [.voIP]
-        //     voipRegistry.delegate = self
-        //     if isSignedIn {           // or simply: if isSignedIn
-        //         voipRegistry.desiredPushTypes = [.voIP]
-        //     } else {
-        //         voipRegistry.desiredPushTypes = []           // keep disabled when signed out
-        //     }
+                let providerConfig = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
+                providerConfig.supportedHandleTypes = [.phoneNumber, .generic]   // ← REQUIRED
+                providerConfig.maximumCallGroups = 1
+                providerConfig.maximumCallsPerCallGroup = 1
+                providerConfig.supportsVideo = false
+                callKitProvider = CXProvider(configuration: providerConfig)
+                callKitProvider.setDelegate(self, queue: nil)
+                audioDevice = DefaultAudioDevice()   // you already had a default value, but initializing here is fine too
 
-        //     UNUserNotificationCenter.current().delegate = self   // ← add this
+                // 2) Now it's safe to call super
+                super.init()
 
-        //     let appDelegate = UIApplication.shared.delegate
-        //     guard let controller = appDelegate?.window??.rootViewController as? FlutterViewController else {
-        //         fatalError("rootViewController is not type FlutterViewController")
-        //     }
-        //     let registrar = controller.registrar(forPlugin: "twilio_voice")
-        //     if let unwrappedRegistrar = registrar {
-        //         let eventChannel = FlutterEventChannel(name: "twilio_voice/events", binaryMessenger: unwrappedRegistrar.messenger())
-        //         eventChannel.setStreamHandler(self)
-        //     }
+                // 3) Wire up delegates and remaining setup (these can reference self)
+                callKitProvider.setDelegate(self, queue: nil)
 
-        //     NotificationCenter.default.addObserver(
-        //     self,
-        //     selector: #selector(appWillTerminate),
-        //     name: UIApplication.willTerminateNotification,
-        //     object: nil
-        
-        // )   
-        //     audioDevice = DefaultAudioDevice()
-        //     TwilioVoiceSDK.audioDevice = self.audioDevice
-        //     audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
+                TwilioVoiceSDK.audioDevice = audioDevice
+                audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
 
-      //  }
+                voipRegistry.delegate = self
+                voipRegistry.desiredPushTypes = isSignedIn ? [.voIP] : []
+
+                callObserver.setDelegate(self, queue: DispatchQueue.main)
+                UNUserNotificationCenter.current().delegate = self
+
+                clients = UserDefaults.standard.object(forKey: kClientList) as? [String:String] ?? [:]
+                let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
+                _ = updateCallKitIcon(icon: defaultIcon)
+
+                #if DEBUG
+                if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
+                    NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
+                }
+                #endif
+
+                NotificationCenter.default.addObserver(
+                    self,
+                    selector: #selector(appWillTerminate),
+                    name: UIApplication.willTerminateNotification,
+                    object: nil
+                )
+        }
         
         
         deinit {
@@ -743,33 +672,28 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // }
         
         // return false;
-        guard let newIcon = UIImage(named: icon) else { return false }
+        guard let img = UIImage(named: icon)?.pngData() else { return false }
 
-        let current = callKitProvider.configuration
-        let fallbackName = SwiftTwilioVoicePlugin.appDisplayName()
-        let trimmedName = current.localizedName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedName = trimmedName.isEmpty ? fallbackName : trimmedName
+            // Keep the visible name stable
+            let name = SwiftTwilioVoicePlugin.appDisplayName()
 
-        let updatedConfig = CXProviderConfiguration(localizedName: resolvedName)
-        updatedConfig.iconTemplateImageData = newIcon.pngData()
-        updatedConfig.groupIdentifier = current.groupIdentifier
-        updatedConfig.maximumCallGroups = current.maximumCallGroups
-        updatedConfig.maximumCallsPerCallGroup = current.maximumCallsPerCallGroup
-        if #available(iOS 11.0, *) {
-            updatedConfig.includesCallsInRecents = current.includesCallsInRecents
-        }
-        updatedConfig.supportedHandleTypes = current.supportedHandleTypes.isEmpty
-            ? [.generic, .phoneNumber]
-            : current.supportedHandleTypes
-        updatedConfig.ringtoneSound = current.ringtoneSound
-        updatedConfig.supportsVideo = current.supportsVideo
-        if #available(iOS 14.0, *) {
-            updatedConfig.audioSessionConfiguration = current.audioSessionConfiguration
-        }
+            let cfg = CXProviderConfiguration(localizedName: name)
+            cfg.supportedHandleTypes = [.phoneNumber, .generic]  // keep!
+            cfg.maximumCallGroups = callKitProvider.configuration.maximumCallGroups
+            cfg.maximumCallsPerCallGroup = callKitProvider.configuration.maximumCallsPerCallGroup
+            cfg.supportsVideo = callKitProvider.configuration.supportsVideo
+            if #available(iOS 11.0, *) {
+                cfg.includesCallsInRecents = true
+            }
+            cfg.ringtoneSound = callKitProvider.configuration.ringtoneSound
+            cfg.iconTemplateImageData = img
 
-        callKitProvider.configuration = updatedConfig
-        UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
-        return true
+            callKitProvider.invalidate()
+            callKitProvider = CXProvider(configuration: cfg)
+            callKitProvider.setDelegate(self, queue: nil)
+
+            UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
+            return true 
     }
 
     func answerCall(callInvite: CallInvite) {
@@ -1377,7 +1301,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     public func providerDidReset(_ provider: CXProvider) {
         self.sendPhoneCallEvents(description: "LOG|providerDidReset:", isError: false)
         audioDevice.isEnabled = false
-       //  buildProvider()
+      
     }
     
     public func providerDidBegin(_ provider: CXProvider) {
@@ -1481,67 +1405,95 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     }
     
     // MARK: Call Kit Actions
-    
     func performStartCallAction(uuid: UUID, handle: String) {
-  if !Thread.isMainThread {
-    DispatchQueue.main.async { [weak self] in
-      self?.performStartCallAction(uuid: uuid, handle: handle)
+    // 1) Ensure main
+    if !Thread.isMainThread {
+        DispatchQueue.main.async { [weak self] in
+            self?.performStartCallAction(uuid: uuid, handle: handle)
+        }
+        return
     }
-    return
-  }
 
-  let trimmed = handle.trimmingCharacters(in: .whitespacesAndNewlines)
-  guard !trimmed.isEmpty else {
-    sendPhoneCallEvents(description: "LOG|StartCallAction aborted: empty handle", isError: true)
-    return
-  }
+    // 2) Sanitize handle
+    let trimmed = handle.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+        NSLog("CK DEBUG abort: empty handle")
+        sendPhoneCallEvents(description: "LOG|StartCallAction aborted: empty handle", isError: true)
+        return
+    }
 
-  // Safely unwrap + trim (handles optional localizedName)
-  let name = (callKitProvider.configuration.localizedName ?? "")
+    let providerName = (callKitProvider.configuration.localizedName ?? "")
     .trimmingCharacters(in: .whitespacesAndNewlines)
-  if name.isEmpty {
-    NSLog("CK DEBUG provider has empty name (will still attempt request)")
-  }
-
-  // Choose handle type
-  let digits = trimmed.filter(\.isNumber)
-  let looksLikeNumber = digits.count >= 3 && (trimmed.hasPrefix("+") || trimmed == digits)
-  let cxType: CXHandle.HandleType = looksLikeNumber ? .phoneNumber : .generic
-
-  NSLog("CK DEBUG handle='\(trimmed)' (len=\(trimmed.count)) type=\(looksLikeNumber ? "phoneNumber" : "generic")")
-  NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName ?? "nil") maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
-
-  let callHandle = CXHandle(type: cxType, value: trimmed)
-  let action = CXStartCallAction(call: uuid, handle: callHandle)
- 
-  let tx = CXTransaction(action: action)
-
-  callKitCallController.request(tx) { [weak self] error in
-    guard let self = self else { return }
-    if let e = error as NSError? {
-      self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request failed: \(e.localizedDescription)", isError: true)
-      return
+    if providerName.isEmpty {
+        NSLog("CK DEBUG provider not ready (empty name) — rebuilding provider")
+        buildProvider()
     }
 
-    var displayName = trimmed
-    let fn = (self.callArgs["to_firstname"] as? String ?? "")
-    let ln = (self.callArgs["to_lastname"]  as? String ?? "")
-    let combined = "\(fn) \(ln)".trimmingCharacters(in: .whitespaces)
-    if !combined.isEmpty { displayName = combined }
+    // 4) Decide handle type
+   let digits = trimmed.filter(\.isNumber)
+    let looksLikeNumber = digits.count >= 3 && (trimmed.hasPrefix("+") || trimmed == digits)
+    let cxHandleType: CXHandle.HandleType = looksLikeNumber ? .phoneNumber : .generic
 
-    let update = CXCallUpdate()
-    update.remoteHandle = callHandle
-    update.localizedCallerName = displayName.isEmpty ? (self.clients[trimmed] ?? self.clients["defaultCaller"] ?? self.defaultCaller) : displayName
-    update.supportsDTMF = true
-    update.supportsHolding = true
-    update.supportsGrouping = false
-    update.supportsUngrouping = false
-    update.hasVideo = false
+    // ✅ Make sure the provider actually allows this handle type
+    let allowed = callKitProvider.configuration.supportedHandleTypes
+    if !allowed.contains(cxHandleType) {
+        NSLog("CK DEBUG config missing handleType \(cxHandleType.rawValue) — rebuilding")
+        buildProvider() // this sets [.phoneNumber, .generic]
+    }
+    NSLog("CK DEBUG handle='\(trimmed)' (len=\(trimmed.count)) type=\(looksLikeNumber ? "phoneNumber" : "generic")")
+    NSLog("CK DEBUG activeCalls=\(callObserver.calls.map { [$0.uuid.uuidString, $0.isOutgoing, $0.hasConnected, $0.hasEnded] })")
+    NSLog("CK DEBUG provider=\(callKitProvider) delegateSet? YES")
+   NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName ?? "nil") maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
 
-    self.callKitProvider.reportCall(with: uuid, updated: update)
-  }
+    let callHandle = CXHandle(type: cxHandleType, value: trimmed)
+    let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
+    let transaction = CXTransaction(action: startCallAction)
+
+    callKitCallController.request(transaction) { [weak self] error in
+        guard let self = self else { return }
+
+        if let e = error as NSError? {
+            NSLog("CK DEBUG StartCallAction failed domain=\(e.domain) code=\(e.code) userInfo=\(e.userInfo)")
+
+            // One-time soft retry if we raced a provider reset
+            if e.domain == CXErrorDomainRequestTransaction,
+               e.code == CXErrorCodeRequestTransactionError.unknown.rawValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    NSLog("CK DEBUG retrying StartCallAction after short delay")
+                    self.buildProvider()
+                    self.performStartCallAction(uuid: uuid, handle: trimmed)
+                }
+            } else {
+                self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request failed: \(e.localizedDescription)", isError: true)
+            }
+            return
+        }
+
+        NSLog("CK DEBUG StartCallAction OK")
+        self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request successful", isError: false)
+
+        // Build nice display name
+        var displayName = trimmed
+        let fn = (self.callArgs["to_firstname"] as? String ?? "")
+        let ln = (self.callArgs["to_lastname"]  as? String ?? "")
+        let combined = "\(fn) \(ln)".trimmingCharacters(in: .whitespaces)
+        if !combined.isEmpty { displayName = combined }
+
+        let callUpdate = CXCallUpdate()
+        callUpdate.remoteHandle = callHandle
+        callUpdate.localizedCallerName =
+            displayName.isEmpty
+            ? (self.clients[trimmed] ?? self.clients["defaultCaller"] ?? self.defaultCaller)
+            : displayName
+        callUpdate.supportsDTMF = true
+        callUpdate.supportsHolding = true
+        callUpdate.supportsGrouping = false
+        callUpdate.supportsUngrouping = false
+        callUpdate.hasVideo = false
+
+        self.callKitProvider.reportCall(with: uuid, updated: callUpdate)
+    }
 }
-
 
 
     // func performStartCallAction(uuid: UUID, handle: String) {
@@ -2157,3 +2109,4 @@ extension UserDefaults {
         return nil
     }
 }
+
