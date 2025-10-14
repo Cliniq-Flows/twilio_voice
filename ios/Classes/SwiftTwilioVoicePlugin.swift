@@ -101,85 +101,85 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
 
-    private func appDisplayName() -> String {
-    // Prefer the visible name
-    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
-        !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
-    // Fallback to bundle name
-    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
-        !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
-    return "Cliniq Flows" // final fallback
-    }
-    
-    public override init() {
-        
-        //isSpinning = false
-        voipRegistry = PKPushRegistry.init(queue: DispatchQueue.main)
-        let configuration = CXProviderConfiguration(localizedName:appDisplayName())
-        configuration.maximumCallGroups = 1
-        configuration.maximumCallsPerCallGroup = 1
-        let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
-        
-        clients = UserDefaults.standard.object(forKey: kClientList)  as? [String:String] ?? [:]
-        callKitProvider = CXProvider(configuration: configuration)
-        callKitCallController = CXCallController()
-        callKitProvider.setDelegate(self, queue: nil)
-        
-        //super.init(coder: aDecoder)
-        super.init()
-        #if DEBUG
-                if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
-                    NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
-                }
-        #endif
-        callObserver.setDelegate(self, queue: DispatchQueue.main)
-        
-        callKitProvider.setDelegate(self, queue: nil)
-        _ = updateCallKitIcon(icon: defaultIcon)
-        
-        // voipRegistry.delegate = self
-        
-        // voipRegistry.desiredPushTypes = [.voIP]
-        voipRegistry.delegate = self
-        if isSignedIn {           // or simply: if isSignedIn
-            voipRegistry.desiredPushTypes = [.voIP]
-        } else {
-            voipRegistry.desiredPushTypes = []           // keep disabled when signed out
+        private func appDisplayName() -> String {
+        // Prefer the visible name
+        if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+            !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
+        // Fallback to bundle name
+        if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
+            !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
+        return "Cliniq Flows" // final fallback
         }
+        
+        public override init() {
+            
+            //isSpinning = false
+            voipRegistry = PKPushRegistry.init(queue: DispatchQueue.main)
+            let configuration = CXProviderConfiguration(localizedName:SwiftTwilioVoicePlugin.appDisplayName())
+            configuration.maximumCallGroups = 1
+            configuration.maximumCallsPerCallGroup = 1
+            let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
+            
+            clients = UserDefaults.standard.object(forKey: kClientList)  as? [String:String] ?? [:]
+            callKitProvider = CXProvider(configuration: configuration)
+            callKitCallController = CXCallController()
+            //callKitProvider.setDelegate(self, queue: nil)
+            
+            //super.init(coder: aDecoder)
+            super.init()
+            #if DEBUG
+                    if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
+                        NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
+                    }
+            #endif
+            callObserver.setDelegate(self, queue: DispatchQueue.main)
+            
+            callKitProvider.setDelegate(self, queue: nil)
+            _ = updateCallKitIcon(icon: defaultIcon)
+            
+            // voipRegistry.delegate = self
+            
+            // voipRegistry.desiredPushTypes = [.voIP]
+            voipRegistry.delegate = self
+            if isSignedIn {           // or simply: if isSignedIn
+                voipRegistry.desiredPushTypes = [.voIP]
+            } else {
+                voipRegistry.desiredPushTypes = []           // keep disabled when signed out
+            }
 
-         UNUserNotificationCenter.current().delegate = self   // ← add this
+            UNUserNotificationCenter.current().delegate = self   // ← add this
 
-        let appDelegate = UIApplication.shared.delegate
-        guard let controller = appDelegate?.window??.rootViewController as? FlutterViewController else {
-            fatalError("rootViewController is not type FlutterViewController")
+            let appDelegate = UIApplication.shared.delegate
+            guard let controller = appDelegate?.window??.rootViewController as? FlutterViewController else {
+                fatalError("rootViewController is not type FlutterViewController")
+            }
+            let registrar = controller.registrar(forPlugin: "twilio_voice")
+            if let unwrappedRegistrar = registrar {
+                let eventChannel = FlutterEventChannel(name: "twilio_voice/events", binaryMessenger: unwrappedRegistrar.messenger())
+                eventChannel.setStreamHandler(self)
+            }
+
+            NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillTerminate),
+            name: UIApplication.willTerminateNotification,
+            object: nil
+        
+        )   
+            audioDevice = DefaultAudioDevice()
+            TwilioVoiceSDK.audioDevice = self.audioDevice
+            audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
+
+
         }
-        let registrar = controller.registrar(forPlugin: "twilio_voice")
-        if let unwrappedRegistrar = registrar {
-            let eventChannel = FlutterEventChannel(name: "twilio_voice/events", binaryMessenger: unwrappedRegistrar.messenger())
-            eventChannel.setStreamHandler(self)
+        
+        
+        deinit {
+            // CallKit has an odd API contract where the developer must call invalidate or the CXProvider is leaked.
+            callKitProvider.invalidate()
+            NotificationCenter.default.removeObserver(self)
+
         }
-
-        NotificationCenter.default.addObserver(
-        self,
-        selector: #selector(appWillTerminate),
-        name: UIApplication.willTerminateNotification,
-        object: nil
-       
-    )   
-        audioDevice = DefaultAudioDevice()
-         TwilioVoiceSDK.audioDevice = self.audioDevice
-         audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
-
-
-    }
-    
-    
-    deinit {
-        // CallKit has an odd API contract where the developer must call invalidate or the CXProvider is leaked.
-        callKitProvider.invalidate()
-        NotificationCenter.default.removeObserver(self)
-
-    }
 
     // ────────────────────────────────────────────────────────────────────────────
     // MARK: — App-Lifecycle Hang-Up Handlers
