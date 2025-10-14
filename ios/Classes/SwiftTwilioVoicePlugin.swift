@@ -104,19 +104,18 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
 
       private static func appDisplayName() -> String {
-        // Prefer the visible name
-        if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
-            !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
-        // Fallback to bundle name
-        if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
-            !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
-        return "Cliniq Flows" // final fallback
-        }
+    // 1) CFBundleDisplayName
+    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+       !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
+    // 2) CFBundleName
+    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
+       !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
+    // 3) Hard fallback that is NEVER empty
+    return "Clini Flows"
+    }
 
       private func buildProvider() {
-    // Always use a non-empty display name
-    let name = SwiftTwilioVoicePlugin.appDisplayName().trimmingCharacters(in: .whitespacesAndNewlines)
-    let cfg = CXProviderConfiguration(localizedName: name.isEmpty ? "App" : name)
+  let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
     cfg.supportedHandleTypes = [.phoneNumber, .generic]
     cfg.maximumCallGroups = 1
     cfg.maximumCallsPerCallGroup = 1
@@ -125,33 +124,28 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
        let img = UIImage(named: iconName)?.pngData() {
         cfg.iconTemplateImageData = img
     }
-
-    callKitProvider.invalidate()
     callKitProvider = CXProvider(configuration: cfg)
     callKitProvider.setDelegate(self, queue: nil)
-    providerReady = false // will flip to true in providerDidBegin
 }
 
         public override init() {
-    // 1) Init all stored properties first (no 'self' use that needs init'd super)
-    self.voipRegistry = PKPushRegistry(queue: .main)
+        voipRegistry = PKPushRegistry(queue: .main)
+    audioDevice = DefaultAudioDevice()
+    callKitCallController = CXCallController()              // <-- important
+    let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
+    cfg.supportedHandleTypes = [.phoneNumber, .generic]
+    cfg.maximumCallGroups = 1
+    cfg.maximumCallsPerCallGroup = 1
+    cfg.supportsVideo = false
+    if let iconName = UserDefaults.standard.string(forKey: defaultCallKitIcon),
+       let img = UIImage(named: iconName)?.pngData() {
+        cfg.iconTemplateImageData = img
+    }
+    callKitProvider = CXProvider(configuration: cfg)
 
-    let providerConfig = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
-    providerConfig.supportedHandleTypes = [.phoneNumber, .generic]
-    providerConfig.maximumCallGroups = 1
-    providerConfig.maximumCallsPerCallGroup = 1
-    providerConfig.supportsVideo = false
-
-    self.callKitProvider       = CXProvider(configuration: providerConfig)
-    self.callKitCallController = CXCallController()
-    self.audioDevice           = DefaultAudioDevice()  // even though it has a default
-
-    // 2) Now it's legal to use 'self'
     super.init()
 
-    // 3) Wire delegates and the rest of setup
     callKitProvider.setDelegate(self, queue: nil)
-
     TwilioVoiceSDK.audioDevice = audioDevice
     audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
 
@@ -162,8 +156,6 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     UNUserNotificationCenter.current().delegate = self
 
     clients = UserDefaults.standard.object(forKey: kClientList) as? [String:String] ?? [:]
-    let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
-    _ = updateCallKitIcon(icon: defaultIcon)
 
     #if DEBUG
     if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
@@ -712,6 +704,23 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     /// - Parameter icon: icon path / name
     /// - Returns: true if succesful
     func updateCallKitIcon(icon: String) -> Bool {
+        guard let img = UIImage(named: icon)?.pngData() else { return false }
+
+    let name = SwiftTwilioVoicePlugin.appDisplayName()
+    let cfg = CXProviderConfiguration(localizedName: name)
+    cfg.supportedHandleTypes = [.phoneNumber, .generic]
+    cfg.maximumCallGroups = callKitProvider.configuration.maximumCallGroups
+    cfg.maximumCallsPerCallGroup = callKitProvider.configuration.maximumCallsPerCallGroup
+    cfg.supportsVideo = callKitProvider.configuration.supportsVideo
+    cfg.iconTemplateImageData = img
+
+    // Rebuild ONCE, then set delegate again.
+    callKitProvider.invalidate()
+    callKitProvider = CXProvider(configuration: cfg)
+    callKitProvider.setDelegate(self, queue: nil)
+
+    UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
+    return true
         // if let newIcon = UIImage(named: icon) {
         //     let configuration = callKitProvider.configuration;
             
@@ -726,28 +735,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // }
         
         // return false;
-        guard let img = UIImage(named: icon)?.pngData() else { return false }
-
-            // Keep the visible name stable
-            let name = SwiftTwilioVoicePlugin.appDisplayName()
-
-            let cfg = CXProviderConfiguration(localizedName: name)
-            cfg.supportedHandleTypes = [.phoneNumber, .generic]  // keep!
-            cfg.maximumCallGroups = callKitProvider.configuration.maximumCallGroups
-            cfg.maximumCallsPerCallGroup = callKitProvider.configuration.maximumCallsPerCallGroup
-            cfg.supportsVideo = callKitProvider.configuration.supportsVideo
-            if #available(iOS 11.0, *) {
-                cfg.includesCallsInRecents = true
-            }
-            cfg.ringtoneSound = callKitProvider.configuration.ringtoneSound
-            cfg.iconTemplateImageData = img
-
-            callKitProvider.invalidate()
-            callKitProvider = CXProvider(configuration: cfg)
-            callKitProvider.setDelegate(self, queue: nil)
-
-            UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
-            return true 
+       
     }
 
     func answerCall(callInvite: CallInvite) {
@@ -1474,16 +1462,12 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     }
 
     // If provider not ready (or has empty name), rebuild and retry shortly
-let name = (callKitProvider.configuration.localizedName ?? "")
-    .trimmingCharacters(in: .whitespacesAndNewlines)
-        let providerLooksBad = name.isEmpty
-    if !providerReady || providerLooksBad {
-        NSLog("CK DEBUG provider not ready (ready=\(providerReady) name='\(name)') — rebuilding")
-        buildProvider()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) { [weak self] in
-            self?.performStartCallAction(uuid: uuid, handle: trimmed)
-        }
-        return
+    let nameOK = !callKitProvider.configuration.localizedName
+        .trimmingCharacters(in: .whitespaces).isEmpty
+    if !nameOK && !didForceRebuildOnce {
+        NSLog("CK DEBUG provider not ready (name empty) — rebuilding ONCE")
+        didForceRebuildOnce = true
+        buildProvider() // this should NOT invalidate; just create a fresh provider with a non-empty name
     }
 
     // Pick handle type + ensure it's allowed
