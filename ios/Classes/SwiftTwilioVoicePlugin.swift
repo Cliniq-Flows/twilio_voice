@@ -192,7 +192,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     super.init()
 
     // 2) CallKit provider – build once
-    let configuration = CXProviderConfiguration(localizedName: appDisplayName())
+    let configuration = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
     configuration.maximumCallGroups = 1
     configuration.maximumCallsPerCallGroup = 1
 
