@@ -126,7 +126,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         cfg.iconTemplateImageData = img
     }
 
-    callKitProvider?.invalidate()
+    callKitProvider.invalidate()
     callKitProvider = CXProvider(configuration: cfg)
     callKitProvider.setDelegate(self, queue: nil)
     providerReady = false // will flip to true in providerDidBegin
@@ -1474,8 +1474,9 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     }
 
     // If provider not ready (or has empty name), rebuild and retry shortly
-    let name = callKitProvider.configuration.localizedName.trimmingCharacters(in: .whitespacesAndNewlines)
-    let providerLooksBad = name.isEmpty
+let name = (callKitProvider.configuration.localizedName ?? "")
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+        let providerLooksBad = name.isEmpty
     if !providerReady || providerLooksBad {
         NSLog("CK DEBUG provider not ready (ready=\(providerReady) name='\(name)') — rebuilding")
         buildProvider()
