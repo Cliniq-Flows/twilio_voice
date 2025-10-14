@@ -1463,8 +1463,9 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     }
 
     // If provider not ready (or has empty name), rebuild and retry shortly
-    let nameOK = !callKitProvider.configuration.localizedName
-        .trimmingCharacters(in: .whitespaces).isEmpty
+    let providerName = callKitProvider.configuration.localizedName?
+        .trimmingCharacters(in: .whitespaces) ?? ""
+    let nameOK = !providerName.isEmpty
     if !nameOK && !didForceRebuildOnce {
         NSLog("CK DEBUG provider not ready (name empty) — rebuilding ONCE")
         didForceRebuildOnce = true
@@ -2144,4 +2145,3 @@ extension UserDefaults {
         return nil
     }
 }
-
