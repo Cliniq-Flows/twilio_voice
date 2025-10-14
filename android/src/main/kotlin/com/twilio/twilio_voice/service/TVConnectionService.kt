@@ -1234,7 +1234,7 @@ class TVConnectionService : ConnectionService() {
         val id = "${applicationContext.packageName}_calls"
         val name = applicationContext.appName
         val descriptionText = "Active Voice Calls"
-        val importance = NotificationManager.IMPORTANCE_NONE
+        val importance = NotificationManager.IMPORTANCE_LOW
         val channel = NotificationChannel(id, name, importance).apply {
             description = descriptionText
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
