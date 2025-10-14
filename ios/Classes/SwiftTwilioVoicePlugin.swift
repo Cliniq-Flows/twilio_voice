@@ -172,6 +172,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         name: UIApplication.willTerminateNotification,
         object: nil
     )
+    let disp = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "nil"
+    let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "nil"
+    NSLog("CK DEBUG bundle names: display='\(disp)' name='\(name)' resolved='\(SwiftTwilioVoicePlugin.appDisplayName())'")
+    NSLog("CK DEBUG provider config name='\(cfg.localizedName)'")
 }
 
         
@@ -718,7 +722,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     cfg.iconTemplateImageData = img
 
     // Rebuild ONCE, then set delegate again.
-    callKitProvider.invalidate()
+   // callKitProvider.invalidate()
     callKitProvider = CXProvider(configuration: cfg)
     callKitProvider.setDelegate(self, queue: nil)
 
@@ -1359,13 +1363,9 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     public func providerDidBegin(_ provider: CXProvider) {
         self.sendPhoneCallEvents(description: "LOG|providerDidBegin", isError: false)
         providerReady = true
-
-         // drain the pending start once provider is ready
         if let p = pendingStart {
             pendingStart = nil
-            DispatchQueue.main.async { [weak self] in
-            self?.performStartCallAction(uuid: p.uuid, handle: p.handle)
-            }
+            DispatchQueue.main.async { [weak self] in self?.performStartCallAction(uuid: p.uuid, handle: p.handle) }
         }
     }
     
@@ -1485,7 +1485,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     if !didForceRebuildOnce {
       didForceRebuildOnce = true
       NSLog("CK DEBUG provider not ready (name empty or not begun) — rebuilding ONCE")
-      buildProvider() // sets delegate; expect providerDidBegin soon
+    
     }
     // Don’t fire the transaction yet
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
