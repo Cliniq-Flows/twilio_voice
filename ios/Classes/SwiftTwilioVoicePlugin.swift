@@ -1465,9 +1465,10 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     return
   }
 
-  // Just log — do NOT rebuild here
-  let name = callKitProvider.configuration.localizedName
-  if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+  // Safely unwrap + trim (handles optional localizedName)
+  let name = (callKitProvider.configuration.localizedName ?? "")
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+  if name.isEmpty {
     NSLog("CK DEBUG provider has empty name (will still attempt request)")
   }
 
@@ -1477,7 +1478,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
   let cxType: CXHandle.HandleType = looksLikeNumber ? .phoneNumber : .generic
 
   NSLog("CK DEBUG handle='\(trimmed)' (len=\(trimmed.count)) type=\(looksLikeNumber ? "phoneNumber" : "generic")")
-  NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName) maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
+  NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName ?? "nil") maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
 
   let callHandle = CXHandle(type: cxType, value: trimmed)
   let action = CXStartCallAction(call: uuid, handle: callHandle)
