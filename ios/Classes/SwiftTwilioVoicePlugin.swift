@@ -75,6 +75,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private var callkitAudioActive = false
     private var providerReady = false
     private var didForceRebuildOnce = false
+    private var pendingStart: (uuid: UUID, handle: String)?
+
 
      // ——————————————————————————————————————
     // MARK: Shared-Prefs Helpers 🔥 NEW
@@ -1346,10 +1348,23 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
         audioDevice.isEnabled = false
          providerReady = false
     }
+
+    private func nameIsOK() -> Bool {
+        let n = callKitProvider.configuration.localizedName
+        return !n.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     
     public func providerDidBegin(_ provider: CXProvider) {
         self.sendPhoneCallEvents(description: "LOG|providerDidBegin", isError: false)
         providerReady = true
+
+         // drain the pending start once provider is ready
+        if let p = pendingStart {
+            pendingStart = nil
+            DispatchQueue.main.async { [weak self] in
+            self?.performStartCallAction(uuid: p.uuid, handle: p.handle)
+            }
+        }
     }
     
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
@@ -1451,62 +1466,75 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     // MARK: Call Kit Actions
     
     func performStartCallAction(uuid: UUID, handle: String) {
-    if !Thread.isMainThread {
-        DispatchQueue.main.async { [weak self] in self?.performStartCallAction(uuid: uuid, handle: handle) }
-        return
-    }
+         if !Thread.isMainThread {
+    DispatchQueue.main.async { [weak self] in self?.performStartCallAction(uuid: uuid, handle: handle) }
+    return
+  }
 
-    let trimmed = handle.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else {
-        sendPhoneCallEvents(description: "LOG|StartCallAction aborted: empty handle", isError: true)
-        return
-    }
+  let trimmed = handle.trimmingCharacters(in: .whitespacesAndNewlines)
+  guard !trimmed.isEmpty else {
+    sendPhoneCallEvents(description: "LOG|StartCallAction aborted: empty handle", isError: true)
+    return
+  }
 
-    // If provider not ready (or has empty name), rebuild and retry shortly
-    let providerName = callKitProvider.configuration.localizedName?
-        .trimmingCharacters(in: .whitespaces) ?? ""
-    let nameOK = !providerName.isEmpty
-    if !nameOK && !didForceRebuildOnce {
-        NSLog("CK DEBUG provider not ready (name empty) — rebuilding ONCE")
-        didForceRebuildOnce = true
-        buildProvider() // this should NOT invalidate; just create a fresh provider with a non-empty name
+  // If not ready or name empty, rebuild once and retry later
+  if (!providerReady || !nameIsOK()) {
+    pendingStart = (uuid, trimmed)
+    if !didForceRebuildOnce {
+      didForceRebuildOnce = true
+      NSLog("CK DEBUG provider not ready (name empty or not begun) — rebuilding ONCE")
+      buildProvider() // sets delegate; expect providerDidBegin soon
     }
+    // Don’t fire the transaction yet
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+      guard let self = self, self.pendingStart != nil else { return }
+      // If provider still not ready, we’ll try again when providerDidBegin fires
+      if self.providerReady && self.nameIsOK() {
+        let p = self.pendingStart!; self.pendingStart = nil
+        self.performStartCallAction(uuid: p.uuid, handle: p.handle)
+      }
+    }
+    return
+  }
 
-    // Pick handle type + ensure it's allowed
-    let digits = trimmed.filter(\.isNumber)
-    let isNumber = digits.count >= 3 && (trimmed.hasPrefix("+") || trimmed == digits)
-    let cxType: CXHandle.HandleType = isNumber ? .phoneNumber : .generic
-    if !callKitProvider.configuration.supportedHandleTypes.contains(cxType) {
-        buildProvider()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) { [weak self] in
-            self?.performStartCallAction(uuid: uuid, handle: trimmed)
+  // Decide handle type and ensure it’s supported
+  let digits = trimmed.filter(\.isNumber)
+  let isNumber = digits.count >= 3 && (trimmed.hasPrefix("+") || trimmed == digits)
+  let type: CXHandle.HandleType = isNumber ? .phoneNumber : .generic
+
+  if !callKitProvider.configuration.supportedHandleTypes.contains(type) {
+    buildProvider()
+    pendingStart = (uuid, trimmed)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) { [weak self] in
+      self?.performStartCallAction(uuid: uuid, handle: trimmed)
+    }
+    return
+  }
+
+  let callHandle = CXHandle(type: type, value: trimmed)
+  let start      = CXStartCallAction(call: uuid, handle: callHandle)
+  let tx         = CXTransaction(action: start)
+
+  callKitCallController.request(tx) { [weak self] error in
+    guard let self = self else { return }
+    if let e = error as NSError? {
+      NSLog("CK DEBUG StartCallAction failed domain=\(e.domain) code=\(e.code) userInfo=\(e.userInfo)")
+      // Soft retry if we raced a reset
+      if e.domain == CXErrorDomainRequestTransaction,
+         e.code == CXErrorCodeRequestTransactionError.unknown.rawValue {
+        self.pendingStart = (uuid, trimmed)
+        self.buildProvider()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
+          self.performStartCallAction(uuid: uuid, handle: trimmed)
         }
-        return
+      } else {
+        self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request failed: \(e.localizedDescription)", isError: true)
+      }
+      return
     }
 
-    let callHandle = CXHandle(type: cxType, value: trimmed)
-    let start     = CXStartCallAction(call: uuid, handle: callHandle)
-    let tx        = CXTransaction(action: start)
-
-    callKitCallController.request(tx) { [weak self] error in
-        guard let self = self else { return }
-        if let e = error as NSError? {
-            NSLog("CK DEBUG StartCallAction failed domain=\(e.domain) code=\(e.code) userInfo=\(e.userInfo)")
-            // Soft retry if the provider just reset mid-flight
-            if e.domain == CXErrorDomainRequestTransaction,
-               e.code == CXErrorCodeRequestTransactionError.unknown.rawValue {
-                self.buildProvider()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
-                    self.performStartCallAction(uuid: uuid, handle: trimmed)
-                }
-            } else {
-                self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request failed: \(e.localizedDescription)", isError: true)
-            }
-            return
-        }
-
-        self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request successful", isError: false)
-
+    self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request successful", isError: false)
+    
         // Optional: pretty name update
         var displayName = trimmed
         let fn = (self.callArgs["to_firstname"] as? String ?? "")
