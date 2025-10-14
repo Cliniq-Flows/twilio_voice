@@ -16,7 +16,7 @@ import MediaPlayer
 public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHandler, PKPushRegistryDelegate, NotificationDelegate, CallDelegate, AVAudioPlayerDelegate, CXProviderDelegate, CXCallObserverDelegate, UNUserNotificationCenterDelegate  {
     let callObserver = CXCallObserver()
     
-    final let defaultCallKitIcon = "callkit_icon"
+   private static let defaultCallKitIcon = "callkit_icon"
     static let shared = SwiftTwilioVoicePlugin()
 
     var callKitIcon: String?
@@ -124,10 +124,10 @@ private let maxStartRetries = 8
     cfg.maximumCallGroups = 1
     cfg.maximumCallsPerCallGroup = 1
     cfg.supportsVideo = false
-    if let iconName = UserDefaults.standard.string(forKey: defaultCallKitIcon),
-       let img = UIImage(named: iconName)?.pngData() {
-        cfg.iconTemplateImageData = img
-    }
+    if let iconName = UserDefaults.standard.string(forKey: SwiftTwilioVoicePlugin.defaultCallKitIcon),
+   let img = UIImage(named: iconName)?.pngData() {
+    cfg.iconTemplateImageData = img
+}
     callKitProvider = CXProvider(configuration: cfg)
     callKitProvider.setDelegate(self, queue: nil)
 }
@@ -142,10 +142,10 @@ private let maxStartRetries = 8
   cfg.maximumCallGroups = 1
   cfg.maximumCallsPerCallGroup = 1
   cfg.supportsVideo = false
-  if let iconName = UserDefaults.standard.string(forKey: Self.defaultCallKitIcon),
-     let img = UIImage(named: iconName)?.pngData() {
+ if let iconName = UserDefaults.standard.string(forKey: SwiftTwilioVoicePlugin.defaultCallKitIcon),
+   let img = UIImage(named: iconName)?.pngData() {
     cfg.iconTemplateImageData = img
-  }
+}
   callKitProvider = CXProvider(configuration: cfg)
 
   // 2) Now we're allowed to use `self`
@@ -539,7 +539,7 @@ private let maxStartRetries = 8
             result(true)
             return
         } else if flutterCall.method == "updateCallKitIcon" {
-            let newIcon = arguments["icon"] as? String ?? defaultCallKitIcon
+let newIcon = arguments["icon"] as? String ?? SwiftTwilioVoicePlugin.defaultCallKitIcon
             
             // update icon & persist
             result(updateCallKitIcon(icon: newIcon))
@@ -733,7 +733,7 @@ private let maxStartRetries = 8
     callKitProvider = CXProvider(configuration: cfg)
     callKitProvider.setDelegate(self, queue: nil)
 
-    UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
+UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIcon)
     return true
         // if let newIcon = UIImage(named: icon) {
         //     let configuration = callKitProvider.configuration;
