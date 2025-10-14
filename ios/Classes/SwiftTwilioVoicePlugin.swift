@@ -73,6 +73,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private var ringtonePlayer: AVAudioPlayer?
     private var wantsRingback = false
     private var callkitAudioActive = false
+    private var providerReady = false
 
      // ——————————————————————————————————————
     // MARK: Shared-Prefs Helpers 🔥 NEW
@@ -112,19 +113,24 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         return "Cliniq Flows" // final fallback
         }
 
-       private func buildProvider() {
-            let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
-            cfg.supportedHandleTypes = [.phoneNumber, .generic]           // ← REQUIRED
-            cfg.maximumCallGroups = 1
-            cfg.maximumCallsPerCallGroup = 1
-            cfg.supportsVideo = false
-            if let iconName = UserDefaults.standard.string(forKey: defaultCallKitIcon),
-            let img = UIImage(named: iconName)?.pngData() {
-                cfg.iconTemplateImageData = img
-            }
-            callKitProvider = CXProvider(configuration: cfg)
-            callKitProvider.setDelegate(self, queue: nil)
-        }
+      private func buildProvider() {
+    // Always use a non-empty display name
+    let name = SwiftTwilioVoicePlugin.appDisplayName().trimmingCharacters(in: .whitespacesAndNewlines)
+    let cfg = CXProviderConfiguration(localizedName: name.isEmpty ? "App" : name)
+    cfg.supportedHandleTypes = [.phoneNumber, .generic]
+    cfg.maximumCallGroups = 1
+    cfg.maximumCallsPerCallGroup = 1
+    cfg.supportsVideo = false
+    if let iconName = UserDefaults.standard.string(forKey: defaultCallKitIcon),
+       let img = UIImage(named: iconName)?.pngData() {
+        cfg.iconTemplateImageData = img
+    }
+
+    callKitProvider?.invalidate()
+    callKitProvider = CXProvider(configuration: cfg)
+    callKitProvider.setDelegate(self, queue: nil)
+    providerReady = false // will flip to true in providerDidBegin
+}
 
         public override init() {
     // 1) Init all stored properties first (no 'self' use that needs init'd super)
@@ -1349,11 +1355,12 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     public func providerDidReset(_ provider: CXProvider) {
         self.sendPhoneCallEvents(description: "LOG|providerDidReset:", isError: false)
         audioDevice.isEnabled = false
-      
+         providerReady = false
     }
     
     public func providerDidBegin(_ provider: CXProvider) {
         self.sendPhoneCallEvents(description: "LOG|providerDidBegin", isError: false)
+        providerReady = true
     }
     
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
@@ -1453,62 +1460,56 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     }
     
     // MARK: Call Kit Actions
+    
     func performStartCallAction(uuid: UUID, handle: String) {
-    // 1) Ensure main
     if !Thread.isMainThread {
-        DispatchQueue.main.async { [weak self] in
-            self?.performStartCallAction(uuid: uuid, handle: handle)
-        }
+        DispatchQueue.main.async { [weak self] in self?.performStartCallAction(uuid: uuid, handle: handle) }
         return
     }
 
-    // 2) Sanitize handle
     let trimmed = handle.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
-        NSLog("CK DEBUG abort: empty handle")
         sendPhoneCallEvents(description: "LOG|StartCallAction aborted: empty handle", isError: true)
         return
     }
 
-    let providerName = (callKitProvider.configuration.localizedName ?? "")
-    .trimmingCharacters(in: .whitespacesAndNewlines)
-    if providerName.isEmpty {
-        NSLog("CK DEBUG provider not ready (empty name) — rebuilding provider")
+    // If provider not ready (or has empty name), rebuild and retry shortly
+    let name = callKitProvider.configuration.localizedName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let providerLooksBad = name.isEmpty
+    if !providerReady || providerLooksBad {
+        NSLog("CK DEBUG provider not ready (ready=\(providerReady) name='\(name)') — rebuilding")
         buildProvider()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) { [weak self] in
+            self?.performStartCallAction(uuid: uuid, handle: trimmed)
+        }
+        return
     }
 
-    // 4) Decide handle type
-   let digits = trimmed.filter(\.isNumber)
-    let looksLikeNumber = digits.count >= 3 && (trimmed.hasPrefix("+") || trimmed == digits)
-    let cxHandleType: CXHandle.HandleType = looksLikeNumber ? .phoneNumber : .generic
-
-    // ✅ Make sure the provider actually allows this handle type
-    let allowed = callKitProvider.configuration.supportedHandleTypes
-    if !allowed.contains(cxHandleType) {
-        NSLog("CK DEBUG config missing handleType \(cxHandleType.rawValue) — rebuilding")
-        buildProvider() // this sets [.phoneNumber, .generic]
+    // Pick handle type + ensure it's allowed
+    let digits = trimmed.filter(\.isNumber)
+    let isNumber = digits.count >= 3 && (trimmed.hasPrefix("+") || trimmed == digits)
+    let cxType: CXHandle.HandleType = isNumber ? .phoneNumber : .generic
+    if !callKitProvider.configuration.supportedHandleTypes.contains(cxType) {
+        buildProvider()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) { [weak self] in
+            self?.performStartCallAction(uuid: uuid, handle: trimmed)
+        }
+        return
     }
-    NSLog("CK DEBUG handle='\(trimmed)' (len=\(trimmed.count)) type=\(looksLikeNumber ? "phoneNumber" : "generic")")
-    NSLog("CK DEBUG activeCalls=\(callObserver.calls.map { [$0.uuid.uuidString, $0.isOutgoing, $0.hasConnected, $0.hasEnded] })")
-    NSLog("CK DEBUG provider=\(callKitProvider) delegateSet? YES")
-   NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName ?? "nil") maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
 
-    let callHandle = CXHandle(type: cxHandleType, value: trimmed)
-    let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
-    let transaction = CXTransaction(action: startCallAction)
+    let callHandle = CXHandle(type: cxType, value: trimmed)
+    let start     = CXStartCallAction(call: uuid, handle: callHandle)
+    let tx        = CXTransaction(action: start)
 
-    callKitCallController.request(transaction) { [weak self] error in
+    callKitCallController.request(tx) { [weak self] error in
         guard let self = self else { return }
-
         if let e = error as NSError? {
             NSLog("CK DEBUG StartCallAction failed domain=\(e.domain) code=\(e.code) userInfo=\(e.userInfo)")
-
-            // One-time soft retry if we raced a provider reset
+            // Soft retry if the provider just reset mid-flight
             if e.domain == CXErrorDomainRequestTransaction,
                e.code == CXErrorCodeRequestTransactionError.unknown.rawValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    NSLog("CK DEBUG retrying StartCallAction after short delay")
-                    self.buildProvider()
+                self.buildProvider()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.20) {
                     self.performStartCallAction(uuid: uuid, handle: trimmed)
                 }
             } else {
@@ -1517,31 +1518,30 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
             return
         }
 
-        NSLog("CK DEBUG StartCallAction OK")
         self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request successful", isError: false)
 
-        // Build nice display name
+        // Optional: pretty name update
         var displayName = trimmed
         let fn = (self.callArgs["to_firstname"] as? String ?? "")
         let ln = (self.callArgs["to_lastname"]  as? String ?? "")
         let combined = "\(fn) \(ln)".trimmingCharacters(in: .whitespaces)
         if !combined.isEmpty { displayName = combined }
 
-        let callUpdate = CXCallUpdate()
-        callUpdate.remoteHandle = callHandle
-        callUpdate.localizedCallerName =
-            displayName.isEmpty
+        let update = CXCallUpdate()
+        update.remoteHandle = callHandle
+        update.localizedCallerName = displayName.isEmpty
             ? (self.clients[trimmed] ?? self.clients["defaultCaller"] ?? self.defaultCaller)
             : displayName
-        callUpdate.supportsDTMF = true
-        callUpdate.supportsHolding = true
-        callUpdate.supportsGrouping = false
-        callUpdate.supportsUngrouping = false
-        callUpdate.hasVideo = false
+        update.supportsDTMF = true
+        update.supportsHolding = true
+        update.supportsGrouping = false
+        update.supportsUngrouping = false
+        update.hasVideo = false
 
-        self.callKitProvider.reportCall(with: uuid, updated: callUpdate)
+        self.callKitProvider.reportCall(with: uuid, updated: update)
     }
 }
+
 
 
     // func performStartCallAction(uuid: UUID, handle: String) {
