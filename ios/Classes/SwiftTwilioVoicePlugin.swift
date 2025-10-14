@@ -74,6 +74,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private var wantsRingback = false
     private var callkitAudioActive = false
     private var providerReady = false
+    private var didForceRebuildOnce = false
 
      // ——————————————————————————————————————
     // MARK: Shared-Prefs Helpers 🔥 NEW
@@ -111,7 +112,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
        !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
     // 3) Hard fallback that is NEVER empty
-    return "Clini Flows"
+    return "Cliniq Flows"
     }
 
       private func buildProvider() {
