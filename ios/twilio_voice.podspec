@@ -15,7 +15,7 @@ Pod::Spec.new do |s|
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'TwilioVoice','~> 6.13.1'
+  s.dependency 'TwilioVoice','~> 6.13.4'
   s.platform = :ios, '12.0'
   
  # bundle all your MP3s into a single .bundle
