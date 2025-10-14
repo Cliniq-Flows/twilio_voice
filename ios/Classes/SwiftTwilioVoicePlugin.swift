@@ -100,6 +100,16 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             return (Bundle.main.infoDictionary!["CFBundleName"] as? String) ?? "Define CFBundleName"
         }
     }
+
+    private func appDisplayName() -> String {
+    // Prefer the visible name
+    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+        !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
+    // Fallback to bundle name
+    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
+        !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
+    return "Cliniq Flows" // final fallback
+    }
     
     public override init() {
         
@@ -1649,15 +1659,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     // audioDevice.isEnabled = true
     }
   
-    private func appDisplayName() -> String {
-    // Prefer the visible name
-    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
-        !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
-    // Fallback to bundle name
-    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
-        !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
-    return "Cliniq Flows" // final fallback
-    }
+    
 
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
