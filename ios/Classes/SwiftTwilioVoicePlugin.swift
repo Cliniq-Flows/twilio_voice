@@ -1408,8 +1408,9 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
         return
     }
 
-    // 3) If provider just reset (or looks odd), rebuild once
-    if callKitProvider.configuration.localizedName.isEmpty {
+    let providerName = (callKitProvider.configuration.localizedName ?? "")
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+    if providerName.isEmpty {
         NSLog("CK DEBUG provider not ready (empty name) — rebuilding provider")
         buildProvider()
     }
@@ -1422,7 +1423,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     NSLog("CK DEBUG handle='\(trimmed)' (len=\(trimmed.count)) type=\(looksLikeNumber ? "phoneNumber" : "generic")")
     NSLog("CK DEBUG activeCalls=\(callObserver.calls.map { [$0.uuid.uuidString, $0.isOutgoing, $0.hasConnected, $0.hasEnded] })")
     NSLog("CK DEBUG provider=\(callKitProvider) delegateSet? YES")
-    NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName) maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
+   NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName ?? "nil") maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
 
     let callHandle = CXHandle(type: cxHandleType, value: trimmed)
     let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
