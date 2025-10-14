@@ -105,7 +105,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         //isSpinning = false
         voipRegistry = PKPushRegistry.init(queue: DispatchQueue.main)
-        let configuration = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appName)
+        let configuration = CXProviderConfiguration(localizedName:appDisplayName())
         configuration.maximumCallGroups = 1
         configuration.maximumCallsPerCallGroup = 1
         let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
@@ -113,6 +113,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         clients = UserDefaults.standard.object(forKey: kClientList)  as? [String:String] ?? [:]
         callKitProvider = CXProvider(configuration: configuration)
         callKitCallController = CXCallController()
+        callKitProvider.setDelegate(self, queue: nil)
         
         //super.init(coder: aDecoder)
         super.init()
@@ -1378,11 +1379,16 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
         return
     }
 
+    // Decide the correct CallKit handle type
+    let isDigitsOnly = CharacterSet.decimalDigits.isSuperset(of: CharacterSet(charactersIn: trimmed))
+    let handleType: CXHandle.HandleType =
+        (trimmed.hasPrefix("+") || isDigitsOnly) ? .phoneNumber : .generic
+
     NSLog("CK DEBUG mainThread=\(Thread.isMainThread)")
-    NSLog("CK DEBUG handle='\(trimmed)' (len=\(trimmed.count))")
+    NSLog("CK DEBUG handle='\(trimmed)' (len=\(trimmed.count)) type=\(handleType == .phoneNumber ? "phoneNumber" : "generic")")
     NSLog("CK DEBUG activeCalls=\(callObserver.calls.map { [$0.uuid.uuidString, $0.isOutgoing, $0.hasConnected, $0.hasEnded] })")
 
-    let callHandle = CXHandle(type: .generic, value: trimmed)
+    let callHandle = CXHandle(type: handleType, value: trimmed)
     let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
     let transaction = CXTransaction(action: startCallAction)
 
@@ -1420,6 +1426,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
         self.callKitProvider.reportCall(with: uuid, updated: callUpdate)
     }
 }
+
     // func performStartCallAction(uuid: UUID, handle: String) {
 
     //     NSLog("CK DEBUG mainThread=\(Thread.isMainThread)")
@@ -1642,6 +1649,16 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     // audioDevice.isEnabled = true
     }
   
+    private func appDisplayName() -> String {
+    // Prefer the visible name
+    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+        !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
+    // Fallback to bundle name
+    if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String,
+        !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
+    return "Cliniq Flows" // final fallback
+    }
+
     
     func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Swift.Void) {
         if let ci = self.callInvite {
