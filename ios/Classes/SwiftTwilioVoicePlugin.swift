@@ -134,51 +134,56 @@ private let maxStartRetries = 8
 
         public override init() {
         voipRegistry = PKPushRegistry(queue: .main)
-    audioDevice = DefaultAudioDevice()
-    callKitCallController = CXCallController()              // <-- important
-    let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
-    cfg.supportedHandleTypes = [.phoneNumber, .generic]
-    cfg.maximumCallGroups = 1
-    cfg.maximumCallsPerCallGroup = 1
-    cfg.supportsVideo = false
-    if let iconName = UserDefaults.standard.string(forKey: defaultCallKitIcon),
-       let img = UIImage(named: iconName)?.pngData() {
-        cfg.iconTemplateImageData = img
+  audioDevice = DefaultAudioDevice()
+  callKitCallController = CXCallController()
+
+  let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
+  cfg.supportedHandleTypes = [.phoneNumber, .generic]
+  cfg.maximumCallGroups = 1
+  cfg.maximumCallsPerCallGroup = 1
+  cfg.supportsVideo = false
+  if let iconName = UserDefaults.standard.string(forKey: Self.defaultCallKitIcon),
+     let img = UIImage(named: iconName)?.pngData() {
+    cfg.iconTemplateImageData = img
+  }
+  callKitProvider = CXProvider(configuration: cfg)
+
+  // 2) Now we're allowed to use `self`
+  super.init()
+
+  // 3) Everything that references `self` goes here
+  callKitProvider.setDelegate(self, queue: nil)
+  providerReady = true
+
+  TwilioVoiceSDK.audioDevice = audioDevice
+  audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
+
+  voipRegistry.delegate = self
+  voipRegistry.desiredPushTypes = isSignedIn ? [.voIP] : []
+
+  callObserver.setDelegate(self, queue: .main)
+  UNUserNotificationCenter.current().delegate = self
+
+  clients = UserDefaults.standard.object(forKey: kClientList) as? [String:String] ?? [:]
+
+  #if DEBUG
+  if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
+    NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
+  }
+  #endif
+
+  NotificationCenter.default.addObserver(
+    self,
+    selector: #selector(appWillTerminate),
+    name: UIApplication.willTerminateNotification,
+    object: nil
+  )
+
+  let disp = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "nil"
+  let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "nil"
+  NSLog("CK DEBUG bundle names: display='\(disp)' name='\(name)' resolved='\(SwiftTwilioVoicePlugin.appDisplayName())'")
+  NSLog("CK DEBUG provider config name='\(cfg.localizedName)'")
     }
-    callKitProvider = CXProvider(configuration: cfg)
-    callKitProvider.setDelegate(self, queue: nil)
-    providerReady = true
-
-    super.init()
-
-    TwilioVoiceSDK.audioDevice = audioDevice
-    audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
-
-    voipRegistry.delegate = self
-    voipRegistry.desiredPushTypes = isSignedIn ? [.voIP] : []
-
-    callObserver.setDelegate(self, queue: .main)
-    UNUserNotificationCenter.current().delegate = self
-
-    clients = UserDefaults.standard.object(forKey: kClientList) as? [String:String] ?? [:]
-
-    #if DEBUG
-    if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
-        NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
-    }
-    #endif
-
-    NotificationCenter.default.addObserver(
-        self,
-        selector: #selector(appWillTerminate),
-        name: UIApplication.willTerminateNotification,
-        object: nil
-    )
-    let disp = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "nil"
-    let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "nil"
-    NSLog("CK DEBUG bundle names: display='\(disp)' name='\(name)' resolved='\(SwiftTwilioVoicePlugin.appDisplayName())'")
-    NSLog("CK DEBUG provider config name='\(cfg.localizedName)'")
-}
 
         
         // public override init() {
