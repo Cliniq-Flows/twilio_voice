@@ -101,7 +101,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
 
-        private func appDisplayName() -> String {
+private static func appDisplayName() -> String {
         // Prefer the visible name
         if let n = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
             !n.trimmingCharacters(in: .whitespaces).isEmpty { return n }
