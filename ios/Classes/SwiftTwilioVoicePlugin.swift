@@ -1363,48 +1363,123 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     
     // MARK: Call Kit Actions
     func performStartCallAction(uuid: UUID, handle: String) {
-        let callHandle = CXHandle(type: .generic, value: handle)
-        let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
-        let transaction = CXTransaction(action: startCallAction)
-        
-        callKitCallController.request(transaction)  { error in
-            if let error = error {
-                self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request failed: \(error.localizedDescription)", isError: false)
-                return
-            }
-            
-            self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request successful", isError: false)
-
-
-            // Determine the custom display name using your extra parameters.
-            // Here we check for "from_firstname" and "from_lastname" in callArgs.
-            // var displayName = handle  // fallback to the handle if custom values are not provided
-            // if let fromFirstName = self.callArgs["to_firstname"] as? String,
-            // let fromLastName = self.callArgs["to_lastname"] as? String,
-            // (!fromFirstName.isEmpty || !fromLastName.isEmpty) {
-            //     displayName = "\(fromFirstName) \(fromLastName)".trimmingCharacters(in: .whitespaces)
-            // }
-
-            var displayName: String = handle
-            let fn = (self.callArgs["to_firstname"] as? String ?? "")
-            let ln = (self.callArgs["to_lastname"]  as? String ?? "")
-            let combined = "\(fn) \(ln)".trimmingCharacters(in: .whitespaces)
-            if !combined.isEmpty { displayName = combined }
-
-            let callUpdate = CXCallUpdate()
-            callUpdate.remoteHandle = callHandle
-            callUpdate.localizedCallerName = displayName.isEmpty ? (self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller) : displayName
-
-            // callUpdate.localizedCallerName = displayName ?? self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller
-            callUpdate.supportsDTMF = false
-            callUpdate.supportsHolding = true
-            callUpdate.supportsGrouping = false
-            callUpdate.supportsUngrouping = false
-            callUpdate.hasVideo = false
-            
-            self.callKitProvider.reportCall(with: uuid, updated: callUpdate)
+    // Ensure we run on main
+    if !Thread.isMainThread {
+        DispatchQueue.main.async { [weak self] in
+            self?.performStartCallAction(uuid: uuid, handle: handle)
         }
+        return
     }
+
+    let trimmed = handle.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+        NSLog("CK DEBUG abort: empty handle")
+        sendPhoneCallEvents(description: "LOG|StartCallAction aborted: empty handle", isError: true)
+        return
+    }
+
+    NSLog("CK DEBUG mainThread=\(Thread.isMainThread)")
+    NSLog("CK DEBUG handle='\(trimmed)' (len=\(trimmed.count))")
+    NSLog("CK DEBUG activeCalls=\(callObserver.calls.map { [$0.uuid.uuidString, $0.isOutgoing, $0.hasConnected, $0.hasEnded] })")
+
+    let callHandle = CXHandle(type: .generic, value: trimmed)
+    let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
+    let transaction = CXTransaction(action: startCallAction)
+
+    NSLog("CK DEBUG provider=\(callKitProvider) delegateSet? YES")
+    NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName) maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
+
+    callKitCallController.request(transaction) { [weak self] error in
+        guard let self = self else { return }
+        if let e = error as NSError? {
+            NSLog("CK DEBUG StartCallAction failed domain=\(e.domain) code=\(e.code) userInfo=\(e.userInfo)")
+            self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request failed: \(e.localizedDescription)", isError: true)
+            return
+        }
+        NSLog("CK DEBUG StartCallAction OK")
+        self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request successful", isError: false)
+
+        var displayName = trimmed
+        let fn = (self.callArgs["to_firstname"] as? String ?? "")
+        let ln = (self.callArgs["to_lastname"]  as? String ?? "")
+        let combined = "\(fn) \(ln)".trimmingCharacters(in: .whitespaces)
+        if !combined.isEmpty { displayName = combined }
+
+        let callUpdate = CXCallUpdate()
+        callUpdate.remoteHandle = callHandle
+        callUpdate.localizedCallerName =
+            displayName.isEmpty
+            ? (self.clients[trimmed] ?? self.clients["defaultCaller"] ?? self.defaultCaller)
+            : displayName
+        callUpdate.supportsDTMF = false
+        callUpdate.supportsHolding = true
+        callUpdate.supportsGrouping = false
+        callUpdate.supportsUngrouping = false
+        callUpdate.hasVideo = false
+
+        self.callKitProvider.reportCall(with: uuid, updated: callUpdate)
+    }
+}
+    // func performStartCallAction(uuid: UUID, handle: String) {
+
+    //     NSLog("CK DEBUG mainThread=\(Thread.isMainThread)")
+    //     NSLog("CK DEBUG handle='\(handle)' (len=\(handle.count))")
+
+    //     // Dump what CallKit thinks is active right now
+    //     NSLog("CK DEBUG activeCalls=\(callObserver.calls.map { [$0.uuid.uuidString, $0.isOutgoing, $0.hasConnected, $0.hasEnded] })")
+
+
+    //     let callHandle = CXHandle(type: .generic, value: handle)
+    //     let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
+    //     let transaction = CXTransaction(action: startCallAction)
+
+    //      NSLog("CK DEBUG provider=\(callKitProvider) delegateSet? YES")
+    //     NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName) maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
+
+        
+    //     callKitCallController.request(transaction)  { error in
+    //      if let e = error as NSError? {
+    //         NSLog("CK DEBUG StartCallAction failed domain=\(e.domain) code=\(e.code) userInfo=\(e.userInfo)")
+    //     } else {
+    //         NSLog("CK DEBUG StartCallAction OK")
+    //     }
+    //         if let error = error {
+    //             self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request failed: \(error.localizedDescription)", isError: false)
+    //             return
+    //         }
+            
+    //         self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request successful", isError: false)
+
+
+    //         // Determine the custom display name using your extra parameters.
+    //         // Here we check for "from_firstname" and "from_lastname" in callArgs.
+    //         // var displayName = handle  // fallback to the handle if custom values are not provided
+    //         // if let fromFirstName = self.callArgs["to_firstname"] as? String,
+    //         // let fromLastName = self.callArgs["to_lastname"] as? String,
+    //         // (!fromFirstName.isEmpty || !fromLastName.isEmpty) {
+    //         //     displayName = "\(fromFirstName) \(fromLastName)".trimmingCharacters(in: .whitespaces)
+    //         // }
+
+    //         var displayName: String = handle
+    //         let fn = (self.callArgs["to_firstname"] as? String ?? "")
+    //         let ln = (self.callArgs["to_lastname"]  as? String ?? "")
+    //         let combined = "\(fn) \(ln)".trimmingCharacters(in: .whitespaces)
+    //         if !combined.isEmpty { displayName = combined }
+
+    //         let callUpdate = CXCallUpdate()
+    //         callUpdate.remoteHandle = callHandle
+    //         callUpdate.localizedCallerName = displayName.isEmpty ? (self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller) : displayName
+
+    //         // callUpdate.localizedCallerName = displayName ?? self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller
+    //         callUpdate.supportsDTMF = false
+    //         callUpdate.supportsHolding = true
+    //         callUpdate.supportsGrouping = false
+    //         callUpdate.supportsUngrouping = false
+    //         callUpdate.hasVideo = false
+            
+    //         self.callKitProvider.reportCall(with: uuid, updated: callUpdate)
+    //     }
+    // }
     
    func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
        let tStarted = Date()
