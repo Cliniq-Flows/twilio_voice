@@ -114,17 +114,17 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
         private func buildProvider() {
         // Build a fresh provider configuration
-        let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
-        cfg.maximumCallGroups = 1
-        cfg.maximumCallsPerCallGroup = 1
-        cfg.supportsVideo = false
-        if let iconName = UserDefaults.standard.string(forKey: defaultCallKitIcon),
-        let img = UIImage(named: iconName)?.pngData() {
-            cfg.iconTemplateImageData = img
-        }
-        // Recreate provider and set delegate
-        callKitProvider = CXProvider(configuration: cfg)
-        callKitProvider.setDelegate(self, queue: nil)
+       let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName().isEmpty ? "Better Cliniq" : SwiftTwilioVoicePlugin.appDisplayName())
+  cfg.supportedHandleTypes = [.generic, .phoneNumber]              // ← add this here too
+  cfg.maximumCallGroups = 1
+  cfg.maximumCallsPerCallGroup = 1
+  cfg.supportsVideo = false
+  if let iconName = UserDefaults.standard.string(forKey: defaultCallKitIcon),
+     let img = UIImage(named: iconName)?.pngData() {
+    cfg.iconTemplateImageData = img
+  }
+  callKitProvider = CXProvider(configuration: cfg)
+  callKitProvider.setDelegate(self, queue: nil)
 }   
 
     public override init() {
@@ -132,11 +132,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
   voipRegistry = PKPushRegistry(queue: .main)
 
   let display = SwiftTwilioVoicePlugin.appDisplayName()
-  let providerConfig = CXProviderConfiguration(localizedName: display.isEmpty ? "Better Cliniq" : display)
+  let providerConfig = CXProviderConfiguration(localizedName: display.isEmpty ? "Cliniq Flows" : display)
+  providerConfig.supportedHandleTypes = [.phoneNumber, .generic]  
   providerConfig.maximumCallGroups = 1
   providerConfig.maximumCallsPerCallGroup = 1
   providerConfig.supportsVideo = false
-  providerConfig.supportedHandleTypes = [.phoneNumber, .generic]   // 👈 IMPORTANT
+  providerConfig.includesCallsInRecents = true
 
   callKitProvider = CXProvider(configuration: providerConfig)
   callKitCallController = CXCallController()
@@ -725,20 +726,29 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     /// - Parameter icon: icon path / name
     /// - Returns: true if succesful
     func updateCallKitIcon(icon: String) -> Bool {
-        if let newIcon = UIImage(named: icon) {
-            let configuration = callKitProvider.configuration;
+        // if let newIcon = UIImage(named: icon) {
+        //     let configuration = callKitProvider.configuration;
             
-            // set new callkit icon
-            configuration.iconTemplateImageData = newIcon.pngData()
-            callKitProvider.configuration = configuration
+        //     // set new callkit icon
+        //     configuration.iconTemplateImageData = newIcon.pngData()
+        //     callKitProvider.configuration = configuration
          
-            // save new icon to persist across sessions
-            UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
+        //     // save new icon to persist across sessions
+        //     UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
             
-            return true;
-        }
+        //     return true;
+        // }
         
-        return false;
+        // return false;
+         guard let newIcon = UIImage(named: icon) else { return false }
+        var configuration = callKitProvider.configuration      // this is a copy
+        configuration.iconTemplateImageData = newIcon.pngData()
+        if configuration.supportedHandleTypes.isEmpty {        // defensive: re-assert
+            configuration.supportedHandleTypes = [.generic, .phoneNumber]
+        }
+        callKitProvider.configuration = configuration
+        UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
+        return true
     }
 
     func answerCall(callInvite: CallInvite) {
@@ -1482,6 +1492,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
 
   let callHandle = CXHandle(type: cxType, value: trimmed)
   let action = CXStartCallAction(call: uuid, handle: callHandle)
+ 
   let tx = CXTransaction(action: action)
 
   callKitCallController.request(tx) { [weak self] error in
