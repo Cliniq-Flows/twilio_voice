@@ -1348,11 +1348,13 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
         audioDevice.isEnabled = false
          providerReady = false
     }
-
     private func nameIsOK() -> Bool {
         let n = callKitProvider.configuration.localizedName
-        return !n.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard let trimmed = n?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
         }
+        return !trimmed.isEmpty
+    }
     
     public func providerDidBegin(_ provider: CXProvider) {
         self.sendPhoneCallEvents(description: "LOG|providerDidBegin", isError: false)
