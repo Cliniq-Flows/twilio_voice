@@ -125,52 +125,100 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             callKitProvider = CXProvider(configuration: cfg)
             callKitProvider.setDelegate(self, queue: nil)
         }
-        
+
         public override init() {
+    // 1) Init all stored properties first (no 'self' use that needs init'd super)
+    self.voipRegistry = PKPushRegistry(queue: .main)
+
+    let providerConfig = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
+    providerConfig.supportedHandleTypes = [.phoneNumber, .generic]
+    providerConfig.maximumCallGroups = 1
+    providerConfig.maximumCallsPerCallGroup = 1
+    providerConfig.supportsVideo = false
+
+    self.callKitProvider       = CXProvider(configuration: providerConfig)
+    self.callKitCallController = CXCallController()
+    self.audioDevice           = DefaultAudioDevice()  // even though it has a default
+
+    // 2) Now it's legal to use 'self'
+    super.init()
+
+    // 3) Wire delegates and the rest of setup
+    callKitProvider.setDelegate(self, queue: nil)
+
+    TwilioVoiceSDK.audioDevice = audioDevice
+    audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
+
+    voipRegistry.delegate = self
+    voipRegistry.desiredPushTypes = isSignedIn ? [.voIP] : []
+
+    callObserver.setDelegate(self, queue: .main)
+    UNUserNotificationCenter.current().delegate = self
+
+    clients = UserDefaults.standard.object(forKey: kClientList) as? [String:String] ?? [:]
+    let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
+    _ = updateCallKitIcon(icon: defaultIcon)
+
+    #if DEBUG
+    if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
+        NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
+    }
+    #endif
+
+    NotificationCenter.default.addObserver(
+        self,
+        selector: #selector(appWillTerminate),
+        name: UIApplication.willTerminateNotification,
+        object: nil
+    )
+}
+
+        
+        // public override init() {
        
-            voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
+        //     voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
 
-                let providerConfig = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
-                providerConfig.supportedHandleTypes = [.phoneNumber, .generic]   // ← REQUIRED
-                providerConfig.maximumCallGroups = 1
-                providerConfig.maximumCallsPerCallGroup = 1
-                providerConfig.supportsVideo = false
-                callKitProvider = CXProvider(configuration: providerConfig)
-                callKitProvider.setDelegate(self, queue: nil)
-                audioDevice = DefaultAudioDevice()   // you already had a default value, but initializing here is fine too
+        //         let providerConfig = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
+        //         providerConfig.supportedHandleTypes = [.phoneNumber, .generic]   // ← REQUIRED
+        //         providerConfig.maximumCallGroups = 1
+        //         providerConfig.maximumCallsPerCallGroup = 1
+        //         providerConfig.supportsVideo = false
+        //         callKitProvider = CXProvider(configuration: providerConfig)
+        //         callKitProvider.setDelegate(self, queue: nil)
+        //         audioDevice = DefaultAudioDevice()   // you already had a default value, but initializing here is fine too
 
-                // 2) Now it's safe to call super
-                super.init()
+        //         // 2) Now it's safe to call super
+        //         super.init()
 
-                // 3) Wire up delegates and remaining setup (these can reference self)
-                callKitProvider.setDelegate(self, queue: nil)
+        //         // 3) Wire up delegates and remaining setup (these can reference self)
+        //         callKitProvider.setDelegate(self, queue: nil)
 
-                TwilioVoiceSDK.audioDevice = audioDevice
-                audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
+        //         TwilioVoiceSDK.audioDevice = audioDevice
+        //         audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
 
-                voipRegistry.delegate = self
-                voipRegistry.desiredPushTypes = isSignedIn ? [.voIP] : []
+        //         voipRegistry.delegate = self
+        //         voipRegistry.desiredPushTypes = isSignedIn ? [.voIP] : []
 
-                callObserver.setDelegate(self, queue: DispatchQueue.main)
-                UNUserNotificationCenter.current().delegate = self
+        //         callObserver.setDelegate(self, queue: DispatchQueue.main)
+        //         UNUserNotificationCenter.current().delegate = self
 
-                clients = UserDefaults.standard.object(forKey: kClientList) as? [String:String] ?? [:]
-                let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
-                _ = updateCallKitIcon(icon: defaultIcon)
+        //         clients = UserDefaults.standard.object(forKey: kClientList) as? [String:String] ?? [:]
+        //         let defaultIcon = UserDefaults.standard.string(forKey: defaultCallKitIcon) ?? defaultCallKitIcon
+        //         _ = updateCallKitIcon(icon: defaultIcon)
 
-                #if DEBUG
-                if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
-                    NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
-                }
-                #endif
+        //         #if DEBUG
+        //         if ProcessInfo.processInfo.environment["SWIFT_TWILIO_VOICE_SILENCE_CHANGE_LOG"] == nil {
+        //             NSLog("SwiftTwilioVoicePlugin.swift summary: \(swiftTwilioVoicePluginChangeSummary.joined(separator: " | "))")
+        //         }
+        //         #endif
 
-                NotificationCenter.default.addObserver(
-                    self,
-                    selector: #selector(appWillTerminate),
-                    name: UIApplication.willTerminateNotification,
-                    object: nil
-                )
-        }
+        //         NotificationCenter.default.addObserver(
+        //             self,
+        //             selector: #selector(appWillTerminate),
+        //             name: UIApplication.willTerminateNotification,
+        //             object: nil
+        //         )
+        // }
         
         
         deinit {
