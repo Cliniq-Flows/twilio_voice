@@ -189,28 +189,28 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         //     audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
 
          // 1) Super first (so we can safely use self)
+   voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
+
+    let providerConfig = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
+    providerConfig.maximumCallGroups = 1
+    providerConfig.maximumCallsPerCallGroup = 1
+
+    callKitProvider = CXProvider(configuration: providerConfig)
+    callKitCallController = CXCallController()
+    audioDevice = DefaultAudioDevice()   // you already had a default value, but initializing here is fine too
+
+    // 2) Now it's safe to call super
     super.init()
 
-    // 2) CallKit provider – build once
-    let configuration = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
-    configuration.maximumCallGroups = 1
-    configuration.maximumCallsPerCallGroup = 1
-
-    callKitProvider = CXProvider(configuration: configuration)
-    callKitCallController = CXCallController()
+    // 3) Wire up delegates and remaining setup (these can reference self)
     callKitProvider.setDelegate(self, queue: nil)
 
-    // 3) Twilio audio device
-    audioDevice = DefaultAudioDevice()
     TwilioVoiceSDK.audioDevice = audioDevice
     audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
 
-    // 4) PushKit
-    voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
     voipRegistry.delegate = self
     voipRegistry.desiredPushTypes = isSignedIn ? [.voIP] : []
 
-    // 5) Other one-time wiring
     callObserver.setDelegate(self, queue: DispatchQueue.main)
     UNUserNotificationCenter.current().delegate = self
 
