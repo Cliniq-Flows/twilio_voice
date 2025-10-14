@@ -4,6 +4,9 @@ private let swiftTwilioVoicePluginChangeSummary: [String] = [
     "Streams call state and audio routing events back to Dart"
 ]
 
+
+
+
 import Flutter
 import UIKit
 import AVFoundation
@@ -740,13 +743,31 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         // }
         
         // return false;
-         guard let newIcon = UIImage(named: icon) else { return false }
-        var configuration = callKitProvider.configuration      // this is a copy
-        configuration.iconTemplateImageData = newIcon.pngData()
-        if configuration.supportedHandleTypes.isEmpty {        // defensive: re-assert
-            configuration.supportedHandleTypes = [.generic, .phoneNumber]
+        guard let newIcon = UIImage(named: icon) else { return false }
+
+        let current = callKitProvider.configuration
+        let fallbackName = SwiftTwilioVoicePlugin.appDisplayName()
+        let trimmedName = current.localizedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedName = trimmedName.isEmpty ? fallbackName : trimmedName
+
+        let updatedConfig = CXProviderConfiguration(localizedName: resolvedName)
+        updatedConfig.iconTemplateImageData = newIcon.pngData()
+        updatedConfig.groupIdentifier = current.groupIdentifier
+        updatedConfig.maximumCallGroups = current.maximumCallGroups
+        updatedConfig.maximumCallsPerCallGroup = current.maximumCallsPerCallGroup
+        if #available(iOS 11.0, *) {
+            updatedConfig.includesCallsInRecents = current.includesCallsInRecents
         }
-        callKitProvider.configuration = configuration
+        updatedConfig.supportedHandleTypes = current.supportedHandleTypes.isEmpty
+            ? [.generic, .phoneNumber]
+            : current.supportedHandleTypes
+        updatedConfig.ringtoneSound = current.ringtoneSound
+        updatedConfig.supportsVideo = current.supportsVideo
+        if #available(iOS 14.0, *) {
+            updatedConfig.audioSessionConfiguration = current.audioSessionConfiguration
+        }
+
+        callKitProvider.configuration = updatedConfig
         UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
         return true
     }
@@ -2136,4 +2157,3 @@ extension UserDefaults {
         return nil
     }
 }
-
