@@ -1339,7 +1339,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     public func providerDidReset(_ provider: CXProvider) {
         self.sendPhoneCallEvents(description: "LOG|providerDidReset:", isError: false)
         audioDevice.isEnabled = false
-         buildProvider()
+       //  buildProvider()
     }
     
     public func providerDidBegin(_ provider: CXProvider) {
