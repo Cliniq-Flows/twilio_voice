@@ -603,16 +603,37 @@ let newIcon = arguments["icon"] as? String ?? SwiftTwilioVoicePlugin.defaultCall
     }
     
 
-    static func setSystemVolume(_ level: Float) {
-    DispatchQueue.main.async {
-      for sub in volumeView.subviews {
-        if let slider = sub as? UISlider {
-          slider.value = level
-          break
-        }
+    private static var volumeView: MPVolumeView = {
+  let v = MPVolumeView(frame: .zero)
+  v.showsRouteButton = false
+  v.isHidden = true
+  return v
+}()
+
+private static func ensureVolumeViewAttachedIfPossible() {
+  // Only touch UIKit windowing when app is active and a keyWindow exists
+  guard Thread.isMainThread else {
+    DispatchQueue.main.async { ensureVolumeViewAttachedIfPossible() }
+    return
+  }
+  guard UIApplication.shared.applicationState == .active else { return }
+  guard let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) else { return }
+  if !window.subviews.contains(where: { $0 === volumeView }) {
+    window.addSubview(volumeView)
+  }
+}
+
+static func setSystemVolume(_ level: Float) {
+  DispatchQueue.main.async {
+    ensureVolumeViewAttachedIfPossible()
+    for sub in volumeView.subviews {
+      if let slider = sub as? UISlider {
+        slider.value = level
+        break
       }
     }
   }
+}
 
     // MARK: — Ringback Tone Playback
 
@@ -796,6 +817,13 @@ UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIco
     let uuid = UUID()
     self.checkRecordPermission { granted in
         guard granted else {
+
+            if UIApplication.shared.applicationState != .active {
+            // If we’re not in foreground, just start the CallKit flow and bail.
+            self.performStartCallAction(uuid: uuid, handle: to)
+            return
+             }
+
             let alert = UIAlertController(
                 title: String(format: NSLocalizedString("mic_permission_title", comment: ""), SwiftTwilioVoicePlugin.appName),
                 message: NSLocalizedString("mic_permission_subtitle", comment: ""),
@@ -959,8 +987,14 @@ UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIco
      * notification payload is passed to the `TwilioVoice.handleNotification()` method.
      */
     public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
-        sendPhoneCallEvents(description: "LOG|pushRegistry:didReceiveIncomingPushWithPayload:forType:completion:", isError: false)
+       sendPhoneCallEvents(description: "LOG|pushRegistry:didReceiveIncomingPushWithPayload:forType:completion:", isError: false)
         guard type == .voIP else { completion(); return }
+
+        // Ensure provider exists (cold start safety)
+        if !providerReady {
+            buildProvider()
+            providerReady = true
+        }
 
         lastVoipPushReceivedAt = Date()
         lastVoipPushSummary = summarizeVoipPayload(payload.dictionaryPayload)
@@ -1471,119 +1505,7 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
   }
 }
 
- ///
 
-
-    // func performStartCallAction(uuid: UUID, handle: String) {
-
-    //     NSLog("CK DEBUG mainThread=\(Thread.isMainThread)")
-    //     NSLog("CK DEBUG handle='\(handle)' (len=\(handle.count))")
-
-    //     // Dump what CallKit thinks is active right now
-    //     NSLog("CK DEBUG activeCalls=\(callObserver.calls.map { [$0.uuid.uuidString, $0.isOutgoing, $0.hasConnected, $0.hasEnded] })")
-
-
-    //     let callHandle = CXHandle(type: .generic, value: handle)
-    //     let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
-    //     let transaction = CXTransaction(action: startCallAction)
-
-    //      NSLog("CK DEBUG provider=\(callKitProvider) delegateSet? YES")
-    //     NSLog("CK DEBUG providerConfig name=\(callKitProvider.configuration.localizedName) maxCalls=\(callKitProvider.configuration.maximumCallsPerCallGroup)")
-
-        
-    //     callKitCallController.request(transaction)  { error in
-    //      if let e = error as NSError? {
-    //         NSLog("CK DEBUG StartCallAction failed domain=\(e.domain) code=\(e.code) userInfo=\(e.userInfo)")
-    //     } else {
-    //         NSLog("CK DEBUG StartCallAction OK")
-    //     }
-    //         if let error = error {
-    //             self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request failed: \(error.localizedDescription)", isError: false)
-    //             return
-    //         }
-            
-    //         self.sendPhoneCallEvents(description: "LOG|StartCallAction transaction request successful", isError: false)
-
-
-    //         // Determine the custom display name using your extra parameters.
-    //         // Here we check for "from_firstname" and "from_lastname" in callArgs.
-    //         // var displayName = handle  // fallback to the handle if custom values are not provided
-    //         // if let fromFirstName = self.callArgs["to_firstname"] as? String,
-    //         // let fromLastName = self.callArgs["to_lastname"] as? String,
-    //         // (!fromFirstName.isEmpty || !fromLastName.isEmpty) {
-    //         //     displayName = "\(fromFirstName) \(fromLastName)".trimmingCharacters(in: .whitespaces)
-    //         // }
-
-    //         var displayName: String = handle
-    //         let fn = (self.callArgs["to_firstname"] as? String ?? "")
-    //         let ln = (self.callArgs["to_lastname"]  as? String ?? "")
-    //         let combined = "\(fn) \(ln)".trimmingCharacters(in: .whitespaces)
-    //         if !combined.isEmpty { displayName = combined }
-
-    //         let callUpdate = CXCallUpdate()
-    //         callUpdate.remoteHandle = callHandle
-    //         callUpdate.localizedCallerName = displayName.isEmpty ? (self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller) : displayName
-
-    //         // callUpdate.localizedCallerName = displayName ?? self.clients[handle] ?? self.clients["defaultCaller"] ?? self.defaultCaller
-    //         callUpdate.supportsDTMF = false
-    //         callUpdate.supportsHolding = true
-    //         callUpdate.supportsGrouping = false
-    //         callUpdate.supportsUngrouping = false
-    //         callUpdate.hasVideo = false
-            
-    //         self.callKitProvider.reportCall(with: uuid, updated: callUpdate)
-    //     }
-    // }
-    
-//    func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
-//        let tStarted = Date()
-//         let firstname = from.capitalized
-//         let lastname = fromx.capitalized
-//         let number = fromx1
-//         let combine = "\(firstname) \(lastname)"
-//         let finale = combine.trimmingCharacters(in: .whitespaces).isEmpty ? number : combine
-        
-//         let callHandle = CXHandle(type: .generic, value: finale.capitalized)
-//         let callUpdate = CXCallUpdate()
-//         callUpdate.remoteHandle = callHandle
-//         callUpdate.localizedCallerName = finale
-//         callUpdate.supportsDTMF = true
-//         callUpdate.supportsHolding = true
-//         callUpdate.supportsGrouping = false
-//         callUpdate.supportsUngrouping = false
-//         callUpdate.hasVideo = false
-        
-//         callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
-//               let tCompleted = Date()
-//             self.lastCallKitReportTimestamp = tCompleted
-//             self.lastIncomingCallUUID = uuid
-
-//             var diag: [String: Any] = [
-//             "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)  // time inside report call
-//         ]
-//         if let pushAt = self.lastVoipPushReceivedAt {
-//             diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
-//         }
-//         if let inviteAt = self.lastCallInviteReceivedAt {
-//             diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
-//         }
-
-//         // Emit one compact JSON diagnostic line (uses your existing helper)
-//         self.emitDiagnostics(diag, scope: "incoming-call")
-
-//             if let error = error {
-//                 self.lastCallKitReportError = error.localizedDescription
-//                 self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).", isError: false)
-//                 self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
-//                                                 reason: error.localizedDescription,
-//                                                 callUUID: uuid,
-//                                                 callInvite: self.callInvite)
-//             } else {
-//                 self.lastCallKitReportError = nil
-//                 self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
-//             }
-//         }
-//     }
         func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
         let tStarted = Date()
 
@@ -1624,6 +1546,8 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
         callUpdate.hasVideo = false
 
         DispatchQueue.main.async {
+            let doReport = { [weak self] in
+            guard let self = self else { return }
             self.callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
                 let tCompleted = Date()
                 self.lastCallKitReportTimestamp = tCompleted
@@ -1652,7 +1576,13 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
                     self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
                 }
             }
+         }
         }
+            if providerReady {
+        DispatchQueue.main.async(execute: doReport)
+    } else {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: doReport)
+    }
 }
     
     func performEndCallAction(uuid: UUID) {

@@ -359,6 +359,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_ANSWER -> {
+                    if (!hasVoipAudioFocus) acquireVoipAudioFocus()
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: run {
                         Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
                         return@let
@@ -385,6 +386,9 @@ class TVConnectionService : ConnectionService() {
   val connection = getConnection(callHandle)
   if (connection != null) {
     connection.disconnect() // this kicks off your onCallDisconnected callback
+    if (activeConnections.isEmpty() && hasVoipAudioFocus) {
+    releaseVoipAudioFocus()
+}
   } else {
     Log.e(TAG, "hangup(): could not find connection for $callHandle")
   }
@@ -491,7 +495,7 @@ class TVConnectionService : ConnectionService() {
                     val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
                     telecomManager.placeCall(address, extras)
 
-                    startForegroundService()
+                    // startForegroundService()
                 }
 
                 ACTION_TOGGLE_BLUETOOTH -> {
@@ -697,6 +701,7 @@ class TVConnectionService : ConnectionService() {
                 startForegroundService()
                 Log.d(TAG, "Conference connected with SID=${call.sid}")
                 // swap your temp ID → real SID
+                setActive()
                 conferenceConnection.twilioCall?.sid?.let { realSid ->
                     activeConnections.remove("conference_$conferenceName")
                     activeConnections[realSid] = conferenceConnection
@@ -768,7 +773,7 @@ class TVConnectionService : ConnectionService() {
             override fun onReconnecting(call: Call, error: CallException) { /* … */ }
             override fun onReconnected(call: Call)                { /* … */ }
         }
-
+        startForegroundService()
         // 3) Kick off the Twilio connect with your listener
         val twilioCall = Voice.connect(applicationContext, connectOptions, conferenceListener)
         conferenceConnection.twilioCall = twilioCall
@@ -841,118 +846,6 @@ class TVConnectionService : ConnectionService() {
         return connection
     }
 
-//    override fun onCreateOutgoingConnection(connectionManagerPhoneAccount: PhoneAccountHandle?, request: ConnectionRequest?): Connection {
-//        assert(request != null) { "ConnectionRequest cannot be null" }
-//        assert(connectionManagerPhoneAccount != null) { "ConnectionManagerPhoneAccount cannot be null" }
-//
-//        super.onCreateOutgoingConnection(connectionManagerPhoneAccount, request)
-//        Log.d(TAG, "onCreateOutgoingConnection")
-//
-//        val extras = request?.extras
-//        val myBundle: Bundle = extras?.getBundle(EXTRA_OUTGOING_PARAMS) ?: run {
-//            Log.e(TAG, "onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS")
-//            throw Exception("onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS");
-//        }
-//
-//        // check required EXTRA_TOKEN, EXTRA_TO, EXTRA_FROM
-//        val token: String = myBundle.getString(EXTRA_TOKEN) ?: run {
-//            Log.e(TAG, "onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
-//            throw Exception("onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN");
-//        }
-//        val to = myBundle.getString(EXTRA_TO) ?: run {
-//            Log.e(TAG, "onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TO")
-//            throw Exception("onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TO");
-//        }
-//        val from = myBundle.getString(EXTRA_FROM) ?: run {
-//            Log.e(TAG, "onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_FROM")
-//            throw Exception("onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_FROM");
-//        }
-//
-//        // Get all params from bundle
-//        val params = HashMap<String, String>()
-//        myBundle.keySet().forEach { key ->
-//            when (key) {
-//                EXTRA_TO, EXTRA_FROM, EXTRA_TOKEN -> {}
-//                else -> {
-//                    myBundle.getString(key)?.let { value ->
-//                        params[key] = value
-//                    }
-//                }
-//            }
-//        }
-//        params["From"] = from
-//        params["To"] = to
-//
-//        // create connect options
-//        val connectOptions = ConnectOptions.Builder(token)
-//            .params(params)
-//            .build()
-//
-//        // create outgoing connection
-//        val connection = TVCallConnection(applicationContext)
-////          val props = connection.connectionProperties or Connection.PROPERTY_SELF_MANAGED
-////        connection.setConnectionProperties(props)
-//
-//        // create Voice SDK call
-//        connection.twilioCall = Voice.connect(applicationContext, connectOptions, connection)
-//
-//        // Optionally improve the displayed name for a conference:
-//        val conf = params["conference"]
-//        if (!conf.isNullOrEmpty()) {
-//            connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, "Conference: $conf")
-//            connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, "Conference: $conf", null),
-//                TelecomManager.PRESENTATION_ALLOWED)
-//            connection.setCallerDisplayName("Conference: $conf", TelecomManager.PRESENTATION_ALLOWED)
-//        }
-//        // create storage instance for call parameters
-//        val mStorage: Storage = StorageImpl(applicationContext)
-//
-//        // Set call state listener, applies non-temporary Call SID when call is ringing or connected (i.e. when assigned by Twilio)
-//        val onCallStateListener: CompletionHandler<Call.State> = CompletionHandler { state ->
-//            if (state == Call.State.RINGING || state == Call.State.CONNECTED) {
-//                val call = connection.twilioCall!!
-//                val callSid = call.sid!!
-//
-//                // Resolve call parameters
-//                val callParams = TVCallParametersImpl(mStorage, call, to, from, params)
-//                connection.setCallParameters(callParams)
-//
-//                // Build custom display name for outgoing calls if provided
-//                val firstName = params["to_firstname"] ?: ""
-//                val lastName = params["to_lastname"] ?: ""
-//                val customDisplayName = if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
-//                    "$firstName $lastName".trim()
-//                } else {
-//                    to
-//                }
-//                // Update the connection extras and UI parameters
-//                connection.extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, customDisplayName)
-//                connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, customDisplayName, null), TelecomManager.PRESENTATION_ALLOWED)
-//                connection.setCallerDisplayName(customDisplayName, TelecomManager.PRESENTATION_ALLOWED)
-//
-//
-//                // If call is not attached, attach it
-//                if (!activeConnections.containsKey(callSid)) {
-//                    applyParameters(connection, callParams)
-//                    attachCallEventListeners(connection, callSid)
-//                    callParams.callSid = callSid
-//                }
-//            }
-//        }
-//        connection.setOnCallStateListener(onCallStateListener)
-//
-//        // Setup connection UI parameters
-//        connection.setInitializing()
-//
-//        // Apply extras
-//        connection.extras = request?.extras ?: Bundle()
-////        connection.extras = request.extras
-//
-//        startForegroundService()
-//
-//        return connection
-//    }
-
     override fun onCreateOutgoingConnection(
         connectionManagerPhoneAccount: PhoneAccountHandle?,
         request: ConnectionRequest?
@@ -1018,6 +911,9 @@ class TVConnectionService : ConnectionService() {
             setInitializing()
         }
 
+        startForegroundService()
+
+
         // Start the Twilio Voice call
         val connectOptions = ConnectOptions.Builder(token).params(params).build()
         connection.twilioCall = Voice.connect(applicationContext, connectOptions, connection)
@@ -1077,7 +973,7 @@ class TVConnectionService : ConnectionService() {
         }
         connection.setOnCallStateListener(onCallStateListener)
 
-        startForegroundService()
+        // startForegroundService()
         return connection
     }
 
@@ -1093,65 +989,33 @@ class TVConnectionService : ConnectionService() {
         }
 
         val onEvent: ValueBundleChanged<String> = ValueBundleChanged { event: String?, extra: Bundle? ->
-            sendBroadcastEvent(applicationContext, event ?: "", callSid, extra)
-            // This is a temporary solution since `isOnCall` returns true when there is an active ConnectionService, regardless of the source app. This also applies to SIM/Telecom calls.
+            // sendBroadcastEvent(applicationContext, event ?: "", callSid, extra)
+            // // This is a temporary solution since `isOnCall` returns true when there is an active ConnectionService, regardless of the source app. This also applies to SIM/Telecom calls.
+            // sendBroadcastCallHandle(applicationContext, extra?.getString(TVBroadcastReceiver.EXTRA_CALL_HANDLE))
+             sendBroadcastEvent(applicationContext, event ?: "", callSid, extra)
             sendBroadcastCallHandle(applicationContext, extra?.getString(TVBroadcastReceiver.EXTRA_CALL_HANDLE))
+
+            if (event == TVNativeCallEvents.EVENT_CONNECTED && !hasVoipAudioFocus) {
+                acquireVoipAudioFocus()
+            }
         }
         val onDisconnect: CompletionHandler<DisconnectCause> = CompletionHandler {
             dc ->
             connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
-      connection.destroy()
-      storage.clearCustomParams()
-      activeConnections.remove(callSid)
+            connection.destroy()
+            storage.clearCustomParams()
+            activeConnections.remove(callSid)
+            if (activeConnections.isEmpty() && hasVoipAudioFocus) {
+    releaseVoipAudioFocus()
+}
+            sendBroadcastEvent(applicationContext, TVBroadcastReceiver.ACTION_CALL_ENDED, callSid)
+            sendBroadcastCallHandle(applicationContext, null)
 
-     
+            // NEW: always release audio focus on teardown
+            if (hasVoipAudioFocus) releaseVoipAudioFocus()
 
-      sendBroadcastEvent(
-          applicationContext,
-          TVBroadcastReceiver.ACTION_CALL_ENDED,
-          callSid
-      )
-      sendBroadcastCallHandle(applicationContext, null)
-     
-      stopForegroundService()
-      stopSelfSafe()
-            //  connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
-            //   connection.destroy()
-            //  storage.clearCustomParams()
-            // activeConnections.remove(callSid)
-//             if (activeConnections.containsKey(callSid)) {
-//                 activeConnections.remove(callSid)
-//             }
-
-             // // ── NEW ── let your Flutter side know that the call really ended
-             // if (dc?.code == DisconnectCause.LOCAL || dc?.code == DisconnectCause.REMOTE) {
-             // sendBroadcastEvent(
-             // applicationContext,
-             // TVBroadcastReceiver.ACTION_CALL_ENDED,
-             // callSid
-             // )
-             // }
-             // safe‐call into dc.code (becomes an Int?), then compare
-//             val causeCode = dc?.code
-//             if (causeCode == DisconnectCause.LOCAL || causeCode == DisconnectCause.REMOTE) {
-//                 sendBroadcastEvent(
-//                 applicationContext,
-//                 TVBroadcastReceiver.ACTION_CALL_ENDED,
-//                 callSid
-//                 )
-//             } else {
-//                 Log.d(TAG, "Skipping CALL_ENDED for non-hangup cause=$causeCode")
-//             }
-
-            // sendBroadcastEvent(
-            //     applicationContext,
-            //     TVBroadcastReceiver.ACTION_CALL_ENDED,
-            //     callSid
-            // )
-            
-
-            //  stopForegroundService()
-            //  stopSelfSafe()
+            stopForegroundService()
+            stopSelfSafe()
          }
 
          // Add to local connection cache
