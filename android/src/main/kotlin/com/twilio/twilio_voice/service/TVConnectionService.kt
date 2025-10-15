@@ -359,6 +359,111 @@ class TVConnectionService : ConnectionService() {
                     }
                 }
 
+//                ACTION_PLACE_OUTGOING_CALL -> {
+//
+//                    val rawConnect = it.getBooleanExtra(EXTRA_CONNECT_RAW, false)
+//
+//                    fun getRequiredString(key: String, allowNullIfRaw: Boolean = false): String? {
+//                        val value = it.getStringExtra(key)
+//                        if (value == null) {
+//                            Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String $key")
+//                            if (!rawConnect || !allowNullIfRaw) return null
+//                        }
+//                        return value
+//                    }
+//
+//                    val token = getRequiredString(EXTRA_TOKEN) ?: return@let
+//                    val to = getRequiredString(EXTRA_TO, allowNullIfRaw = true)
+//                    val from = getRequiredString(EXTRA_FROM, allowNullIfRaw = true)
+//
+//                    val params = buildMap {
+//                        it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)?.let { bundle ->
+//                            for (key in bundle.keySet()) {
+//                                bundle.getString(key)?.let { value -> put(key, value) }
+//                            }
+//                        }
+//                        put(EXTRA_TOKEN, token)
+//                        if (!rawConnect) {
+//                            to?.let { v -> put(EXTRA_TO, v) }
+//                            from?.let { v -> put(EXTRA_FROM, v) }
+//                        }
+//                    }
+//
+//                    val myBundle = Bundle().apply {
+//                        putBundle(EXTRA_OUTGOING_PARAMS, Bundle().apply {
+//                            params.forEach { (key, value) -> putString(key, value) }
+//                        })
+//                    }
+//
+//                    val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
+//                    val phoneAccountHandle = telecomManager.getPhoneAccountHandle(applicationContext)
+//
+//                    if (!telecomManager.canReadPhoneState(applicationContext)) {
+//                        Log.e(TAG, "onStartCommand: Missing READ_PHONE_STATE permission")
+//                        return@let
+//                    }
+//
+//                    val phoneAccount = telecomManager.getPhoneAccount(phoneAccountHandle)
+//                    if(phoneAccount == null) {
+//                        Log.e(TAG, "onStartCommand: PhoneAccount is null, make sure to register one with `registerPhoneAccount()`")
+//                        return@let
+//                    }
+//                    if(!phoneAccount.isEnabled) {
+//                        Log.e(TAG, "onStartCommand: PhoneAccount is not enabled, prompt the user to enable the phone account by opening settings with `openPhoneAccountSettings()`")
+//                        return@let
+//                    }
+//
+//                    if (!telecomManager.hasCallCapableAccount(applicationContext, phoneAccountHandle.componentName.className)) {
+//                        Log.e(TAG, "onStartCommand: No registered phone account for PhoneHandle $phoneAccountHandle")
+//                        telecomManager.registerPhoneAccount(applicationContext, phoneAccountHandle)
+//                    }
+//
+//                    if (!applicationContext.hasCallPhonePermission()) {
+//                        Log.e(TAG, "onStartCommand: Missing CALL_PHONE permission, request permission with `requestCallPhonePermission()`")
+//                        return@let
+//                    }
+//
+//                    if (!applicationContext.hasManageOwnCallsPermission()) {
+//                        Log.e(TAG, "onStartCommand: Missing MANAGE_OWN_CALLS permission, request permission with `requestManageOwnCallsPermission()`")
+//                        return@let
+//                    }
+//
+//                    // Create outgoing extras
+////                    val extras = Bundle().apply {
+////                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
+////                        putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
+////                    }
+////
+////                    val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
+////                    telecomManager.placeCall(address, extras)
+//                    val extras = Bundle().apply {
+//                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
+//
+//                        // Put our payload into the OUTGOING_CALL_EXTRAS bundle
+//                        putBundle(
+//                            TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS,
+//                            Bundle().apply {
+//                                // Pass the params bundle as-is
+//                                putBundle(EXTRA_OUTGOING_PARAMS, myBundle.getBundle(EXTRA_OUTGOING_PARAMS))
+//                                // IMPORTANT: also pass down whether this is a raw connect so
+//                                // onCreateOutgoingConnection can skip To/From requirements
+//                                putBoolean(EXTRA_CONNECT_RAW, rawConnect)
+//                            }
+//                        )
+//                    }
+//
+//// Build a SAFE address Uri
+//                    val address: Uri = if (rawConnect) {
+//                        // Use your conference id (or a sensible default) as the SSP;
+//                        // never pass null to Uri.fromParts(…)
+//                        val conf = params["conference"] ?: "connect"
+//                        Uri.fromParts("conf", conf, null)
+//                    } else {
+//                        Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
+//                    }
+//
+//                    telecomManager.placeCall(address, extras)
+//                }
                 ACTION_PLACE_OUTGOING_CALL -> {
 
                     val rawConnect = it.getBooleanExtra(EXTRA_CONNECT_RAW, false)
@@ -366,8 +471,11 @@ class TVConnectionService : ConnectionService() {
                     fun getRequiredString(key: String, allowNullIfRaw: Boolean = false): String? {
                         val value = it.getStringExtra(key)
                         if (value == null) {
-                            Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String $key")
-                            if (!rawConnect || !allowNullIfRaw) return null
+                            // Only log as error when not raw or when we don't allow null
+                            if (!rawConnect || !allowNullIfRaw) {
+                                Log.e(TAG, "onStartCommand: ACTION_PLACE_OUTGOING_CALL is missing String $key")
+                                return null
+                            }
                         }
                         return value
                     }
@@ -376,6 +484,7 @@ class TVConnectionService : ConnectionService() {
                     val to = getRequiredString(EXTRA_TO, allowNullIfRaw = true)
                     val from = getRequiredString(EXTRA_FROM, allowNullIfRaw = true)
 
+                    // Flatten the params bundle into a map (conference, etc.)
                     val params = buildMap {
                         it.getParcelableExtraSafe<Bundle>(EXTRA_OUTGOING_PARAMS)?.let { bundle ->
                             for (key in bundle.keySet()) {
@@ -389,12 +498,6 @@ class TVConnectionService : ConnectionService() {
                         }
                     }
 
-                    val myBundle = Bundle().apply {
-                        putBundle(EXTRA_OUTGOING_PARAMS, Bundle().apply {
-                            params.forEach { (key, value) -> putString(key, value) }
-                        })
-                    }
-
                     val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
                     val phoneAccountHandle = telecomManager.getPhoneAccountHandle(applicationContext)
 
@@ -404,11 +507,11 @@ class TVConnectionService : ConnectionService() {
                     }
 
                     val phoneAccount = telecomManager.getPhoneAccount(phoneAccountHandle)
-                    if(phoneAccount == null) {
+                    if (phoneAccount == null) {
                         Log.e(TAG, "onStartCommand: PhoneAccount is null, make sure to register one with `registerPhoneAccount()`")
                         return@let
                     }
-                    if(!phoneAccount.isEnabled) {
+                    if (!phoneAccount.isEnabled) {
                         Log.e(TAG, "onStartCommand: PhoneAccount is not enabled, prompt the user to enable the phone account by opening settings with `openPhoneAccountSettings()`")
                         return@let
                     }
@@ -428,34 +531,24 @@ class TVConnectionService : ConnectionService() {
                         return@let
                     }
 
-                    // Create outgoing extras
-//                    val extras = Bundle().apply {
-//                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
-//                        putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
-//                    }
-//
-//                    val address: Uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
-//                    telecomManager.placeCall(address, extras)
-                    val extras = Bundle().apply {
-                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
-
-                        // Put our payload into the OUTGOING_CALL_EXTRAS bundle
-                        putBundle(
-                            TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS,
-                            Bundle().apply {
-                                // Pass the params bundle as-is
-                                putBundle(EXTRA_OUTGOING_PARAMS, myBundle.getBundle(EXTRA_OUTGOING_PARAMS))
-                                // IMPORTANT: also pass down whether this is a raw connect so
-                                // onCreateOutgoingConnection can skip To/From requirements
-                                putBoolean(EXTRA_CONNECT_RAW, rawConnect)
-                            }
-                        )
+                    // Build the OUTGOING_CALL_EXTRAS bundle and include the raw flag
+                    val myBundle = Bundle().apply {
+                        putBundle(EXTRA_OUTGOING_PARAMS, Bundle().apply {
+                            params.forEach { (key, value) -> putString(key, value) }
+                        })
+                        // Make the raw flag visible to onCreateOutgoingConnection
+                        putBoolean(EXTRA_CONNECT_RAW, rawConnect)
                     }
 
-// Build a SAFE address Uri
+                    val extras = Bundle().apply {
+                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
+                        putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, myBundle)
+                    }
+
+                    // IMPORTANT: Build a SAFE Uri.
+                    // Raw connect => we are not dialing a PSTN/client target; use a custom scheme with a non-null SSP.
+                    // Non-raw => keep your existing PSTN/client tel: behavior.
                     val address: Uri = if (rawConnect) {
-                        // Use your conference id (or a sensible default) as the SSP;
-                        // never pass null to Uri.fromParts(…)
                         val conf = params["conference"] ?: "connect"
                         Uri.fromParts("conf", conf, null)
                     } else {
@@ -464,6 +557,7 @@ class TVConnectionService : ConnectionService() {
 
                     telecomManager.placeCall(address, extras)
                 }
+
 
                 ACTION_TOGGLE_BLUETOOTH -> {
                     val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
