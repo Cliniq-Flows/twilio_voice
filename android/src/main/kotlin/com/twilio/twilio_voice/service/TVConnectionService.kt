@@ -12,6 +12,8 @@ import android.content.Context
 import android.content.Intent
 import com.twilio.voice.CallException
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -191,7 +193,7 @@ class TVConnectionService : ConnectionService() {
          */
         const val EXTRA_MUTE_STATE: String = "EXTRA_MUTE_STATE"
 
-            
+        private var focusRequest: AudioFocusRequest? = null
 
         //endregion
 
@@ -270,6 +272,7 @@ class TVConnectionService : ConnectionService() {
                     getConnection(callHandle)?.onAbort() ?: run {
                         Log.e(TAG, "onStartCommand: [ACTION_CANCEL_CALL_INVITE] could not find connection for callHandle: $callHandle")
                     }
+                    resumeFirstHeldCall()
                      stopForegroundService()
                     stopSelf()
                     return START_NOT_STICKY
@@ -401,9 +404,7 @@ class TVConnectionService : ConnectionService() {
   val connection = getConnection(callHandle)
   if (connection != null) {
     connection.disconnect() // this kicks off your onCallDisconnected callback
-    if (activeConnections.isEmpty() && hasVoipAudioFocus) {
-    releaseVoipAudioFocus()
-}
+    
   } else {
     Log.e(TAG, "hangup(): could not find connection for $callHandle")
   }
@@ -649,27 +650,83 @@ class TVConnectionService : ConnectionService() {
     }
     //endregion
 
+    private fun resumeFirstHeldCall() {
+    val held = activeConnections.values.firstOrNull { it.state == Connection.STATE_HOLDING }
+    held?.let {
+        it.toggleHold(false)           // unhold Twilio + Telecom
+        it.setActive()                 // make sure Telecom shows ACTIVE again
+        if (!hasVoipAudioFocus) acquireVoipAudioFocus()
+    }
+}
 
     private fun acquireVoipAudioFocus() {
-        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        // val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        // am.mode = AudioManager.MODE_IN_COMMUNICATION
+        // @Suppress("DEPRECATION")
+        // val result = am.requestAudioFocus(
+        //     { /* no-op */ },
+        //     AudioManager.STREAM_VOICE_CALL,
+        //     AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+        // )
+        // hasVoipAudioFocus = (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        // Log.d(TAG, "acquireVoipAudioFocus: granted=$hasVoipAudioFocus")
+         val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+    // Keep call routing optimal
+    if (am.mode != AudioManager.MODE_IN_COMMUNICATION) {
         am.mode = AudioManager.MODE_IN_COMMUNICATION
+    }
+
+    // Prefer exclusive focus if available
+    val gain = if (Build.VERSION.SDK_INT >= 19)
+        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+    else
+        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+
+    hasVoipAudioFocus = if (Build.VERSION.SDK_INT >= 26) {
+        val req = AudioFocusRequest.Builder(gain)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            .setOnAudioFocusChangeListener { /* no-op for VOIP */ }
+            .setWillPauseWhenDucked(false) // don't pause VOIP on duck
+            .build()
+        focusRequest = req
+        am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    } else {
         @Suppress("DEPRECATION")
-        val result = am.requestAudioFocus(
+        am.requestAudioFocus(
             { /* no-op */ },
             AudioManager.STREAM_VOICE_CALL,
-            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
-        )
-        hasVoipAudioFocus = (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
-        Log.d(TAG, "acquireVoipAudioFocus: granted=$hasVoipAudioFocus")
+            gain
+        ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    Log.d(TAG, "acquireVoipAudioFocus: granted=$hasVoipAudioFocus")
     }
 
     private fun releaseVoipAudioFocus() {
-        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        // val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        // @Suppress("DEPRECATION")
+        // am.abandonAudioFocus(null)
+        // am.mode = AudioManager.MODE_NORMAL
+        // hasVoipAudioFocus = false
+        // Log.d(TAG, "releaseVoipAudioFocus: released")
+         val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    if (Build.VERSION.SDK_INT >= 26) {
+        focusRequest?.let { am.abandonAudioFocusRequest(it) }
+        focusRequest = null
+    } else {
         @Suppress("DEPRECATION")
         am.abandonAudioFocus(null)
-        am.mode = AudioManager.MODE_NORMAL
-        hasVoipAudioFocus = false
-        Log.d(TAG, "releaseVoipAudioFocus: released")
+    }
+    hasVoipAudioFocus = false
+
+    // Return to normal audio mode only when no calls remain
+    am.mode = AudioManager.MODE_NORMAL
     }
 
     private fun joinConference(intent: Intent, conferenceName: String) {
@@ -735,9 +792,7 @@ class TVConnectionService : ConnectionService() {
             }
 
             override fun onConnectFailure(call: Call, error: CallException) {
-             if (activeConnections.isEmpty() && hasVoipAudioFocus) {
-        releaseVoipAudioFocus()
-    }
+            
     conferenceConnection.disconnect()
                 Log.e(TAG, "Conference connect failure: ${error.message}")
                 if (error.errorCode == 31603) {
@@ -771,9 +826,7 @@ class TVConnectionService : ConnectionService() {
             }
 
             override fun onDisconnected(call: Call, error: CallException?) {
-               if (activeConnections.isEmpty() && hasVoipAudioFocus) {
-        releaseVoipAudioFocus()
-    }
+            
   
                 Log.d(TAG, "Conference disconnected")
                 // this kicks off your telecom onDisconnect handler, which will remove from activeConnections
