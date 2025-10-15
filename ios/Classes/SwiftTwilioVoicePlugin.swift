@@ -749,8 +749,12 @@ static func setSystemVolume(_ level: Float) {
     /// - Parameter icon: icon path / name
     /// - Returns: true if succesful
     func updateCallKitIcon(icon: String) -> Bool {
-        guard let img = UIImage(named: icon)?.pngData() else { return false }
-    
+        if !callObserver.calls.isEmpty {
+        sendPhoneCallEvents(description: "LOG|updateCallKitIcon skipped (active calls present)", isError: false)
+        return false
+    }
+    guard let img = UIImage(named: icon)?.pngData() else { return false }
+
     let name = SwiftTwilioVoicePlugin.appDisplayName()
     let cfg = CXProviderConfiguration(localizedName: name)
     cfg.supportedHandleTypes = [.phoneNumber, .generic]
@@ -759,28 +763,11 @@ static func setSystemVolume(_ level: Float) {
     cfg.supportsVideo = callKitProvider.configuration.supportsVideo
     cfg.iconTemplateImageData = img
 
-    // Rebuild ONCE, then set delegate again.
-   // callKitProvider.invalidate()
     callKitProvider = CXProvider(configuration: cfg)
     callKitProvider.setDelegate(self, queue: nil)
 
-UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIcon)
+    UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIcon)
     return true
-        // if let newIcon = UIImage(named: icon) {
-        //     let configuration = callKitProvider.configuration;
-            
-        //     // set new callkit icon
-        //     configuration.iconTemplateImageData = newIcon.pngData()
-        //     callKitProvider.configuration = configuration
-         
-        //     // save new icon to persist across sessions
-        //     UserDefaults.standard.set(icon, forKey: defaultCallKitIcon)
-            
-        //     return true;
-        // }
-        
-        // return false;
-       
     }
 
     func answerCall(callInvite: CallInvite) {
@@ -1241,58 +1228,48 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     }
     
     public func callDidFailToConnect(call: Call, error: Error) {
-        self.sendPhoneCallEvents(description: "LOG|Call failed to connect: \(error.localizedDescription)", isError: false)
-        self.sendPhoneCallEvents(description: "Call Ended", isError: false)
-        
-      stopRingbackTone()
-       wantsRingback = false
-        
-        if(error.localizedDescription.contains("Access Token expired")){
-            self.sendPhoneCallEvents(description: "DEVICETOKEN", isError: false)
-        }
-        if let completion = self.callKitCompletionCallback {
-            completion(false)
-        }
-        
-        
-        callKitProvider.reportCall(with: call.uuid!, endedAt: Date(), reason: CXCallEndedReason.failed)
-        callDisconnected()
+         sendPhoneCallEvents(description: "LOG|Call failed to connect: \(error.localizedDescription)", isError: false)
+    sendPhoneCallEvents(description: "Call Ended", isError: false)
 
-    
+    stopRingbackTone()
+    wantsRingback = false
+
+    if error.localizedDescription.contains("Access Token expired") {
+        sendPhoneCallEvents(description: "DEVICETOKEN", isError: false)
+    }
+    if let completion = callKitCompletionCallback { completion(false) }
+
+    if let uuid = call.uuid {
+        callKitProvider.reportCall(with: uuid, endedAt: Date(), reason: .failed)
+    } else {
+        sendPhoneCallEvents(description: "LOG|callDidFailToConnect: no UUID (cold-start race), skipping report", isError: false)
+    }
+
+    callDisconnected()
     }
     
     // @objc(callDidDisconnect:error:)
     public func callDidDisconnect(call: Call, error: Error?) {
-       
-     clearCustomParams()
-        stopRingbackTone()
-            wantsRingback = false
+          clearCustomParams()
+    stopRingbackTone()
+    wantsRingback = false
 
+    let reason: CXCallEndedReason = (error == nil) ? .remoteEnded : .failed
+    if let uuid = call.uuid {
+        callKitProvider.reportCall(with: uuid, endedAt: Date(), reason: reason)
+    } else {
+        sendPhoneCallEvents(description: "LOG|callDidDisconnect: no UUID, skipping report", isError: false)
+    }
 
-   
-     let reason: CXCallEndedReason = (error == nil)
-      ? .remoteEnded    
-      : .failed    
-    // self.userInitiatedDisconnect
-    //   ? .remoteEnded
-    //   : .failed
-        callKitProvider.reportCall(
-        with: call.uuid!,
-        endedAt: Date(),
-        reason: reason
-        )
-        sendPhoneCallEvents(description: "Call Ended", isError: false)
-
-        
-        if let err = error {
+    sendPhoneCallEvents(description: "Call Ended", isError: false)
+    if let err = error {
         sendPhoneCallEvents(description: "Call Ended: \(err.localizedDescription)", isError: true)
-        }
-        isRejectingCallInvite = false
-        userInitiatedDisconnect = false
-        self.call               = nil
-        self.callInvite         = nil
+    }
 
-  
+    isRejectingCallInvite = false
+    userInitiatedDisconnect = false
+    self.call       = nil
+    self.callInvite = nil
     }
     
     func callDisconnected() {
@@ -1654,11 +1631,11 @@ if providerReady {
     
     func performEndCallAction(uuid: UUID) {
         
-         guard isCallActive(uuid: uuid) else {
+            guard isCallActive(uuid: uuid) else {
         sendPhoneCallEvents(description: "Call Ended", isError: false)
         return
     }
-        sendPhoneCallEvents(description: "LOG|performEndCallAction method invoked", isError: false)
+    sendPhoneCallEvents(description: "LOG|performEndCallAction method invoked", isError: false)
     let end = CXEndCallAction(call: uuid)
     let tx = CXTransaction(action: end)
     callKitCallController.request(tx) { err in
