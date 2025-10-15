@@ -75,8 +75,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private var callkitAudioActive = false
     private var providerReady = false
     private var startRetryCount = 0
-private let maxStartRetries = 8
+    private let maxStartRetries = 8
     private var didForceRebuildOnce = false
+    private let kAccessTokenKey = "TwilioAccessToken"
+
 
 
      // ——————————————————————————————————————
@@ -159,7 +161,11 @@ private let maxStartRetries = 8
   audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
 
   voipRegistry.delegate = self
-  voipRegistry.desiredPushTypes = isSignedIn ? [.voIP] : []
+  voipRegistry.desiredPushTypes =[.voIP]
+
+  if let cached = UserDefaults.standard.string(forKey: kAccessTokenKey), !cached.isEmpty {
+    self.accessToken = cached
+  }
 
   callObserver.setDelegate(self, queue: .main)
   UNUserNotificationCenter.current().delegate = self
@@ -274,16 +280,19 @@ private let maxStartRetries = 8
     }
     
     public func handle(_ flutterCall: FlutterMethodCall, result: @escaping FlutterResult) {
-        _result = result
+        // _result = result
         
-        let arguments:Dictionary<String, AnyObject> = flutterCall.arguments as! Dictionary<String, AnyObject>;
+        // let arguments:Dictionary<String, AnyObject> = flutterCall.arguments as! Dictionary<String, AnyObject>;
         
+         _result = result
+  let arguments = (flutterCall.arguments as? [String: AnyObject]) ?? [:]
         if flutterCall.method == "tokens" {
                 guard let token = arguments["accessToken"] as? String else {
                 result(FlutterError(code: "INVALID_ARGUMENTS", message: "Missing accessToken", details: nil))
                 return
             }
             self.accessToken = token
+            UserDefaults.standard.set(token, forKey: kAccessTokenKey)
 
             if let dev = self.deviceToken {
                 // We already have a device token → register with Twilio
@@ -719,7 +728,7 @@ let newIcon = arguments["icon"] as? String ?? SwiftTwilioVoicePlugin.defaultCall
     /// - Returns: true if succesful
     func updateCallKitIcon(icon: String) -> Bool {
         guard let img = UIImage(named: icon)?.pngData() else { return false }
-
+    
     let name = SwiftTwilioVoicePlugin.appDisplayName()
     let cfg = CXProviderConfiguration(localizedName: name)
     cfg.supportedHandleTypes = [.phoneNumber, .generic]
@@ -839,63 +848,24 @@ UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIco
     
     // MARK: PKPushRegistryDelegate
     public func pushRegistry(_ registry: PKPushRegistry, didUpdate credentials: PKPushCredentials, for type: PKPushType) {
-       self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials:forType:", isError: false)
-        
         guard type == .voIP else { return }
-        guard isSignedIn else {
-            sendPhoneCallEvents(description: "LOG|Skipping Twilio register (signed out or disabled)", isError: false)
-            return
-        }
-      
-        guard registrationRequired() || deviceToken != credentials.token else {
-            self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials device token unchanged, no update needed.", isError: true)
-            return
-        }
 
-        self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials:forType: device token updated", isError: false)
-        let deviceToken = credentials.token
-        
-        self.sendPhoneCallEvents(description: "LOG|pushRegistry:attempting to register with twilio", isError: false)
-        if let token = accessToken {
-            TwilioVoiceSDK.register(accessToken: token, deviceToken: deviceToken) { (error) in
-                if let error = error {
-                    self.sendPhoneCallEvents(description: "LOG|An error occurred while registering: \(error.localizedDescription)", isError: false)
-                    self.sendPhoneCallEvents(description: "DEVICETOKEN|\(String(decoding: deviceToken, as: UTF8.self))", isError: false)
-                }
-                else {
-                    self.sendPhoneCallEvents(description: "LOG|Successfully registered for VoIP push notifications.", isError: false)
-                }
-            }
-        }
-        self.deviceToken = deviceToken
-        UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
-      
-        // self.sendPhoneCallEvents(description: "LOG|pushRegistry:didUpdatePushCredentials:forType:", isError: false)
-        
-        //  guard type == .voIP else { return }
+  let newToken = credentials.token  // ← add this
+  let tokenChanged = (deviceToken == nil) || (deviceToken! != newToken)
+  let shouldRegisterWithTwilio = (self.accessToken != nil) && (registrationRequired() || tokenChanged)
 
-        // let newToken = credentials.token
-        // let previouslySaved = self.deviceToken    
+  if shouldRegisterWithTwilio, let token = self.accessToken {
+    TwilioVoiceSDK.register(accessToken: token, deviceToken: newToken) { err in
+      if let err = err {
+        self.sendPhoneCallEvents(description: "LOG|Twilio register error: \(err.localizedDescription)", isError: false)
+      } else {
+        self.sendPhoneCallEvents(description: "LOG|Registered for VoIP pushes.", isError: false)
+      }
+    }
+  }
 
-        // if registrationRequired() || previouslySaved != newToken {
-        //     self.sendPhoneCallEvents(description: "LOG|PushKit gave us a new token; registering with Twilio…", isError: false)
-        //     if let tokenStr = self.accessToken {
-        //         TwilioVoiceSDK.register(accessToken: tokenStr, deviceToken: newToken) { error in
-        //             if let error = error {
-        //                 self.sendPhoneCallEvents(description: "LOG|TwilioVoiceSDK.register error: \(error.localizedDescription)", isError: false)
-        //             } else {
-        //                 self.sendPhoneCallEvents(description: "LOG|Registered for VoIP pushes (new token).", isError: false)
-        //             }
-        //         }
-        //     } else {
-        //         self.sendPhoneCallEvents(description: "LOG|Have deviceToken but no accessToken yet.", isError: false)
-        //     }
-        // }
-        
-        // // Cache new token and timestamp
-        // self.deviceToken = newToken
-        // UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
-
+  self.deviceToken = newToken
+  UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
     }
     
     /**
@@ -971,36 +941,31 @@ UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIco
     }
     
     
-    public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType) {
-        guard type == .voIP else { return }
-    guard isSignedIn else {
-        sendPhoneCallEvents(description: "LOG|Ignoring VOIP push (signed out)", isError: false)
-        return
-    }
+    // public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType) {
+    //    sendPhoneCallEvents(description: "LOG|pushRegistry:didReceiveIncomingPushWithPayload:forType:completion:", isError: false)
+    //     guard type == .voIP else { completion(); return }
 
-    lastVoipPushReceivedAt = Date()
-    lastVoipPushSummary = summarizeVoipPayload(payload.dictionaryPayload)
-    TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
-    }
+    //     lastVoipPushReceivedAt = Date()
+    //     lastVoipPushSummary = summarizeVoipPayload(payload.dictionaryPayload)
+
+    //     // Let Twilio parse and deliver the CallInvite even if token isn't set yet
+    //     TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
+    //     completion()
+    // }
     
     /**
      * This delegate method is available on iOS 11 and above. Call the completion handler once the
      * notification payload is passed to the `TwilioVoice.handleNotification()` method.
      */
     public func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
-        self.sendPhoneCallEvents(description: "LOG|pushRegistry:didReceiveIncomingPushWithPayload:forType:completion:", isError: false)
-
+        sendPhoneCallEvents(description: "LOG|pushRegistry:didReceiveIncomingPushWithPayload:forType:completion:", isError: false)
         guard type == .voIP else { completion(); return }
-            guard isSignedIn else {
-                sendPhoneCallEvents(description: "LOG|Ignoring VOIP push (signed out)", isError: false)
-                completion()
-                return
-            }
 
-            lastVoipPushReceivedAt = Date()
-            lastVoipPushSummary = summarizeVoipPayload(payload.dictionaryPayload)
-            TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
-            completion()
+        lastVoipPushReceivedAt = Date()
+        lastVoipPushSummary = summarizeVoipPayload(payload.dictionaryPayload)
+
+        TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
+        completion()
     }
 
     // MARK: CXCallObserverDelegate
@@ -1028,9 +993,7 @@ UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIco
     
     // MARK: TVONotificaitonDelegate
     public func callInviteReceived(callInvite: CallInvite) {
-        guard isSignedIn else { callInvite.reject(); return }
-
-  self.callInvite = callInvite
+        self.callInvite = callInvite
   if let custom = callInvite.customParameters { saveCustomParams(custom) }
   UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
 
@@ -1051,8 +1014,10 @@ UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIco
     description: "Ringing|\(first)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))",
     isError: false
   )
+
+  // Show CallKit UI even on cold start
   reportIncomingCall(from: first, fromx: last, fromx1: fromx1, uuid: callInvite.uuid)
-}
+    }
     //     guard isSignedIn else { callInvite.reject(); return }
 
     //      self.callInvite = callInvite
@@ -1137,63 +1102,35 @@ UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIco
     }
     
 func showMissedCallNotification(from: String?, to: String?, customParams: [String:Any]? = nil) {
-        guard UserDefaults.standard.optionalBool(forKey: "show-notifications") ?? true else{return}
-        let notificationCenter = UNUserNotificationCenter.current()
+        guard UserDefaults.standard.optionalBool(forKey: "show-notifications") ?? true else { return }
+  let center = UNUserNotificationCenter.current()
+  center.getNotificationSettings { settings in
+    guard settings.authorizationStatus == .authorized else { return }
 
-       
-        notificationCenter.getNotificationSettings { (settings) in
-          if settings.authorizationStatus == .authorized {
-            let content = UNMutableNotificationContent()
+    let content = UNMutableNotificationContent()
 
-             var callerId = from?.replacingOccurrences(of: "client:", with: "")
-            if callerId == nil || callerId!.isEmpty {
-                callerId = self.lastCallInviteFrom
-            }
+    var callerId = from?.replacingOccurrences(of: "client:", with: "")
+    if callerId == nil || callerId!.isEmpty { callerId = self.lastCallInviteFrom }
 
-            // 2) Try to resolve a nice display name
-            let first = (customParams?["firstname"] as? String ?? "")
-            let last  = (customParams?["lastname"]  as? String ?? "")
-            let full  = "\(first) \(last)".trimmingCharacters(in: .whitespaces)
+    let first = (customParams?["firstname"] as? String ?? "")
+    let last  = (customParams?["lastname"]  as? String ?? "")
+    let full  = "\(first) \(last)".trimmingCharacters(in: .whitespaces)
+    let resolved = !full.isEmpty ? full :
+                   (callerId.flatMap { self.clients[$0] } ??
+                    self.clients["defaultCaller"] ?? self.defaultCaller)
 
-            let resolvedName: String = {
-                if !full.isEmpty { return full }
-                if let id = callerId, let known = self.clients[id] { return known }
-                return self.clients["defaultCaller"] ?? self.defaultCaller
-            }()
+    content.title = "Missed call"
+    content.body  = "Missed call from \(resolved)"
 
-            // 3) Title + Body
-            content.title = "Missed call"
-            content.body  = "Missed call from \(resolvedName)"
+    // ✅ restore payload so tap-to-callback works
+    var info: [String: Any] = ["type": "twilio-missed-call"]
+    if let from = callerId { info["From"] = from }
+    if let to = to, !to.isEmpty { info["To"] = to }
+    content.userInfo = info
 
-            // var userName:String?
-            // if var from = from{
-            //     from = from.replacingOccurrences(of: "client:", with: "")
-            //     content.userInfo = ["type":"twilio-missed-call", "From":from]
-            //     if let to = to{
-            //         content.userInfo["To"] = to
-            //     }
-            //     userName = self.clients[from]
-            // }
-            
-            // let title = userName ?? self.clients["defaultCaller"] ?? self.defaultCaller
-            // content.title = title
-            // content.body = NSLocalizedString("notification_missed_call_body", comment: "")
-
-            // content.title = String(format:  NSLocalizedString("notification_missed_call", comment: ""),title)
-
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-            let request = UNNotificationRequest(identifier: UUID().uuidString,
-                                                content: content,
-                                                trigger: trigger)
-            
-                notificationCenter.add(request) { (error) in
-                    if let error = error {
-                        print("Notification Error: ", error)
-                    }
-                }
-            
-          }
-        }
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger))
+    }
     }
     
     // MARK: TVOCallDelegate
@@ -1647,75 +1584,75 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
 //         }
 //     }
         func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
-            let tStarted = Date()
+        let tStarted = Date()
 
-            let firstname = from.trimmingCharacters(in: .whitespacesAndNewlines)
-            let lastname  = fromx.trimmingCharacters(in: .whitespacesAndNewlines)
-            let numberRaw = fromx1
-                .replacingOccurrences(of: "client:", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstname = from.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lastname  = fromx.trimmingCharacters(in: .whitespacesAndNewlines)
+        let numberRaw = fromx1
+            .replacingOccurrences(of: "client:", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
-            let fullName = "\(firstname) \(lastname)".trimmingCharacters(in: .whitespacesAndNewlines)
+        let fullName = "\(firstname) \(lastname)".trimmingCharacters(in: .whitespacesAndNewlines)
 
-            // Prefer full name → number → known client → constant
-            var display = !fullName.isEmpty
-                ? fullName
-                : (!numberRaw.isEmpty
-                    ? numberRaw
-                    : (self.clients[numberRaw] ?? self.clients["defaultCaller"] ?? self.defaultCaller))
+        // Prefer full name → number → known client → constant
+        var display = !fullName.isEmpty
+            ? fullName
+            : (!numberRaw.isEmpty
+                ? numberRaw
+                : (self.clients[numberRaw] ?? self.clients["defaultCaller"] ?? self.defaultCaller))
 
-            if display.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                display = "Unknown Caller"
-            }
+        if display.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            display = "Unknown Caller"
+        }
 
-            // Choose handle type/value
-            let digits = numberRaw.filter(\.isNumber)
-            let isPhoneLike = !numberRaw.isEmpty && (numberRaw.hasPrefix("+") || digits.count >= 3)
-            let handleType: CXHandle.HandleType = isPhoneLike ? .phoneNumber : .generic
-            let handleValue = isPhoneLike ? numberRaw : display
+        // Choose handle type/value
+        let digits = numberRaw.filter(\.isNumber)
+        let isPhoneLike = !numberRaw.isEmpty && (numberRaw.hasPrefix("+") || digits.count >= 3)
+        let handleType: CXHandle.HandleType = isPhoneLike ? .phoneNumber : .generic
+        let handleValue = isPhoneLike ? numberRaw : display
 
-            let callHandle = CXHandle(type: handleType, value: handleValue)
+        let callHandle = CXHandle(type: handleType, value: handleValue)
 
-            let callUpdate = CXCallUpdate()
-            callUpdate.remoteHandle = callHandle
-            callUpdate.localizedCallerName = display
-            callUpdate.supportsDTMF = true
-            callUpdate.supportsHolding = true
-            callUpdate.supportsGrouping = false
-            callUpdate.supportsUngrouping = false
-            callUpdate.hasVideo = false
+        let callUpdate = CXCallUpdate()
+        callUpdate.remoteHandle = callHandle
+        callUpdate.localizedCallerName = display
+        callUpdate.supportsDTMF = true
+        callUpdate.supportsHolding = true
+        callUpdate.supportsGrouping = false
+        callUpdate.supportsUngrouping = false
+        callUpdate.hasVideo = false
 
-            DispatchQueue.main.async {
-                self.callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
-                    let tCompleted = Date()
-                    self.lastCallKitReportTimestamp = tCompleted
-                    self.lastIncomingCallUUID = uuid
+        DispatchQueue.main.async {
+            self.callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+                let tCompleted = Date()
+                self.lastCallKitReportTimestamp = tCompleted
+                self.lastIncomingCallUUID = uuid
 
-                    var diag: [String: Any] = [
-                        "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)
-                    ]
-                    if let pushAt = self.lastVoipPushReceivedAt {
-                        diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
-                    }
-                    if let inviteAt = self.lastCallInviteReceivedAt {
-                        diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
-                    }
-                    self.emitDiagnostics(diag, scope: "incoming-call")
+                var diag: [String: Any] = [
+                    "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)
+                ]
+                if let pushAt = self.lastVoipPushReceivedAt {
+                    diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
+                }
+                if let inviteAt = self.lastCallInviteReceivedAt {
+                    diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
+                }
+                self.emitDiagnostics(diag, scope: "incoming-call")
 
-                    if let error = error {
-                        self.lastCallKitReportError = error.localizedDescription
-                        self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call: \(error.localizedDescription)", isError: false)
-                        self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
-                                                        reason: error.localizedDescription,
-                                                        callUUID: uuid,
-                                                        callInvite: self.callInvite)
-                    } else {
-                        self.lastCallKitReportError = nil
-                        self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
-                    }
+                if let error = error {
+                    self.lastCallKitReportError = error.localizedDescription
+                    self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call: \(error.localizedDescription)", isError: false)
+                    self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
+                                                    reason: error.localizedDescription,
+                                                    callUUID: uuid,
+                                                    callInvite: self.callInvite)
+                } else {
+                    self.lastCallKitReportError = nil
+                    self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
                 }
             }
         }
+}
     
     func performEndCallAction(uuid: UUID) {
         
@@ -2147,16 +2084,16 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     }
 
     func signOutAndDisableVoip() {
-    
     if let token = self.accessToken, let dev = self.deviceToken {
         TwilioVoiceSDK.unregister(accessToken: token, deviceToken: dev) { _ in }
     }
-    // Disable PushKit & clear local state
-    voipRegistry.desiredPushTypes = []
+    // Keep voipRegistry.desiredPushTypes = [.voIP]
     self.accessToken = nil
-    self.deviceToken = nil
+    UserDefaults.standard.removeObject(forKey: kAccessTokenKey)
+    // Do NOT nil out deviceToken; iOS/APNs tracks that for you.
+      voipRegistry.desiredPushTypes = []
     UserDefaults.standard.removeObject(forKey: kCachedBindingDate)
-    sendPhoneCallEvents(description: "LOG|Signed out: VoIP disabled, tokens cleared", isError: false)
+    sendPhoneCallEvents(description: "LOG|Signed out: Twilio unregistered; still registered with PushKit", isError: false)
     }
 
 }
