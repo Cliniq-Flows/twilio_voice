@@ -711,7 +711,7 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 accessToken?.let { token ->
                     context?.let { ctx ->
                         // from and to removed; pass empty strings
-                        val success = placeCall(ctx, token, "", "", params, connect = true)
+                        val success = placeCall(ctx, token, null, null, params, connect = true)
                         result.success(success)
                     } ?: run {
                         Log.e(TAG, "Context is null, cannot place call")
@@ -1158,8 +1158,12 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         connect: Boolean = false
     ): Boolean {
         assert(accessToken.isNotEmpty()) { "Twilio Access Token cannot be empty" }
-        assert(!connect && (to == null || to.isNotEmpty())) { "To cannot be empty" }
-        assert(!connect && (from == null || from.isNotEmpty())) { "From cannot be empty" }
+        if (!connect) {
+            assert(to == null || to.isNotEmpty()) { "To cannot be empty" }
+            assert(from == null || from.isNotEmpty()) { "From cannot be empty" }
+        }
+//        assert(!connect && (to == null || to.isNotEmpty())) { "To cannot be empty" }
+//        assert(!connect && (from == null || from.isNotEmpty())) { "From cannot be empty" }
 
         telecomManager?.let { tm ->
             if (!tm.hasCallCapableAccount(ctx, TVConnectionService::class.java.name)) {
@@ -1199,8 +1203,8 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 if(connect) {
                     putExtra(TVConnectionService.EXTRA_CONNECT_RAW, true)
                 }
-                putExtra(TVConnectionService.EXTRA_TO, to)
-                putExtra(TVConnectionService.EXTRA_FROM, from)
+                if (to != null)   putExtra(TVConnectionService.EXTRA_TO, to)
+                if (from != null) putExtra(TVConnectionService.EXTRA_FROM, from)
                 putExtra(TVConnectionService.EXTRA_OUTGOING_PARAMS, Bundle().apply {
                     for ((key, value) in params) {
                         putString(key, value)
