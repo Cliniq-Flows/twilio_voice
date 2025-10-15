@@ -185,6 +185,17 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                 result(false);
             }
         }
+        else  if flutterCall.method == "updateDisplayName" {
+        guard let args = flutterCall.arguments as? [String:Any],
+              let newName = args["name"] as? String
+        else {
+            result(FlutterError(code: "INVALID_ARGS", message: "Missing name", details: nil))
+            return
+        }
+        updateCurrentCallDisplayName(to: newName)
+        result(true)
+        return
+    } 
         else if flutterCall.method == "toggleSpeaker"
         {
             guard let speakerIsOn = arguments["speakerIsOn"] as? Bool else {return}
@@ -367,6 +378,31 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
         result(true)
     }
+
+    func updateCurrentCallDisplayName(to newName: String) {
+    guard let activeCall = self.call else {
+        NSLog("No active call to update")
+        return
+    }
+    // Unwrap the optional UUID
+    guard let uuid = activeCall.uuid else {
+        NSLog("Active call has no UUID")
+        return
+    }
+
+    // Build a CXCallUpdate
+    let update = CXCallUpdate()
+    update.remoteHandle = CXHandle(type: .generic, value: activeCall.to ?? activeCall.from ?? "")
+    update.localizedCallerName = newName
+    update.supportsDTMF = true
+    update.supportsHolding = true
+    update.supportsGrouping = false
+    update.supportsUngrouping = false
+    update.hasVideo = false
+
+    // Tell CallKit to apply it
+    callKitProvider.reportCall(with: uuid, updated: update)
+}
     
     /// Set and persist call logging in app preferences
     /// - Parameter value: value, true if it should be enabled

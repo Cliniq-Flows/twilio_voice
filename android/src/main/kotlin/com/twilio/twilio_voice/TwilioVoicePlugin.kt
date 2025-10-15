@@ -945,6 +945,18 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 result.success(true)
             }
 
+            TVMethodChannels.UPDATE_DISPLAY_NAME -> {
+                // Retrieve the new display name from the arguments.
+                val newDisplayName = call.argument<String>("name") ?: run {
+                    result.error("MALFORMED_ARGUMENTS", "Missing 'name' argument", null)
+                    return@onMethodCall
+                }
+                // Call a helper function to send the intent to update display name.
+                updateDisplayName(newDisplayName)
+                result.success(true)
+            }
+
+
             TVMethodChannels.REJECT_CALL_ON_NO_PERMISSIONS -> {
                 val shouldRejectOnNoPermissions = call.argument<Boolean>("shouldReject") ?: run {
                     result.error(
@@ -988,6 +1000,16 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
         }
     }
     //endregion
+
+    private fun updateDisplayName(displayName: String) {
+        context?.let { ctx ->
+            Intent(ctx, TVConnectionService::class.java).apply {
+                action = TVMethodChannels.UPDATE_DISPLAY_NAME.method
+                putExtra("name", displayName)
+                ctx.startService(this)
+            }
+        }
+    }
 
     private fun sendDigits(digits: String): Boolean {
         // Send to active call via Intent

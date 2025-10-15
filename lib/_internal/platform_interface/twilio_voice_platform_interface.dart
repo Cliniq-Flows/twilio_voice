@@ -202,4 +202,8 @@ abstract class TwilioVoicePlatform extends SharedPlatformInterface {
   ///
   /// Defaults to true.
   Future<void> enableCallLogging({bool enable = true});
+
+  Future<bool?> updateDisplayName({
+    required String displayName,
+  });
 }
