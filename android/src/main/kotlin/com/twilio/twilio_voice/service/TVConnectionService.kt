@@ -359,22 +359,37 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_ANSWER -> {
+                    // if (!hasVoipAudioFocus) acquireVoipAudioFocus()
+                    // val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: run {
+                    //     Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
+                    //     return@let
+                    // }
+
+                    // val connection = getConnection(callHandle) ?: run {
+                    //     Log.e(TAG, "onStartCommand: [ACTION_HANGUP] could not find connection for callHandle: $callHandle")
+                    //     return@let
+                    // }
+
+                    // if(connection is TVCallInviteConnection) {
+                    //     connection.acceptInvite()
+                    // } else {
+                    //     Log.e(TAG, "onStartCommand: [ACTION_ANSWER] could not find connection for callHandle: $callHandle")
+                    // }
                     if (!hasVoipAudioFocus) acquireVoipAudioFocus()
-                    val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: run {
-                        Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
-                        return@let
-                    }
 
-                    val connection = getConnection(callHandle) ?: run {
-                        Log.e(TAG, "onStartCommand: [ACTION_HANGUP] could not find connection for callHandle: $callHandle")
-                        return@let
-                    }
+    val incomingHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getIncomingCallHandle() ?: return@let
 
-                    if(connection is TVCallInviteConnection) {
-                        connection.acceptInvite()
-                    } else {
-                        Log.e(TAG, "onStartCommand: [ACTION_ANSWER] could not find connection for callHandle: $callHandle")
-                    }
+    // NEW: if there’s an already ACTIVE call that’s not this one, put it on HOLD
+    getActiveCallHandle()?.let { activeHandle ->
+        if (activeHandle != incomingHandle) {
+            getConnection(activeHandle)?.toggleHold(true)
+        }
+    }
+
+    val connection = getConnection(incomingHandle) ?: return@let
+    if (connection is TVCallInviteConnection) {
+        connection.acceptInvite()
+    }
                 }
 
                 ACTION_HANGUP -> {
@@ -392,7 +407,7 @@ class TVConnectionService : ConnectionService() {
   } else {
     Log.e(TAG, "hangup(): could not find connection for $callHandle")
   }
-                    if (hasVoipAudioFocus) releaseVoipAudioFocus()
+                    // if (hasVoipAudioFocus) releaseVoipAudioFocus()
                 //     storage.clearCustomParams()
                 //      val callHandle = it.getStringExtra(EXTRA_CALL_HANDLE) ?: getActiveCallHandle() ?: run {
                 //         Log.e(TAG, "onStartCommand: ACTION_HANGUP is missing String EXTRA_CALL_HANDLE")
@@ -720,7 +735,10 @@ class TVConnectionService : ConnectionService() {
             }
 
             override fun onConnectFailure(call: Call, error: CallException) {
-                if (hasVoipAudioFocus) releaseVoipAudioFocus()
+             if (activeConnections.isEmpty() && hasVoipAudioFocus) {
+        releaseVoipAudioFocus()
+    }
+    conferenceConnection.disconnect()
                 Log.e(TAG, "Conference connect failure: ${error.message}")
                 if (error.errorCode == 31603) {
                     sendBroadcastEvent(
@@ -753,7 +771,10 @@ class TVConnectionService : ConnectionService() {
             }
 
             override fun onDisconnected(call: Call, error: CallException?) {
-                if (hasVoipAudioFocus) releaseVoipAudioFocus()
+               if (activeConnections.isEmpty() && hasVoipAudioFocus) {
+        releaseVoipAudioFocus()
+    }
+  
                 Log.d(TAG, "Conference disconnected")
                 // this kicks off your telecom onDisconnect handler, which will remove from activeConnections
                 conferenceConnection.disconnect()
@@ -1006,13 +1027,12 @@ class TVConnectionService : ConnectionService() {
             storage.clearCustomParams()
             activeConnections.remove(callSid)
             if (activeConnections.isEmpty() && hasVoipAudioFocus) {
-    releaseVoipAudioFocus()
+        releaseVoipAudioFocus()
 }
             sendBroadcastEvent(applicationContext, TVBroadcastReceiver.ACTION_CALL_ENDED, callSid)
             sendBroadcastCallHandle(applicationContext, null)
 
-            // NEW: always release audio focus on teardown
-            if (hasVoipAudioFocus) releaseVoipAudioFocus()
+          
 
             stopForegroundService()
             stopSelfSafe()

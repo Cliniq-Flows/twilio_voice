@@ -1578,7 +1578,7 @@ private fun stopOutgoingRingtone() {
 
     override fun onDetachedFromActivity() {
         Log.d(TAG, "onDetachedFromActivity")
-         hangupIfActive()
+        // hangupIfActive()
         unregisterReceiver()
         activity = null
     }
