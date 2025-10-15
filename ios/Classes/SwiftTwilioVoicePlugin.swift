@@ -684,11 +684,15 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          */
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
         
-        var from:String = callInvite.from ?? defaultCaller
-        from = from.replacingOccurrences(of: "client:", with: "")
+        let first = (callInvite.customParameters?["firstname"] as? String ?? "")
+        let last  = (callInvite.customParameters?["lastname"]  as? String ?? "")
+        var fromx1 = callInvite.from ?? ""
+         fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
+        // var from:String = callInvite.from ?? defaultCaller
+        // from = from.replacingOccurrences(of: "client:", with: "")
         
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        reportIncomingCall(from: from, uuid: callInvite.uuid)
+        reportIncomingCall(from: fromx1, uuid: callInvite.uuid)
         self.callInvite = callInvite
     }
     
@@ -708,7 +712,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func cancelledCallInviteReceived(cancelledCallInvite: CancelledCallInvite, error: Error) {
         self.sendPhoneCallEvents(description: "Missed Call", isError: false)
         self.sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
-        self.showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
+        self.showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to,
+        customParams: self.callInvite.customParameters)
         if (self.callInvite == nil) {
             self.sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
             return
@@ -719,7 +724,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
     
-    func showMissedCallNotification(from:String?, to:String?){
+    func showMissedCallNotification(from:String?, to:String?,customParams: [String:Any]? = nil){
         guard UserDefaults.standard.optionalBool(forKey: "show-notifications") ?? true else{return}
         let notificationCenter = UNUserNotificationCenter.current()
 
@@ -741,10 +746,18 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                 }
             }
 
-            let title = userName ?? self.clients["defaultCaller"] ?? self.defaultCaller
-            content.title = title
-            content.body = NSLocalizedString("notification_missed_call_body", comment: "")
+            // let title = userName ?? self.clients["defaultCaller"] ?? self.defaultCaller
+            // content.title = title
+            // content.body = NSLocalizedString("notification_missed_call_body", comment: "")
+            let first = (customParams?["firstname"] as? String ?? "")
+            let last  = (customParams?["lastname"]  as? String ?? "")
+            let full  = "\(first) \(last)".trimmingCharacters(in: .whitespaces)
+            let resolved = !full.isEmpty ? full :
+                        (callerId.flatMap { self.clients[$0] } ??
+                            self.clients["defaultCaller"] ?? self.defaultCaller)
 
+            content.title = "Missed call"
+            content.body  = "Missed call from \(resolved)"
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
             let request = UNNotificationRequest(identifier: UUID().uuidString,
                                                 content: content,
