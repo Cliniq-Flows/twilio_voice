@@ -1597,55 +1597,125 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     //     }
     // }
     
-   func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
-       let tStarted = Date()
-        let firstname = from.capitalized
-        let lastname = fromx.capitalized
-        let number = fromx1
-        let combine = "\(firstname) \(lastname)"
-        let finale = combine.trimmingCharacters(in: .whitespaces).isEmpty ? number : combine
+//    func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
+//        let tStarted = Date()
+//         let firstname = from.capitalized
+//         let lastname = fromx.capitalized
+//         let number = fromx1
+//         let combine = "\(firstname) \(lastname)"
+//         let finale = combine.trimmingCharacters(in: .whitespaces).isEmpty ? number : combine
         
-        let callHandle = CXHandle(type: .generic, value: finale.capitalized)
-        let callUpdate = CXCallUpdate()
-        callUpdate.remoteHandle = callHandle
-        callUpdate.localizedCallerName = finale
-        callUpdate.supportsDTMF = true
-        callUpdate.supportsHolding = true
-        callUpdate.supportsGrouping = false
-        callUpdate.supportsUngrouping = false
-        callUpdate.hasVideo = false
+//         let callHandle = CXHandle(type: .generic, value: finale.capitalized)
+//         let callUpdate = CXCallUpdate()
+//         callUpdate.remoteHandle = callHandle
+//         callUpdate.localizedCallerName = finale
+//         callUpdate.supportsDTMF = true
+//         callUpdate.supportsHolding = true
+//         callUpdate.supportsGrouping = false
+//         callUpdate.supportsUngrouping = false
+//         callUpdate.hasVideo = false
         
-        callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
-              let tCompleted = Date()
-            self.lastCallKitReportTimestamp = tCompleted
-            self.lastIncomingCallUUID = uuid
+//         callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+//               let tCompleted = Date()
+//             self.lastCallKitReportTimestamp = tCompleted
+//             self.lastIncomingCallUUID = uuid
 
-            var diag: [String: Any] = [
-            "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)  // time inside report call
-        ]
-        if let pushAt = self.lastVoipPushReceivedAt {
-            diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
-        }
-        if let inviteAt = self.lastCallInviteReceivedAt {
-            diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
-        }
+//             var diag: [String: Any] = [
+//             "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)  // time inside report call
+//         ]
+//         if let pushAt = self.lastVoipPushReceivedAt {
+//             diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
+//         }
+//         if let inviteAt = self.lastCallInviteReceivedAt {
+//             diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
+//         }
 
-        // Emit one compact JSON diagnostic line (uses your existing helper)
-        self.emitDiagnostics(diag, scope: "incoming-call")
+//         // Emit one compact JSON diagnostic line (uses your existing helper)
+//         self.emitDiagnostics(diag, scope: "incoming-call")
 
-            if let error = error {
-                self.lastCallKitReportError = error.localizedDescription
-                self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).", isError: false)
-                self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
-                                                reason: error.localizedDescription,
-                                                callUUID: uuid,
-                                                callInvite: self.callInvite)
-            } else {
-                self.lastCallKitReportError = nil
-                self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
+//             if let error = error {
+//                 self.lastCallKitReportError = error.localizedDescription
+//                 self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call successfully: \(error.localizedDescription).", isError: false)
+//                 self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
+//                                                 reason: error.localizedDescription,
+//                                                 callUUID: uuid,
+//                                                 callInvite: self.callInvite)
+//             } else {
+//                 self.lastCallKitReportError = nil
+//                 self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
+//             }
+//         }
+//     }
+        func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
+            let tStarted = Date()
+
+            let firstname = from.trimmingCharacters(in: .whitespacesAndNewlines)
+            let lastname  = fromx.trimmingCharacters(in: .whitespacesAndNewlines)
+            let numberRaw = fromx1
+                .replacingOccurrences(of: "client:", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let fullName = "\(firstname) \(lastname)".trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Prefer full name → number → known client → constant
+            var display = !fullName.isEmpty
+                ? fullName
+                : (!numberRaw.isEmpty
+                    ? numberRaw
+                    : (self.clients[numberRaw] ?? self.clients["defaultCaller"] ?? self.defaultCaller))
+
+            if display.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                display = "Unknown Caller"
+            }
+
+            // Choose handle type/value
+            let digits = numberRaw.filter(\.isNumber)
+            let isPhoneLike = !numberRaw.isEmpty && (numberRaw.hasPrefix("+") || digits.count >= 3)
+            let handleType: CXHandle.HandleType = isPhoneLike ? .phoneNumber : .generic
+            let handleValue = isPhoneLike ? numberRaw : display
+
+            let callHandle = CXHandle(type: handleType, value: handleValue)
+
+            let callUpdate = CXCallUpdate()
+            callUpdate.remoteHandle = callHandle
+            callUpdate.localizedCallerName = display
+            callUpdate.supportsDTMF = true
+            callUpdate.supportsHolding = true
+            callUpdate.supportsGrouping = false
+            callUpdate.supportsUngrouping = false
+            callUpdate.hasVideo = false
+
+            DispatchQueue.main.async {
+                self.callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+                    let tCompleted = Date()
+                    self.lastCallKitReportTimestamp = tCompleted
+                    self.lastIncomingCallUUID = uuid
+
+                    var diag: [String: Any] = [
+                        "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)
+                    ]
+                    if let pushAt = self.lastVoipPushReceivedAt {
+                        diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
+                    }
+                    if let inviteAt = self.lastCallInviteReceivedAt {
+                        diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
+                    }
+                    self.emitDiagnostics(diag, scope: "incoming-call")
+
+                    if let error = error {
+                        self.lastCallKitReportError = error.localizedDescription
+                        self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call: \(error.localizedDescription)", isError: false)
+                        self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
+                                                        reason: error.localizedDescription,
+                                                        callUUID: uuid,
+                                                        callInvite: self.callInvite)
+                    } else {
+                        self.lastCallKitReportError = nil
+                        self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
+                    }
+                }
             }
         }
-    }
     
     func performEndCallAction(uuid: UUID) {
         
