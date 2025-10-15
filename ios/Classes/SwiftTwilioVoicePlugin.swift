@@ -88,17 +88,17 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
     private var activeCalls: [UUID: CXCall] = [:]
 
-    private static let volumeView: MPVolumeView = {
-    let v = MPVolumeView(frame: .zero)
-    v.showsRouteButton = false
-    v.isHidden = true
-    DispatchQueue.main.async {
-      if let window = UIApplication.shared.windows.first {
-        window.addSubview(v)
-      }
-    }
-    return v
-  }()
+//     private static let volumeView: MPVolumeView = {
+//     let v = MPVolumeView(frame: .zero)
+//     v.showsRouteButton = false
+//     v.isHidden = true
+//     DispatchQueue.main.async {
+//       if let window = UIApplication.shared.windows.first {
+//         window.addSubview(v)
+//       }
+//     }
+//     return v
+//   }()
   // ——————————————————————————————————————
     // MARK: Shared-Prefs Helpers 🔥 END
     // ——————————————————————————————————————
@@ -612,10 +612,10 @@ let newIcon = arguments["icon"] as? String ?? SwiftTwilioVoicePlugin.defaultCall
 
 private static func ensureVolumeViewAttachedIfPossible() {
   // Only touch UIKit windowing when app is active and a keyWindow exists
-  guard Thread.isMainThread else {
-    DispatchQueue.main.async { ensureVolumeViewAttachedIfPossible() }
-    return
-  }
+ guard Thread.isMainThread else {
+  DispatchQueue.main.async { Self.ensureVolumeViewAttachedIfPossible() }
+  return
+}
   guard UIApplication.shared.applicationState == .active else { return }
   guard let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) else { return }
   if !window.subviews.contains(where: { $0 === volumeView }) {
@@ -1573,45 +1573,83 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
         callUpdate.supportsGrouping = false
         callUpdate.supportsUngrouping = false
         callUpdate.hasVideo = false
+        
+        let doReport: () -> Void = { [weak self] in
+  guard let self = self else { return }
+  self.callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+    let tCompleted = Date()
+    self.lastCallKitReportTimestamp = tCompleted
+    self.lastIncomingCallUUID = uuid
 
-        DispatchQueue.main.async {
-            let doReport = { [weak self] in
-            guard let self = self else { return }
-            self.callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
-                let tCompleted = Date()
-                self.lastCallKitReportTimestamp = tCompleted
-                self.lastIncomingCallUUID = uuid
-
-                var diag: [String: Any] = [
-                    "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)
-                ]
-                if let pushAt = self.lastVoipPushReceivedAt {
-                    diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
-                }
-                if let inviteAt = self.lastCallInviteReceivedAt {
-                    diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
-                }
-                self.emitDiagnostics(diag, scope: "incoming-call")
-
-                if let error = error {
-                    self.lastCallKitReportError = error.localizedDescription
-                    self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call: \(error.localizedDescription)", isError: false)
-                    self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
-                                                    reason: error.localizedDescription,
-                                                    callUUID: uuid,
-                                                    callInvite: self.callInvite)
-                } else {
-                    self.lastCallKitReportError = nil
-                    self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
-                }
-            }
-         }
-        }
-            if providerReady {
-        DispatchQueue.main.async(execute: doReport)
-    } else {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: doReport)
+    var diag: [String: Any] = [
+      "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)
+    ]
+    if let pushAt = self.lastVoipPushReceivedAt {
+      diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
     }
+    if let inviteAt = self.lastCallInviteReceivedAt {
+      diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
+    }
+    self.emitDiagnostics(diag, scope: "incoming-call")
+
+    if let error = error {
+      self.lastCallKitReportError = error.localizedDescription
+      self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call: \(error.localizedDescription)", isError: false)
+      self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
+                                      reason: error.localizedDescription,
+                                      callUUID: uuid,
+                                      callInvite: self.callInvite)
+    } else {
+      self.lastCallKitReportError = nil
+      self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
+    }
+  }
+}
+
+// If provider is ready, report immediately on main; otherwise, wait a tick.
+if providerReady {
+  DispatchQueue.main.async(execute: doReport)
+} else {
+  DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: doReport)
+}
+    //     DispatchQueue.main.async {
+    //         let doReport = { [weak self] in
+    //         guard let self = self else { return }
+    //         self.callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+    //             let tCompleted = Date()
+    //             self.lastCallKitReportTimestamp = tCompleted
+    //             self.lastIncomingCallUUID = uuid
+
+    //             var diag: [String: Any] = [
+    //                 "msReportCallback": Int(tCompleted.timeIntervalSince(tStarted) * 1000)
+    //             ]
+    //             if let pushAt = self.lastVoipPushReceivedAt {
+    //                 diag["msSinceVoipPushToReportCallback"] = Int(tCompleted.timeIntervalSince(pushAt) * 1000)
+    //             }
+    //             if let inviteAt = self.lastCallInviteReceivedAt {
+    //                 diag["msSinceInviteToReportCallback"] = Int(tCompleted.timeIntervalSince(inviteAt) * 1000)
+    //             }
+    //             self.emitDiagnostics(diag, scope: "incoming-call")
+
+    //             if let error = error {
+    //                 self.lastCallKitReportError = error.localizedDescription
+    //                 self.sendPhoneCallEvents(description: "LOG|Failed to report incoming call: \(error.localizedDescription)", isError: false)
+    //                 self.logIncomingCallDiagnostics(trigger: "callkit_report_failed",
+    //                                                 reason: error.localizedDescription,
+    //                                                 callUUID: uuid,
+    //                                                 callInvite: self.callInvite)
+    //             } else {
+    //                 self.lastCallKitReportError = nil
+    //                 self.sendPhoneCallEvents(description: "LOG|Incoming call successfully reported.", isError: false)
+    //             }
+    //         }
+    //      }
+    //     }
+    //         if providerReady {
+    //     DispatchQueue.main.async(execute: doReport)
+    // } else {
+    //     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: doReport)
+    // }
 }
     
     func performEndCallAction(uuid: UUID) {
