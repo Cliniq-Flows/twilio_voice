@@ -689,19 +689,21 @@ class TVConnectionService : ConnectionService() {
         Log.d(TAG, "onCreateOutgoingConnection")
 
         val topExtras = request?.extras
-        // ✅ pull our payload from EXTRA_OUTGOING_CALL_EXTRAS, not directly from request.extras
-        val outgoingExtras = topExtras?.getBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS) ?: run {
-            Log.e(TAG, "onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_CALL_EXTRAS")
-            throw Exception("onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_CALL_EXTRAS")
-        }
-        val myBundle: Bundle = outgoingExtras.getBundle(EXTRA_OUTGOING_PARAMS) ?: run {
-            Log.e(TAG, "onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS")
-            throw Exception("onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS")
+
+// Try the new path first (what onStartCommand now builds)
+        val outgoingExtras: Bundle? = topExtras?.getBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS)
+
+// Fallback: older path that put EXTRA_OUTGOING_PARAMS directly on request.extras
+        val myBundle: Bundle = (
+                outgoingExtras?.getBundle(EXTRA_OUTGOING_PARAMS)
+                    ?: topExtras?.getBundle(EXTRA_OUTGOING_PARAMS)
+                ) ?: run {
+            Log.e(TAG, "onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS / OUTGOING_CALL_EXTRAS")
+            throw Exception("onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS / OUTGOING_CALL_EXTRAS")
         }
 
-        // ✅ detect raw via the flag we set in onStartCommand
-        val isRawConnect: Boolean = outgoingExtras.getBoolean(EXTRA_CONNECT_RAW, false)
-
+// Raw flag only exists in the new path. If we’re on the fallback, it’s a normal (non-raw) call.
+        val isRawConnect: Boolean = (outgoingExtras?.getBoolean(EXTRA_CONNECT_RAW, false) == true)
         // token always required
         val token: String = myBundle.getString(EXTRA_TOKEN) ?: run {
             Log.e(TAG, "onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
@@ -779,7 +781,7 @@ class TVConnectionService : ConnectionService() {
         connection.setOnCallStateListener(onCallStateListener)
         connection.setOnCallDisconnected(onCallInitializingDisconnectedListener)
         connection.setInitializing()
-        connection.extras = request.extras
+        connection.extras = request?.extras
         startForegroundService()
         return connection
     }
