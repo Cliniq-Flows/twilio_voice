@@ -548,14 +548,24 @@ class TVConnectionService : ConnectionService() {
                     // IMPORTANT: Build a SAFE Uri.
                     // Raw connect => we are not dialing a PSTN/client target; use a custom scheme with a non-null SSP.
                     // Non-raw => keep your existing PSTN/client tel: behavior.
-                    val address: Uri = if (rawConnect) {
-                        val conf = params["conference"] ?: "connect"
-                        Uri.fromParts("conf", conf, null)
-                    } else {
-                        Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
-                    }
+                    // val address: Uri = if (rawConnect) {
+                    //     val conf = params["conference"] ?: "connect"
+                    //     Uri.fromParts("conf", conf, null)
+                    // } else {
+                    //     Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
+                    // }
 
-                    telecomManager.placeCall(address, extras)
+                    // telecomManager.placeCall(address, extras)
+                    val address: Uri = if (rawConnect) {
+                    val conf = params["conference"] ?: "connect"
+                    Uri.fromParts("conf", conf, null)
+                } else {
+                    Uri.fromParts(PhoneAccount.SCHEME_TEL, to, null)
+                }
+
+                // Helpful diagnostic: confirm scheme used
+                Log.d(TAG, "placeCall address=${address.scheme}:${address.schemeSpecificPart} raw=$rawConnect to=$to")
+                telecomManager.placeCall(address, extras)
                 }
 
 
@@ -690,21 +700,24 @@ class TVConnectionService : ConnectionService() {
 
         val topExtras = request?.extras
 
-// Try the new path first (what onStartCommand now builds)
-        val outgoingExtras: Bundle? = topExtras?.getBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS)
+// Prefer new path (EXTRA_OUTGOING_CALL_EXTRAS), but fall back to legacy
+val outgoingExtras: Bundle? = topExtras?.getBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS)
+val myBundle: Bundle = (
+    outgoingExtras?.getBundle(EXTRA_OUTGOING_PARAMS)
+        ?: topExtras?.getBundle(EXTRA_OUTGOING_PARAMS)
+) ?: run {
+    Log.e(TAG, "onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS / OUTGOING_CALL_EXTRAS")
+    throw Exception("onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS / OUTGOING_CALL_EXTRAS")
+}
 
-// Fallback: older path that put EXTRA_OUTGOING_PARAMS directly on request.extras
-        val myBundle: Bundle = (
-                outgoingExtras?.getBundle(EXTRA_OUTGOING_PARAMS)
-                    ?: topExtras?.getBundle(EXTRA_OUTGOING_PARAMS)
-                ) ?: run {
-            Log.e(TAG, "onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS / OUTGOING_CALL_EXTRAS")
-            throw Exception("onCreateOutgoingConnection: request is missing Bundle EXTRA_OUTGOING_PARAMS / OUTGOING_CALL_EXTRAS")
-        }
+// Detect raw flag from either place; fallback to false for classic calls
+val isRawConnect: Boolean =
+    (outgoingExtras?.getBoolean(EXTRA_CONNECT_RAW, false) == true) ||
+    (topExtras?.getBoolean(EXTRA_CONNECT_RAW, false) == true) ||
+    // Last-resort heuristic: no To/From in params
+    (myBundle.getString(EXTRA_TO) == null && myBundle.getString(EXTRA_FROM) == null)
 
-// Raw flag only exists in the new path. If we’re on the fallback, it’s a normal (non-raw) call.
-        val isRawConnect: Boolean = (outgoingExtras?.getBoolean(EXTRA_CONNECT_RAW, false) == true)
-        // token always required
+
         val token: String = myBundle.getString(EXTRA_TOKEN) ?: run {
             Log.e(TAG, "onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
             throw Exception("onCreateOutgoingConnection: ACTION_PLACE_OUTGOING_CALL is missing String EXTRA_TOKEN")
