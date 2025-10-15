@@ -36,6 +36,7 @@ import com.twilio.twilio_voice.types.TelecomManagerExtension.registerPhoneAccoun
 import com.twilio.twilio_voice.types.ValueBundleChanged
 import com.twilio.voice.*
 import com.twilio.voice.Call
+import org.json.JSONObject
 
 class TVConnectionService : ConnectionService() {
 
@@ -259,6 +260,15 @@ class TVConnectionService : ConnectionService() {
                         return@let
                     }
 
+                     // Extract firstname and lastname from the custom parameters (if available)
+                    val firstName = callInvite.customParameters["firstname"] ?: ""
+                    val lastName = callInvite.customParameters["lastname"] ?: ""
+                    // Also clean up the default 'from' value (remove any unwanted prefix)
+                    var fromCleaned = callInvite.from ?: ""
+                    fromCleaned = fromCleaned.replace("client:", "")
+
+                    val incomingJson = JSONObject(callInvite.customParameters).toString()
+                     val displayName = "$firstName $lastName".trim()
                     val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
                     if (!telecomManager.canReadPhoneState(applicationContext)) {
                         Log.e(TAG, "onCallInvite: Permission to read phone state not granted or requested.")
@@ -292,6 +302,9 @@ class TVConnectionService : ConnectionService() {
 
                     val myBundle: Bundle = Bundle().apply {
                         putParcelable(EXTRA_INCOMING_CALL_INVITE, callInvite)
+                          if (displayName.isNotEmpty()) {
+                            putString(TelecomManager.EXTRA_CALL_SUBJECT, displayName)
+                        }
                     }
                     myBundle.classLoader = CallInvite::class.java.classLoader
 
@@ -300,8 +313,11 @@ class TVConnectionService : ConnectionService() {
                         putBundle(TelecomManager.EXTRA_INCOMING_CALL_EXTRAS, myBundle)
                         putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccountHandle)
 
-                        if (callInvite.customParameters.containsKey("_TWI_SUBJECT")) {
-                            putString(TelecomManager.EXTRA_CALL_SUBJECT, callInvite.customParameters["_TWI_SUBJECT"])
+                        // if (callInvite.customParameters.containsKey("_TWI_SUBJECT")) {
+                        //     putString(TelecomManager.EXTRA_CALL_SUBJECT, callInvite.customParameters["_TWI_SUBJECT"])
+                        // }
+                        if (displayName.isNotEmpty()) {
+                            putString(TelecomManager.EXTRA_CALL_SUBJECT, displayName)
                         }
                     }
 
@@ -499,6 +515,15 @@ class TVConnectionService : ConnectionService() {
             throw Exception("onCreateIncomingConnection: request is missing CallInvite EXTRA_INCOMING_CALL_INVITE");
         }
 
+          val firstName = ci.customParameters["firstname"] ?: ""
+            val lastName = ci.customParameters["lastname"] ?: ""
+            // Use custom display name if available, otherwise default to callInvite.from
+            val displayName = if (firstName.isNotEmpty() || lastName.isNotEmpty()) {
+                "$firstName $lastName".trim()
+            } else {
+                ci.from ?: ""
+            }
+
         // Create storage instance for call parameters
         val storage: Storage = StorageImpl(applicationContext)
 
@@ -517,6 +542,11 @@ class TVConnectionService : ConnectionService() {
         // Setup connection event listeners and UI parameters
         attachCallEventListeners(connection, ci.callSid)
         applyParameters(connection, callParams)
+        // **Override the caller display name here using the custom displayName**
+            connection.setCallerDisplayName(displayName, TelecomManager.PRESENTATION_ALLOWED)
+            // Optionally, if you want the address to use the displayName rather than the phone number:
+            connection.setAddress(Uri.fromParts(PhoneAccount.SCHEME_TEL, displayName, null), TelecomManager.PRESENTATION_ALLOWED)
+
         connection.setRinging()
 
         startForegroundService()
