@@ -161,7 +161,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
   audioDevice.block = DefaultAudioDevice.DefaultAVAudioSessionConfigurationBlock
 
   voipRegistry.delegate = self
-  voipRegistry.desiredPushTypes =[.voIP]
+  voipRegistry.desiredPushTypes = [.voIP]
 
   if let cached = UserDefaults.standard.string(forKey: kAccessTokenKey), !cached.isEmpty {
     self.accessToken = cached
