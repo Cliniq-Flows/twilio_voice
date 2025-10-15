@@ -695,7 +695,7 @@ static func setSystemVolume(_ level: Float) {
         // keep Twilio-compatible settings, avoid forcing speaker here
         if !ok {
             do {
-                try s.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .mixWithOthers])
+                try s.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
                 try s.setActive(true, options: [])
                 let ok2 = p.play()
                 sendPhoneCallEvents(description: "LOG|ringback: fallback play()=\(ok2)", isError: !ok2)
@@ -1190,11 +1190,12 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
         let to = (call.to ?? self.callTo)
         self.sendPhoneCallEvents(description: "Connected|\(from)|\(to)|\(direction)", isError: false)
 
-         audioDevice.block() 
+         audioDevice.block()
         audioDevice.isEnabled = true
-         wantsRingback = false
+        wantsRingback = false
+            stopRingbackTone()
         callKitCompletionCallback?(true)
-        stopRingbackTone()
+       
         saveCustomParams(callArgs as [String:Any])
         
       
@@ -1346,12 +1347,12 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     }
     
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
-        self.sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
-       audioDevice.block()       
-       audioDevice.isEnabled = true
+       sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
+        // Re-apply Twilio’s session config and enable
+        audioDevice.block()
+        audioDevice.isEnabled = true
         callkitAudioActive = true
-            if wantsRingback && ringtonePlayer == nil { playRingbackTone() }
-
+        if wantsRingback && ringtonePlayer == nil { playRingbackTone() } 
     }
     
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
