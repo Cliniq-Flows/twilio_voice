@@ -36,6 +36,7 @@ import com.twilio.twilio_voice.types.TelecomManagerExtension.registerPhoneAccoun
 import com.twilio.twilio_voice.types.ValueBundleChanged
 import com.twilio.voice.*
 import com.twilio.voice.Call
+import org.json.JSONObject
 
 class TVConnectionService : ConnectionService() {
 
@@ -267,7 +268,7 @@ class TVConnectionService : ConnectionService() {
                     fromCleaned = fromCleaned.replace("client:", "")
 
                     val incomingJson = JSONObject(callInvite.customParameters).toString()
-                    storage.saveCustomParams(incomingJson)
+                   
                    
                     Log.d(TAG, "Ringing | $firstName | ${callInvite.to} | Incoming - customParams: ${callInvite.customParameters}")
 
