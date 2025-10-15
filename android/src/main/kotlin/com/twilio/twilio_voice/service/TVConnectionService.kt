@@ -701,7 +701,7 @@ class TVConnectionService : ConnectionService() {
                 startForegroundService()
                 Log.d(TAG, "Conference connected with SID=${call.sid}")
                 // swap your temp ID → real SID
-                setActive()
+                conferenceConnection.setActive()
                 conferenceConnection.twilioCall?.sid?.let { realSid ->
                     activeConnections.remove("conference_$conferenceName")
                     activeConnections[realSid] = conferenceConnection
