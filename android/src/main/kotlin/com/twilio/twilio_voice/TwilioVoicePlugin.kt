@@ -510,6 +510,35 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 result.success(activeCallHandle)
             }
 
+            TVMethodChannels.CONNECTTOCONFERENCE -> {
+    val args = call.arguments as? Map<*, *>
+    val conferenceName = args?.get("conferenceName") as? String ?: run {
+        result.error(FlutterErrorCodes.MALFORMED_ARGUMENTS, "Missing 'conferenceName' argument", null)
+        return@onMethodCall
+    }
+    val displayName = (args["displayName"] as? String) ?: ""  // optional
+    val token = accessToken ?: run {
+        result.error(FlutterErrorCodes.MALFORMED_ARGUMENTS, "No accessToken set, are you registered?", null)
+        return@onMethodCall
+    }
+
+    context?.let { ctx ->
+        Intent(ctx, TVConnectionService::class.java).apply {
+            action = TVConnectionService.ACTION_CONNECT_TO_CONFERENCE
+            putExtra(TVConnectionService.EXTRA_CONFERENCE_NAME, conferenceName)
+            putExtra(TVConnectionService.EXTRA_TOKEN, token)
+            putExtra(TVConnectionService.EXTRA_DISPLAY_NAME, displayName)
+            // For safety, also include raw flag at top-level in case some OEM paths read it here:
+            putExtra(TVConnectionService.EXTRA_CONNECT_RAW, true)
+            ctx.startService(this)
+        }
+        result.success(true)
+    } ?: run {
+        Log.e(TAG, "Context is null, cannot start conference connect")
+        result.success(false)
+    }
+}
+
             TVMethodChannels.IS_ON_CALL -> {
                 result.success(isOnCall())
                 return

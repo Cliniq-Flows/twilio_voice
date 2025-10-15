@@ -339,6 +339,18 @@ class MethodChannelTwilioVoice extends TwilioVoicePlatform {
   }
 
   @override
+  Future<bool?> connectToConference({
+    required String conferenceName,
+    required String displayName,
+  }) {
+    final Map<String, dynamic> args = {
+      'conferenceName': conferenceName,
+      'displayName': displayName,
+    };
+    return _channel.invokeMethod('connectToConference', args);
+  }
+
+  @override
   CallEvent parseCallEvent(String state) {
     if (state.startsWith("DEVICETOKEN|")) {
       var token = state.split('|')[1];

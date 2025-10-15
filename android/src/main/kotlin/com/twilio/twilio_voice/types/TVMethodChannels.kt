@@ -49,7 +49,8 @@ enum class TVMethodChannels(val method: String) {
     IS_REJECTING_CALL_ON_NO_PERMISSIONS("isRejectingCallOnNoPermissions"),
     UPDATE_CALLKIT_ICON("updateCallKitIcon"),
     CONNECT("connect"),
-    UPDATE_DISPLAY_NAME("updateDisplayName");
+    UPDATE_DISPLAY_NAME("updateDisplayName"),
+    CONNECTTOCONFERENCE("connectToConference");
 
 
     companion object {
