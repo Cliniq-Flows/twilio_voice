@@ -877,14 +877,45 @@ UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIco
     
     // MARK: PKPushRegistryDelegate
     public func pushRegistry(_ registry: PKPushRegistry, didUpdate credentials: PKPushCredentials, for type: PKPushType) {
-        guard type == .voIP else { return }
+//         guard type == .voIP else { return }
 
-  let newToken = credentials.token  // ← add this
-  let tokenChanged = (deviceToken == nil) || (deviceToken! != newToken)
-  let shouldRegisterWithTwilio = (self.accessToken != nil) && (registrationRequired() || tokenChanged)
+//   let newToken = credentials.token  // ← add this
+//   let tokenChanged = (deviceToken == nil) || (deviceToken! != newToken)
+//   let shouldRegisterWithTwilio = (self.accessToken != nil) && (registrationRequired() || tokenChanged)
 
-  if shouldRegisterWithTwilio, let token = self.accessToken {
-    TwilioVoiceSDK.register(accessToken: token, deviceToken: newToken) { err in
+//   if shouldRegisterWithTwilio, let token = self.accessToken {
+//     TwilioVoiceSDK.register(accessToken: token, deviceToken: newToken) { err in
+//       if let err = err {
+//         self.sendPhoneCallEvents(description: "LOG|Twilio register error: \(err.localizedDescription)", isError: false)
+//       } else {
+//         self.sendPhoneCallEvents(description: "LOG|Registered for VoIP pushes.", isError: false)
+//       }
+//     }
+//   }
+
+//   self.deviceToken = newToken
+//   UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
+    guard type == .voIP else { return }
+
+  let newToken = credentials.token                  // raw Data (correct for Twilio)
+  let oldToken = self.deviceToken                   // keep a copy for unregister
+  let tokenChanged = (oldToken == nil) || (oldToken! != newToken)
+
+  // Always persist the new token + bump binding date
+  self.deviceToken = newToken
+  UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
+
+  // If the token changed and we had an old one bound, proactively unregister it
+  if tokenChanged, let old = oldToken, let at = self.accessToken {
+    TwilioVoiceSDK.unregister(accessToken: at, deviceToken: old) { _ in
+      self.sendPhoneCallEvents(description: "LOG|Unregistered old VoIP token", isError: false)
+    }
+  }
+
+  // Register the (new) token with Twilio when we have an access token,
+  // OR when our binding is stale (half TTL passed)
+  if let at = self.accessToken, (tokenChanged || self.registrationRequired()) {
+    TwilioVoiceSDK.register(accessToken: at, deviceToken: newToken) { err in
       if let err = err {
         self.sendPhoneCallEvents(description: "LOG|Twilio register error: \(err.localizedDescription)", isError: false)
       } else {
@@ -892,9 +923,6 @@ UserDefaults.standard.set(icon, forKey: SwiftTwilioVoicePlugin.defaultCallKitIco
       }
     }
   }
-
-  self.deviceToken = newToken
-  UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
     }
     
     /**
