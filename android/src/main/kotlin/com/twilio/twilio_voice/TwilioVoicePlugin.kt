@@ -636,6 +636,56 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                 }
             }
 
+//            TVMethodChannels.CONNECT -> {
+//                val args = call.arguments as? Map<*, *> ?: run {
+//                    result.error(
+//                        FlutterErrorCodes.MALFORMED_ARGUMENTS,
+//                        "Arguments should be a Map<*, *>",
+//                        null
+//                    )
+//                    return@onMethodCall
+//                }
+//
+//                Log.d(TAG, "Making new call via connect")
+//                logEvent("Making new call via connect")
+//                val params = HashMap<String, String>()
+//                for ((key, value) in args) {
+//                    when (key) {
+//                        Constants.PARAM_TO, Constants.PARAM_FROM -> {}
+//                        else -> {
+//                            params[key.toString()] = value.toString()
+//                        }
+//                    }
+//                }
+////                callOutgoing = true
+//                val from = call.argument<String>(Constants.PARAM_FROM) ?: run {
+//                    logEvent("No 'from' provided or invalid type, ignoring.")
+//                    ""
+//                }
+//
+//                val to = call.argument<String>(Constants.PARAM_TO) ?: run {
+//                    logEvent("No 'to' provided or invalid type, ignoring.")
+//                    ""
+//                }
+//                val paramsStringify = JSONObject(args).toString()
+//                Log.d(TAG, "calling with parameters: from: '$from' -> to: '$to', params: $paramsStringify")
+//
+//                accessToken?.let { token ->
+//                    context?.let { ctx ->
+//                        val success = placeCall(ctx, token, from, to, params, connect = true)
+//                        result.success(success)
+//                    } ?: run {
+//                        Log.e(TAG, "Context is null, cannot place call")
+//                        result.success(false)
+//                    }
+//                } ?: run {
+//                    result.error(
+//                        FlutterErrorCodes.MALFORMED_ARGUMENTS,
+//                        "No accessToken set, are you registered?",
+//                        null
+//                    )
+//                }
+//            }
             TVMethodChannels.CONNECT -> {
                 val args = call.arguments as? Map<*, *> ?: run {
                     result.error(
@@ -648,31 +698,20 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
 
                 Log.d(TAG, "Making new call via connect")
                 logEvent("Making new call via connect")
+
+                // Use all args as params (no filtering)
                 val params = HashMap<String, String>()
                 for ((key, value) in args) {
-                    when (key) {
-                        Constants.PARAM_TO, Constants.PARAM_FROM -> {}
-                        else -> {
-                            params[key.toString()] = value.toString()
-                        }
-                    }
-                }
-//                callOutgoing = true
-                val from = call.argument<String>(Constants.PARAM_FROM) ?: run {
-                    logEvent("No 'from' provided or invalid type, ignoring.")
-                    ""
+                    params[key.toString()] = value.toString()
                 }
 
-                val to = call.argument<String>(Constants.PARAM_TO) ?: run {
-                    logEvent("No 'to' provided or invalid type, ignoring.")
-                    ""
-                }
                 val paramsStringify = JSONObject(args).toString()
-                Log.d(TAG, "calling with parameters: from: '$from' -> to: '$to', params: $paramsStringify")
+                Log.d(TAG, "calling with parameters: $paramsStringify")
 
                 accessToken?.let { token ->
                     context?.let { ctx ->
-                        val success = placeCall(ctx, token, from, to, params, connect = true)
+                        // from and to removed; pass empty strings
+                        val success = placeCall(ctx, token, "", "", params, connect = true)
                         result.success(success)
                     } ?: run {
                         Log.e(TAG, "Context is null, cannot place call")
