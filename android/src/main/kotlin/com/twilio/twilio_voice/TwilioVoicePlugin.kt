@@ -1188,13 +1188,15 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
             }
 
             val callParams = HashMap<String, String>(params)
-            if (params[Constants.PARAM_TO] == null) {
-                Log.w(TAG, "Call parameters must include '${Constants.PARAM_TO}', removing...")
-                callParams.remove(Constants.PARAM_TO)
-            }
-            if (params[Constants.PARAM_FROM] == null) {
-                Log.w(TAG, "Call parameters must include '${Constants.PARAM_FROM}', removing...")
-                callParams.remove(Constants.PARAM_FROM)
+            if (!connect) {
+                if (params[Constants.PARAM_TO] == null) {
+                    Log.w(TAG, "Call parameters must include '${Constants.PARAM_TO}', removing...")
+                    callParams.remove(Constants.PARAM_TO)
+                }
+                if (params[Constants.PARAM_FROM] == null) {
+                    Log.w(TAG, "Call parameters must include '${Constants.PARAM_FROM}', removing...")
+                    callParams.remove(Constants.PARAM_FROM)
+                }
             }
 
             Intent(ctx, TVConnectionService::class.java).apply {
