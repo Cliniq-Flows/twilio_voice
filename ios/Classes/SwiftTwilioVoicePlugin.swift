@@ -120,19 +120,21 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     return "Cliniq Flows"
     }
 
-      private func buildProvider() {
-  let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
-    cfg.supportedHandleTypes = [.phoneNumber, .generic]
-    cfg.maximumCallGroups = 1
-    cfg.maximumCallsPerCallGroup = 1
-    cfg.supportsVideo = false
-    if let iconName = UserDefaults.standard.string(forKey: SwiftTwilioVoicePlugin.defaultCallKitIcon),
-   let img = UIImage(named: iconName)?.pngData() {
+    private func buildProvider() {
+        let cfg = CXProviderConfiguration(localizedName: SwiftTwilioVoicePlugin.appDisplayName())
+  cfg.supportedHandleTypes = [.phoneNumber, .generic]
+  cfg.maximumCallGroups = 1
+  cfg.maximumCallsPerCallGroup = 1
+  cfg.supportsVideo = false
+  if let iconName = UserDefaults.standard.string(forKey: SwiftTwilioVoicePlugin.defaultCallKitIcon),
+     let img = UIImage(named: iconName)?.pngData() {
     cfg.iconTemplateImageData = img
-}
-    callKitProvider = CXProvider(configuration: cfg)
-    callKitProvider.setDelegate(self, queue: nil)
-}
+  }
+
+  callKitProvider = CXProvider(configuration: cfg)
+  callKitProvider.setDelegate(self, queue: nil)
+  providerReady = true
+    }
 
         public override init() {
         voipRegistry = PKPushRegistry(queue: .main)
@@ -1005,17 +1007,16 @@ static func setSystemVolume(_ level: Float) {
        sendPhoneCallEvents(description: "LOG|pushRegistry:didReceiveIncomingPushWithPayload:forType:completion:", isError: false)
         guard type == .voIP else { completion(); return }
 
-        // Ensure provider exists (cold start safety)
-        if !providerReady {
-            buildProvider()
-            providerReady = true
-        }
-
+        // Capture for diagnostics
         lastVoipPushReceivedAt = Date()
-        lastVoipPushSummary = summarizeVoipPayload(payload.dictionaryPayload)
+        lastVoipPushSummary    = summarizeVoipPayload(payload.dictionaryPayload)
 
-        TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
-        completion()
+        // CallKit + Twilio must be touched on main
+        DispatchQueue.main.async {
+            self.ensureProviderReady()
+            TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
+            completion()
+        }
     }
 
     // MARK: CXCallObserverDelegate
@@ -1099,6 +1100,14 @@ static func setSystemVolume(_ level: Float) {
     //                            callInvite: callInvite)
     // self.sendPhoneCallEvents(description: "Ringing|\(first)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
 
+    @inline(__always)
+    private func ensureProviderReady() {
+    // If provider was invalidated or not fully built yet, (re)build it safely.
+    if !providerReady {
+        buildProvider()
+        providerReady = true
+    }
+    }
      
     
     func formatCustomParams(params: [String:Any]?)->String{
@@ -1239,11 +1248,11 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     }
     if let completion = callKitCompletionCallback { completion(false) }
 
-    if let uuid = call.uuid {
-        callKitProvider.reportCall(with: uuid, endedAt: Date(), reason: .failed)
-    } else {
-        sendPhoneCallEvents(description: "LOG|callDidFailToConnect: no UUID (cold-start race), skipping report", isError: false)
-    }
+    // if let uuid = call.uuid {
+    //     callKitProvider.reportCall(with: uuid, endedAt: Date(), reason: .failed)
+    // } else {
+    //     sendPhoneCallEvents(description: "LOG|callDidFailToConnect: no UUID (cold-start race), skipping report", isError: false)
+    // }
 
     callDisconnected()
     }
@@ -1255,11 +1264,11 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     wantsRingback = false
 
     let reason: CXCallEndedReason = (error == nil) ? .remoteEnded : .failed
-    if let uuid = call.uuid {
-        callKitProvider.reportCall(with: uuid, endedAt: Date(), reason: reason)
-    } else {
-        sendPhoneCallEvents(description: "LOG|callDidDisconnect: no UUID, skipping report", isError: false)
-    }
+    // if let uuid = call.uuid {
+    //     callKitProvider.reportCall(with: uuid, endedAt: Date(), reason: reason)
+    // } else {
+    //     sendPhoneCallEvents(description: "LOG|callDidDisconnect: no UUID, skipping report", isError: false)
+    // }
 
     sendPhoneCallEvents(description: "Call Ended", isError: false)
     if let err = error {
@@ -1453,6 +1462,8 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
     DispatchQueue.main.async { [weak self] in self?.performStartCallAction(uuid: uuid, handle: handle) }
     return
   }
+      ensureProviderReady()
+
 
   let trimmed = handle.trimmingCharacters(in: .whitespacesAndNewlines)
   guard !trimmed.isEmpty else {
@@ -1512,7 +1523,8 @@ func showMissedCallNotification(from: String?, to: String?, customParams: [Strin
 }
 
 
-        func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
+    func reportIncomingCall(from: String, fromx: String, fromx1: String, uuid: UUID) {
+        ensureProviderReady()
         let tStarted = Date()
 
         let firstname = from.trimmingCharacters(in: .whitespacesAndNewlines)
