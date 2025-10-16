@@ -694,7 +694,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
         let first = callInvite.customParameters?["firstname"] as? String ?? ""
         let last  = callInvite.customParameters?["lastname"]  as? String ?? ""
-        let fromx1 = callInvite.from ?? ""
+        var fromx1 = callInvite.from ?? ""
         fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
         // Combine first and last, trimming any extra spaces
         let fullName = "\(first) \(last)".trimmingCharacters(in: .whitespaces)
@@ -703,11 +703,10 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         let displayName = fullName.isEmpty ? fromx1 : fullName
         // var from:String = callInvite.from ?? defaultCaller
         
-        if let sid = callInvite.callSid {
-             pendingDisplayNamesBySid[sid] = displayName
-         }
+        pendingDisplayNamesBySid[callInvite.callSid] = displayName
+
         
-        self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
+        self.sendPhoneCallEvents(description: "Ringing|\(displayName)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
         reportIncomingCall(from: displayName, uuid: callInvite.uuid)
         self.callInvite = callInvite
     }
