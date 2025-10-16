@@ -58,6 +58,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private let kCustomParamsKey = "TwilioCustomParams"
     
     private var activeCalls: [UUID: CXCall] = [:]
+    private var pendingDisplayNamesBySid: [String:String] = [:] 
     
     static var appName: String {
         get {
@@ -690,12 +691,23 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
          * sent to this device/identity pair.
          */
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
+        let first = callInvite.customParameters?["firstname"] as? String ?? ""
+        let last  = callInvite.customParameters?["lastname"]  as? String ?? ""
+        let fromx1 = callInvite.from ?? ""
+        fromx1 = fromx1.replacingOccurrences(of: "client:", with: "")
+        // Combine first and last, trimming any extra spaces
+        let fullName = "\(first) \(last)".trimmingCharacters(in: .whitespaces)
+
+        // Use `fullName` if it’s not empty; otherwise fall back to `fromx1`
+        let displayName = fullName.isEmpty ? fromx1 : fullName
+        // var from:String = callInvite.from ?? defaultCaller
         
-        var from:String = callInvite.from ?? defaultCaller
-        from = from.replacingOccurrences(of: "client:", with: "")
+        if let sid = callInvite.callSid {
+             pendingDisplayNamesBySid[sid] = displayName
+         }
         
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
-        reportIncomingCall(from: from, uuid: callInvite.uuid)
+        reportIncomingCall(from: displayName, uuid: callInvite.uuid)
         self.callInvite = callInvite
     }
     
@@ -715,7 +727,17 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func cancelledCallInviteReceived(cancelledCallInvite: CancelledCallInvite, error: Error) {
         self.sendPhoneCallEvents(description: "Missed Call", isError: false)
         self.sendPhoneCallEvents(description: "LOG|cancelledCallInviteCanceled:", isError: false)
-        self.showMissedCallNotification(from: cancelledCallInvite.from, to: cancelledCallInvite.to)
+       
+        let rawFrom = (cancelledCallInvite.from ?? "").replacingOccurrences(of: "client:", with: "")
+        let resolvedDisplay = pendingDisplayNamesBySid[cancelledCallInvite.callSid]
+        ?? self.clients[rawFrom]      // optional mapping from your clients dictionary
+        ?? rawFrom                     // raw caller id/number
+        ?? self.clients["defaultCaller"]
+        ?? self.defaultCaller
+       
+        self.showMissedCallNotification(from: resolvedDisplay, to: cancelledCallInvite.to)
+        pendingDisplayNamesBySid.removeValue(forKey: cancelledCallInvite.callSid)
+
         if (self.callInvite == nil) {
             self.sendPhoneCallEvents(description: "LOG|No pending call invite", isError: false)
             return
@@ -748,9 +770,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
                 }
             }
 
-            let title = userName ?? self.clients["defaultCaller"] ?? self.defaultCaller
-            content.title = title
-            content.body = NSLocalizedString("notification_missed_call_body", comment: "")
+            let resolvedName = userName
+                ?? self.clients["defaultCaller"]
+                ?? self.defaultCaller
+            content.title = "Missed call"
+            content.body = "You have missed call from \(resolvedName)"
 
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
             let request = UNNotificationRequest(identifier: UUID().uuidString,
