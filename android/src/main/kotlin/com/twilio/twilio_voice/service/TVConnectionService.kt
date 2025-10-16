@@ -221,6 +221,9 @@ class TVConnectionService : ConnectionService() {
         fun getConnection(callSid: String): TVCallConnection? {
             return activeConnections[callSid]
         }
+
+        private fun nextActiveHandle(): String? =
+            activeConnections.keys.firstOrNull()
     }
 
     private val storage: Storage by lazy { StorageImpl(applicationContext) }
@@ -273,8 +276,14 @@ class TVConnectionService : ConnectionService() {
                         Log.e(TAG, "onStartCommand: [ACTION_CANCEL_CALL_INVITE] could not find connection for callHandle: $callHandle")
                     }
                     resumeFirstHeldCall()
-                     stopForegroundService()
-                    stopSelf()
+                    val survivor = nextActiveHandle()
+                    sendBroadcastCallHandle(applicationContext, survivor)
+
+// ⬇️ Only stop FGS if no calls remain
+                    if (activeConnections.isEmpty()) {
+                        stopForegroundService()
+                        stopSelf()
+                    }
                     return START_NOT_STICKY
                 }
 
@@ -826,12 +835,13 @@ class TVConnectionService : ConnectionService() {
             }
 
             override fun onDisconnected(call: Call, error: CallException?) {
-            
-  
-                Log.d(TAG, "Conference disconnected")
-                // this kicks off your telecom onDisconnect handler, which will remove from activeConnections
+
                 conferenceConnection.disconnect()
-                sendBroadcastCallHandle(applicationContext, null)
+
+                // ⬇️ Broadcast survivor, not null
+                val survivor = nextActiveHandle()
+                sendBroadcastCallHandle(applicationContext, survivor)
+
                 sendBroadcastEvent(
                     applicationContext,
                     TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
@@ -840,6 +850,27 @@ class TVConnectionService : ConnectionService() {
                         putString("reason", error?.message ?: "remote hangup")
                     }
                 )
+
+                // ⬇️ Only stop foreground service if no other calls remain
+                if (activeConnections.isEmpty()) {
+                    if (hasVoipAudioFocus) releaseVoipAudioFocus()
+                    stopForegroundService()
+                    stopSelfSafe()
+                }
+  
+//                Log.d(TAG, "Conference disconnected")
+//                // this kicks off your telecom onDisconnect handler, which will remove from activeConnections
+//                conferenceConnection.disconnect()
+//                sendBroadcastCallHandle(applicationContext, null)
+//                sendBroadcastEvent(
+//                    applicationContext,
+//                    TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE,
+//                    call.sid,
+//                    Bundle().apply {
+//                        putString("reason", error?.message ?: "remote hangup")
+//                    }
+//                )
+
 
             }
 
@@ -1075,20 +1106,42 @@ class TVConnectionService : ConnectionService() {
         }
         val onDisconnect: CompletionHandler<DisconnectCause> = CompletionHandler {
             dc ->
+//            connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
+//            connection.destroy()
+//            storage.clearCustomParams()
+//            activeConnections.remove(callSid)
+//            if (activeConnections.isEmpty() && hasVoipAudioFocus) {
+//        releaseVoipAudioFocus()
+//        }
+//            sendBroadcastEvent(applicationContext, TVBroadcastReceiver.ACTION_CALL_ENDED, callSid)
+//            sendBroadcastCallHandle(applicationContext, null)
+//
+//
+//
+//            stopForegroundService()
+//            stopSelfSafe()
             connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
             connection.destroy()
             storage.clearCustomParams()
+
+            // Remove the ended call
             activeConnections.remove(callSid)
+
+            // Release audio focus only if NO calls remain
             if (activeConnections.isEmpty() && hasVoipAudioFocus) {
-        releaseVoipAudioFocus()
-}
+                releaseVoipAudioFocus()
+            }
+
+            // ⬇️ NEW: broadcast the remaining active call (if any), NOT null
+            val survivor = nextActiveHandle()
             sendBroadcastEvent(applicationContext, TVBroadcastReceiver.ACTION_CALL_ENDED, callSid)
-            sendBroadcastCallHandle(applicationContext, null)
+            sendBroadcastCallHandle(applicationContext, survivor)
 
-          
-
-            stopForegroundService()
-            stopSelfSafe()
+            // ⬇️ Only stop FGS if there are no calls left
+            if (activeConnections.isEmpty()) {
+                stopForegroundService()
+                stopSelfSafe()
+            }
          }
 
          // Add to local connection cache
