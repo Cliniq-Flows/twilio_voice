@@ -794,12 +794,17 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     // MARK: TVOCallDelegate
     public func callDidStartRinging(call: Call) {
         let direction = (self.callOutgoing ? "Outgoing" : "Incoming")
-        let from = (call.from ?? self.identity)
-        let to = (call.to ?? self.callTo)
+        let from = call.from ?? self.identity ?? ""
+        let to = call.to ?? self.callTo ?? ""
+        let callSid = call.sid ?? ""
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(to)|\(direction)", isError: false)
 
         // Persist outbound params for later (missed call notification, etc.)
-        saveCustomParams(callArgs as [String:Any])
+         var params = callArgs as? [String: Any] ?? [:]
+        params["from"] = from
+        params["to"] = to
+        params["callSid"] = callSid
+        saveCustomParams(params)
 
         // Ringback tone only for outbound calls
         if self.callOutgoing {

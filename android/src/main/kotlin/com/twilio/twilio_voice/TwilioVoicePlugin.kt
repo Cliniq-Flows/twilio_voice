@@ -1984,8 +1984,14 @@ private fun stopOutgoingRingtone() {
                     }
                 }.toString()
 //                callSid = callHandle
-                val paramsJson = JSONObject(callInvite.customParameters).toString()
-            storage?.saveCustomParams(paramsJson)
+                val paramsJson = JSONObject(callInvite.customParameters).apply {
+                    put("from", callInvite.from ?: "")
+                    put("to", callInvite.to)
+                    put("callsId", callInvite.callSid)
+                }
+
+                val updatedParams = paramsJson.toString()
+                storage?.saveCustomParams(updatedParams)
                 logEvents("", arrayOf("Incoming", from, to, CallDirection.INCOMING.label, params))
                 logEvents("", arrayOf("Ringing", from, to, CallDirection.INCOMING.label, params))
             }
