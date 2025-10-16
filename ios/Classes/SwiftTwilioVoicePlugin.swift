@@ -58,7 +58,8 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     private let kCustomParamsKey = "TwilioCustomParams"
     
     private var activeCalls: [UUID: CXCall] = [:]
-    private var pendingDisplayNamesBySid: [String:String] = [:] 
+    private var pendingDisplayNamesBySid: [String:String] = [:]
+    private var pendingAnswer: (() -> Void)? 
     
     static var appName: String {
         get {
@@ -950,10 +951,31 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
 
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+        // self.sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
+        // audioDevice.isEnabled = true
+        // callkitAudioActive = true
+        // if wantsRingback && ringtonePlayer == nil { playRingbackTone() }
         self.sendPhoneCallEvents(description: "LOG|provider:didActivateAudioSession:", isError: false)
-        audioDevice.isEnabled = true
-        callkitAudioActive = true
-        if wantsRingback && ringtonePlayer == nil { playRingbackTone() }
+
+    // Ensure Twilio’s audio device is attached and enabled
+    TwilioVoiceSDK.audioDevice = audioDevice
+    audioDevice.isEnabled = true
+    callkitAudioActive = true
+
+    // Extra safety: make sure AVAudioSession is active
+    do {
+        try audioSession.setActive(true, options: [])
+    } catch {
+        self.sendPhoneCallEvents(description: "LOG|AVAudioSession setActive error: \(error.localizedDescription)", isError: false)
+    }
+
+    // If we were waiting to answer, do it now
+    if let f = pendingAnswer {
+        pendingAnswer = nil
+        f()
+    }
+
+    if wantsRingback && ringtonePlayer == nil { playRingbackTone() }
     }
 
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
@@ -991,15 +1013,36 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "LOG|provider:performAnswerCallAction:", isError: false)
 
 
-        self.performAnswerVoiceCall(uuid: action.callUUID) { (success) in
+        // self.performAnswerVoiceCall(uuid: action.callUUID) { (success) in
+        //     if success {
+        //         self.sendPhoneCallEvents(description: "LOG|provider:performAnswerVoiceCall() successful", isError: false)
+        //     } else {
+        //         self.sendPhoneCallEvents(description: "LOG|provider:performAnswerVoiceCall() failed:", isError: false)
+        //     }
+        // }
+
+        // action.fulfill()
+        // Closure that actually answers via Twilio
+    let doAnswer = { [weak self] in
+        guard let self = self else { return }
+        self.performAnswerVoiceCall(uuid: action.callUUID) { success in
             if success {
                 self.sendPhoneCallEvents(description: "LOG|provider:performAnswerVoiceCall() successful", isError: false)
             } else {
                 self.sendPhoneCallEvents(description: "LOG|provider:performAnswerVoiceCall() failed:", isError: false)
             }
         }
+    }
 
-        action.fulfill()
+    if callkitAudioActive {
+        // Audio session already active – answer immediately
+        doAnswer()
+    } else {
+        // Cold start: wait for didActivate before answering
+        pendingAnswer = doAnswer
+    }
+
+    action.fulfill()
     }
 
     public func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
