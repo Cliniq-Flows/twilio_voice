@@ -59,6 +59,15 @@ class TVCallInviteConnection(
             putParcelable(TVBroadcastReceiver.EXTRA_CALL_INVITE, callInvite)
             putInt(TVBroadcastReceiver.EXTRA_CALL_DIRECTION, callDirection.id)
         })
+        try {
+            val ctx = context
+            val intent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                putExtra("tv_call_sid", callInvite.callSid)
+                putExtra("tv_call_direction", "incoming")
+            }
+            intent?.let { ctx.startActivity(it) }
+        } catch (_: Exception) {}
     }
 
     fun acceptInvite() {

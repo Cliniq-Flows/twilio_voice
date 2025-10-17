@@ -378,6 +378,8 @@ class TVConnectionService : ConnectionService() {
 
                     // Add new incoming call to the telecom manager
                     telecomManager.addNewIncomingCall(phoneAccountHandle, extras)
+                    showIncomingFullscreenNotification(displayName, callInvite.callSid)
+
                 }
 
                 ACTION_ANSWER -> {
@@ -1114,6 +1116,22 @@ class TVConnectionService : ConnectionService() {
             if (event == TVNativeCallEvents.EVENT_CONNECTED && !hasVoipAudioFocus) {
                 acquireVoipAudioFocus()
             }
+            if (event == TVNativeCallEvents.EVENT_CONNECTED) {
+                // Bring UI to front on connect (covers answer from system screen)
+                val sid = extra?.getString(TVBroadcastReceiver.EXTRA_CALL_HANDLE) ?: callSid
+                try {
+                    val pi = launchIntentToApp(sid, /* incoming = */ true) // re-use helper above
+                    // Using PendingIntent to keep it consistent; we can also directly startActivity:
+                    val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        putExtra("tv_call_sid", sid)
+                        putExtra("tv_call_direction", "incoming")
+                    }
+                    intent?.let { startActivity(it) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to foreground app on connect: $e")
+                }
+            }
         }
         val onDisconnect: CompletionHandler<DisconnectCause> = CompletionHandler {
             dc ->
@@ -1246,6 +1264,50 @@ class TVConnectionService : ConnectionService() {
         return channel
     }
 
+    private fun getOrCreateIncomingChannel(): NotificationChannel {
+        val id = "${applicationContext.packageName}_calls_incoming"
+        val name = "${applicationContext.appName} Incoming Calls"
+        val channel = NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH).apply {
+            description = "Incoming VoIP calls"
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
+        return channel
+    }
+
+    private fun launchIntentToApp(callSid: String, incoming: Boolean): PendingIntent {
+        // Use package launch intent so this works even if your MainActivity class name changes
+        val launch = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra("tv_call_sid", callSid)
+            putExtra("tv_call_direction", if (incoming) "incoming" else "outgoing")
+        } ?: Intent(this, TVConnectionService::class.java) // fallback (won't show UI)
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        else PendingIntent.FLAG_UPDATE_CURRENT
+        return PendingIntent.getActivity(this, 1001, launch, flags)
+    }
+
+    private fun showIncomingFullscreenNotification(displayName: String, callSid: String) {
+        val channel = getOrCreateIncomingChannel()
+        val fullScreenPi = launchIntentToApp(callSid, true)
+
+        val notif = Notification.Builder(this, channel.id)
+            .setSmallIcon(R.drawable.ic_microphone)
+            .setContentTitle(displayName.ifEmpty { "Incoming call" })
+            .setContentText("Tap to answer in app")
+            .setCategory(Notification.CATEGORY_CALL)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            // This is the key bit that can open the activity while the phone is ringing:
+            .setFullScreenIntent(fullScreenPi, /* highPriority */ true)
+            .build()
+
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(9991, notif)
+    }
+
+
     private fun createNotification(): Notification {
         // val channel = getOrCreateChannel()
 
@@ -1261,25 +1323,44 @@ class TVConnectionService : ConnectionService() {
         //     setContentIntent(pendingIntent)
         //     setSmallIcon(R.drawable.ic_microphone)
         // }.build()
-         val channel = getOrCreateChannel()
-    val intent = Intent(applicationContext, TVConnectionService::class.java)
-    intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-    val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    else
-        PendingIntent.FLAG_UPDATE_CURRENT
-    val pendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, flag)
-
-    return Notification.Builder(this, channel.id).apply {
-        setOngoing(true)
-        setContentTitle("Voice Calls")
-        setCategory(Notification.CATEGORY_SERVICE)
-        setContentIntent(pendingIntent)
-        setSmallIcon(R.drawable.ic_microphone)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+//         val channel = getOrCreateChannel()
+//    val intent = Intent(applicationContext, TVConnectionService::class.java)
+//    intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+//    val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+//        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+//    else
+//        PendingIntent.FLAG_UPDATE_CURRENT
+//    val pendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, flag)
+//
+//    return Notification.Builder(this, channel.id).apply {
+//        setOngoing(true)
+//        setContentTitle("Voice Calls")
+//        setCategory(Notification.CATEGORY_SERVICE)
+//        setContentIntent(pendingIntent)
+//        setSmallIcon(R.drawable.ic_microphone)
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+//            setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+//        }
+//    }.build()
+        val channel = getOrCreateChannel()
+        val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
-    }.build()
+        val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        else PendingIntent.FLAG_UPDATE_CURRENT
+        val pendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, flag)
+
+        return Notification.Builder(this, channel.id).apply {
+            setOngoing(true)
+            setContentTitle("Voice Calls")
+            setCategory(Notification.CATEGORY_SERVICE)
+            setContentIntent(pendingIntent)
+            setSmallIcon(R.drawable.ic_microphone)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+            }
+        }.build()
     }
 
     private fun cancelNotification() {
