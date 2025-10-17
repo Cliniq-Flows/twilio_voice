@@ -671,6 +671,28 @@ class TwilioVoicePlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamH
                     )
                     return@onMethodCall
                 }
+
+                runCatching {
+                    val outParams = org.json.JSONObject()
+
+                    // copy everything from `params` (Flutter-provided extras)
+                    for ((k, v) in params) {
+                        outParams.put(k, v)
+                    }
+
+                    // also include these top-level fields
+                    outParams.put("from", from)
+                    outParams.put("to", to)
+                    outParams.put("direction", "outgoing")
+                    outParams.put("timestamp_ms", System.currentTimeMillis())
+
+                    // optional: a temp id so the UI can correlate before we have a real callSid
+                    outParams.put("temp_call_sid", java.util.UUID.randomUUID().toString())
+
+                    storage?.saveCustomParams(outParams.toString())
+                }.onFailure {
+                    Log.w(TAG, "Failed to save outgoing custom params snapshot", it)
+                }
                 Log.d(TAG, "calling $from -> $to")
 
                 accessToken?.let { token ->
@@ -1988,6 +2010,7 @@ private fun stopOutgoingRingtone() {
                     put("from", callInvite.from ?: "")
                     put("to", callInvite.to)
                     put("callsId", callInvite.callSid)
+                    put("direction", "incoming")
                 }
 
                 val updatedParams = paramsJson.toString()

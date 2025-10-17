@@ -160,6 +160,11 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             }
             self.callTo = callTo
             self.identity = callFrom
+             var extras: [String: Any] = [:]
+            extras["from"] = callFrom
+            extras["to"] = callTo
+            extras["direction"] = "outgoing"
+    saveCustomParams(extras)
             makeCall(to: callTo)
         } else if flutterCall.method == "connect" {
             guard let callTo = arguments["To"] as? String? else {
@@ -456,6 +461,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
             }
         }
     }
+
     
     func makeCall(to: String)
     {
@@ -804,6 +810,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         params["from"] = from
         params["to"] = to
         params["callSid"] = callSid
+        params["direction"] = "incoming"
         saveCustomParams(params)
 
         // Ringback tone only for outbound calls
