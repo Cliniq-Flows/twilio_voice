@@ -17,6 +17,7 @@ import android.media.AudioFocusRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Looper
 import android.telecom.*
 import android.util.Log
 import com.twilio.twilio_voice.types.CallExceptionExtension
@@ -195,6 +196,9 @@ class TVConnectionService : ConnectionService() {
 
         private var focusRequest: AudioFocusRequest? = null
 
+        private val delayedBringToFront = HashMap<String, Runnable>()
+        private val mainHandler by lazy { android.os.Handler(Looper.getMainLooper()) }
+
         //endregion
 
         fun hasActiveCalls(): Boolean {
@@ -262,6 +266,7 @@ class TVConnectionService : ConnectionService() {
                 }
 
                 ACTION_CANCEL_CALL_INVITE -> {
+                    cancelIncomingFullscreenNotification()
                     startForegroundService()  
                     // Load CancelledCallInvite class loader
                     // See: https://github.com/twilio/voice-quickstart-android/issues/561#issuecomment-1678613170
@@ -672,6 +677,26 @@ class TVConnectionService : ConnectionService() {
     }
     //endregion
 
+
+    private fun scheduleBringAppToFront(callSid: String, delayMs: Long = 1500L) {
+        // cancel any existing
+        delayedBringToFront.remove(callSid)?.let { mainHandler.removeCallbacks(it) }
+
+        val task = Runnable {
+            // Direction is "incoming" for this use-case; change if you also want it for outgoing
+            launchApp(callSid, "incoming")
+            delayedBringToFront.remove(callSid)
+        }
+        delayedBringToFront[callSid] = task
+        mainHandler.postDelayed(task, delayMs)
+    }
+
+    // Call this on disconnect to avoid popping UI after hangup
+    private fun cancelBringAppToFront(callSid: String?) {
+        callSid ?: return
+        delayedBringToFront.remove(callSid)?.let { mainHandler.removeCallbacks(it) }
+    }
+
     private fun resumeFirstHeldCall() {
     val held = activeConnections.values.firstOrNull { it.state == Connection.STATE_HOLDING }
     held?.let {
@@ -824,6 +849,7 @@ class TVConnectionService : ConnectionService() {
                             putString("message", error.message)
                         }
                     )
+                    cancelBringAppToFront(call.sid)
                 } else {
                     sendBroadcastEvent(
                         applicationContext, TVNativeCallEvents.EVENT_CONNECT_FAILURE, call.sid, Bundle().apply {
@@ -831,6 +857,7 @@ class TVConnectionService : ConnectionService() {
                             putString("message", error.message)
                         }
                     )
+                    cancelBringAppToFront(call.sid)
                 }
                 // tear down your ConnectionService connection if needed
           //      conn.disconnect()
@@ -863,7 +890,7 @@ class TVConnectionService : ConnectionService() {
                         putString("reason", error?.message ?: "remote hangup")
                     }
                 )
-
+                cancelBringAppToFront(call.sid)
                 // ⬇️ Only stop foreground service if no other calls remain
                 if (activeConnections.isEmpty()) {
                     if (hasVoipAudioFocus) releaseVoipAudioFocus()
@@ -1096,6 +1123,10 @@ class TVConnectionService : ConnectionService() {
         return connection
     }
 
+    private fun cancelIncomingFullscreenNotification() {
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(9991)
+    }
+
     /**
      * Attach call event listeners to the given connection. This includes responding to call events, call actions and when call has ended.
      * @param connection The connection to attach the listeners to.
@@ -1120,36 +1151,32 @@ class TVConnectionService : ConnectionService() {
             if (event == TVNativeCallEvents.EVENT_CONNECTED) {
                 // Bring UI to front on connect (covers answer from system screen)
                 val sid = extra?.getString(TVBroadcastReceiver.EXTRA_CALL_HANDLE) ?: callSid
-                try {
-                    val pi = launchIntentToApp(sid, /* incoming = */ true) // re-use helper above
-                    // Using PendingIntent to keep it consistent; we can also directly startActivity:
-                    val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        putExtra("tv_call_sid", sid)
-                        putExtra("tv_call_direction", "incoming")
-                    }
-                    intent?.let { startActivity(it) }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to foreground app on connect: $e")
-                }
+//                try {
+//                    val pi = launchIntentToApp(sid, /* incoming = */ true) // re-use helper above
+//                    // Using PendingIntent to keep it consistent; we can also directly startActivity:
+//                    val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+//                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+//                        putExtra("tv_call_sid", sid)
+//                        putExtra("tv_call_direction", "incoming")
+//                    }
+//                    intent?.let { startActivity(it) }
+////
+//                } catch (e: Exception) {
+//                    Log.w(TAG, "Failed to foreground app on connect: $e")
+//                }
+                cancelIncomingFullscreenNotification()
+                scheduleBringAppToFront(callSid /* from the event */, 1500L)
+            }
+
+            if (event == TVNativeCallEvents.EVENT_CONNECT_FAILURE ||
+                event == TVNativeCallEvents.EVENT_DISCONNECTED_REMOTE) {
+                cancelBringAppToFront(callSid)
             }
         }
         val onDisconnect: CompletionHandler<DisconnectCause> = CompletionHandler {
             dc ->
-//            connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
-//            connection.destroy()
-//            storage.clearCustomParams()
-//            activeConnections.remove(callSid)
-//            if (activeConnections.isEmpty() && hasVoipAudioFocus) {
-//        releaseVoipAudioFocus()
-//        }
-//            sendBroadcastEvent(applicationContext, TVBroadcastReceiver.ACTION_CALL_ENDED, callSid)
-//            sendBroadcastCallHandle(applicationContext, null)
-//
-//
-//
-//            stopForegroundService()
-//            stopSelfSafe()
+            cancelBringAppToFront(callSid)
+
             connection.setDisconnected(dc ?: DisconnectCause(DisconnectCause.LOCAL))
             connection.destroy()
             storage.clearCustomParams()
@@ -1172,6 +1199,8 @@ class TVConnectionService : ConnectionService() {
                 stopForegroundService()
                 stopSelfSafe()
             }
+
+
          }
 
          // Add to local connection cache
@@ -1308,6 +1337,17 @@ class TVConnectionService : ConnectionService() {
             .notify(9991, notif)
     }
 
+    private fun launchApp(callSid: String?, direction: String) {
+        val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra("tv_call_sid", callSid)
+            putExtra("tv_call_direction", direction)
+        }
+        try { if (intent != null) startActivity(intent) } catch (_: Exception) {}
+    }
+
 
     private fun createNotification(): Notification {
         // val channel = getOrCreateChannel()
@@ -1343,13 +1383,37 @@ class TVConnectionService : ConnectionService() {
 //            setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
 //        }
 //    }.build()
+
+//        val channel = getOrCreateChannel()
+//        val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+//            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+//        }
+//        val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+//            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+//        else PendingIntent.FLAG_UPDATE_CURRENT
+//        val pendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, flag)
+//
+//        return Notification.Builder(this, channel.id).apply {
+//            setOngoing(true)
+//            setContentTitle("Voice Calls")
+//            setCategory(Notification.CATEGORY_SERVICE)
+//            setContentIntent(pendingIntent)
+//            setSmallIcon(R.drawable.ic_microphone)
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+//                setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+//            }
+//        }.build()
         val channel = getOrCreateChannel()
         val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        else PendingIntent.FLAG_UPDATE_CURRENT
+        else
+            PendingIntent.FLAG_UPDATE_CURRENT
+
         val pendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, flag)
 
         return Notification.Builder(this, channel.id).apply {
