@@ -301,13 +301,23 @@ class TVConnectionService : ConnectionService() {
                     var fromCleaned = callInvite.from ?: ""
                     fromCleaned = fromCleaned.replace("client:", "")
 
-                    val incomingJson = JSONObject(callInvite.customParameters).toString()
-                    storage.saveCustomParams(incomingJson)
+                    
                      // Log or send events as needed (similar to your iOS logging)
                     Log.d(TAG, "Ringing | $firstName | ${callInvite.to} | Incoming - customParams: ${callInvite.customParameters}")
 
                     // Optionally, create a display name by combining firstname and lastname
                     val displayName = "$firstName $lastName".trim()
+
+                   val incomingJson = JSONObject(callInvite.customParameters).apply {
+                    put("from", displayName ?: "")
+                    put("to", callInvite.to)
+                    put("callsId", callInvite.callSid)
+                    put("direction", "incoming")
+                    }
+                    val updatedParams = incomingJson.toString()
+                    storage?.saveCustomParams(updatedParams)
+
+               
 
                     val telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
                     if (!telecomManager.canReadPhoneState(applicationContext)) {

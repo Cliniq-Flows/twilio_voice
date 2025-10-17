@@ -711,6 +711,23 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         
         pendingDisplayNamesBySid[callInvite.callSid] = displayName
 
+        var params = callArgs as? [String: Any] ?? [:]
+        params["from"] = displayName
+        params["to"] = callInvite.to ?? ""
+        params["callSid"] = callInvite.callSid ?? ""
+        params["direction"] = "incoming"
+
+        // === Merge all customParameters directly into params ===
+        if let rawCustom = callInvite.customParameters {
+            for (k, v) in rawCustom {
+                let key = (k as? String) ?? String(describing: k)
+                params[key] = v
+            }
+        }
+
+        // Save final merged params (no nesting)
+        saveCustomParams(params)
+
         
         self.sendPhoneCallEvents(description: "Ringing|\(displayName)|\(callInvite.to)|Incoming\(formatCustomParams(params: callInvite.customParameters))", isError: false)
         reportIncomingCall(from: displayName, uuid: callInvite.uuid)
@@ -806,12 +823,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         self.sendPhoneCallEvents(description: "Ringing|\(from)|\(to)|\(direction)", isError: false)
 
         // Persist outbound params for later (missed call notification, etc.)
-         var params = callArgs as? [String: Any] ?? [:]
-        params["from"] = from
-        params["to"] = to
-        params["callSid"] = callSid
-        params["direction"] = "incoming"
-        saveCustomParams(params)
+        
 
         // Ringback tone only for outbound calls
         if self.callOutgoing {
