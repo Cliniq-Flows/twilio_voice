@@ -717,7 +717,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         params["callSid"] = callInvite.callSid ?? ""
         params["direction"] = "incoming"
 
-        // === Merge all customParameters directly into params ===
+ 
         if let rawCustom = callInvite.customParameters {
             for (k, v) in rawCustom {
                 let key = (k as? String) ?? String(describing: k)
