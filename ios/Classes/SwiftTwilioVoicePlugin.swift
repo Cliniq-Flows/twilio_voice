@@ -56,6 +56,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
 
     // MARK: — Custom Params Storage
     private let kCustomParamsKey = "TwilioCustomParams"
+    private var bringToFrontWorkItem: DispatchWorkItem?
     
     private var activeCalls: [UUID: CXCall] = [:]
     private var pendingDisplayNamesBySid: [String:String] = [:]
@@ -852,6 +853,12 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         isError: false
         )
         toggleAudioRoute(toSpeaker: false)
+        bringToFrontWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.requestAppForeground()
+        }
+        bringToFrontWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
     }
 
     public func call(call: Call, isReconnectingWithError error: Error) {
@@ -864,6 +871,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
 
     public func callDidFailToConnect(call: Call, error: Error) {
+        bringToFrontWorkItem?.cancel()
         self.sendPhoneCallEvents(description: "LOG|Call failed to connect: \(error.localizedDescription)", isError: false)
         self.sendPhoneCallEvents(description: "Call Ended", isError: false)
 
@@ -886,6 +894,7 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     }
 
     public func callDidDisconnect(call: Call, error: Error?) {
+        bringToFrontWorkItem?.cancel()
         // clear params and stop ringback
         clearCustomParams()
         stopRingbackTone()
@@ -1104,6 +1113,47 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
         }
     }
 
+        private func requestAppForeground() {
+        DispatchQueue.main.async {
+            if UIApplication.shared.applicationState == .active {
+                // Already frontmost: let Flutter navigate however you like (send an event)
+                self.sendPhoneCallEvents(description: "LOG|iOS app already active; showing call UI", isError: false)
+                return
+            }
+
+            // iOS 13+: try to activate a scene (system decides; often succeeds)
+            if #available(iOS 13.0, *) {
+                let activity = NSUserActivity(activityType: "co.bettercliniq.app")
+                activity.title = "Return to Call"
+                UIApplication.shared.requestSceneSessionActivation(nil, userActivity: activity, options: nil) { error in
+                    // If the system declined, fall back to a local notification with "Open App"
+                    self.sendPhoneCallEvents(description: "LOG|requestSceneSessionActivation error: \(error.localizedDescription)", isError: false)
+                    self.postReturnToAppLocalNotification()
+                }
+            } else {
+                // < iOS 13: can’t programmatically foreground — show actionable notification instead
+                self.postReturnToAppLocalNotification()
+            }
+        }
+    }
+
+    /// Fire a local notification that, when tapped, opens the app immediately.
+    private func postReturnToAppLocalNotification() {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Connected"
+            content.body  = "Tap to return to the in-call screen."
+            content.userInfo = ["type": "twilio-return-to-call"]
+            content.categoryIdentifier = "RETURN_TO_APP"
+
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+            let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+            center.add(req, withCompletionHandler: nil)
+        }
+    }
+
     // MARK: Call Kit Actions
     func performStartCallAction(uuid: UUID, handle: String) {
         let callHandle = CXHandle(type: .generic, value: handle)
@@ -1278,6 +1328,14 @@ public class SwiftTwilioVoicePlugin: NSObject, FlutterPlugin,  FlutterStreamHand
     public func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
         
+        let info = response.notification.request.content.userInfo
+        if let t = info["type"] as? String, t == "twilio-return-to-call" {
+            // Just opening the app is enough; Flutter can navigate using the current call state
+            self.sendPhoneCallEvents(description: "LOG|Returning to app from local notification", isError: false)
+            completionHandler()
+            return
+        }
+
         if let type = userInfo["type"] as? String, type == "twilio-missed-call", let user = userInfo["From"] as? String{
             self.callTo = user
             if let to = userInfo["To"] as? String{
